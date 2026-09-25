@@ -168,6 +168,7 @@ export class Hud {
     if (p.buffs.power > 0) buffs.push(t('buff.power', { t: p.buffs.power.toFixed(1) }));
     if (p.poisonT > 0) buffs.push(t('buff.poison'));
     if (p.slowT > 0) buffs.push(t('buff.slow'));
+    if (p.buffs.magnet > 0) buffs.push(t('buff.magnet', { t: p.buffs.magnet.toFixed(1) }));
     this.set('buffs', buffs.join('|'), () => { this.el.buffs.innerHTML = buffs.map((b) => `<span class="buff">${b}</span>`).join(''); });
 
     // 技能

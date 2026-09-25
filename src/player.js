@@ -7,6 +7,7 @@ import { clamp, damp, prepareModel, mergeStaticMeshes } from './util.js';
 import { createShield, Afterimages } from './effects.js';
 import { t } from './i18n.js';
 import { curvature } from './bend.js';
+import { LAUNCH_VY, RAMP_GRAV } from './hazards.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -15,6 +16,7 @@ const _inherit = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const FWD = new THREE.Vector3(0, 0, 1);
 const GRAVITY = 32;
+const smoothstep01 = (x) => x * x * (3 - 2 * x);
 export const RAGE_TIME = 7;
 const RAGE_COL = new THREE.Color(0xffb020);
 const _rc = new THREE.Color();
@@ -99,7 +101,9 @@ export class Player {
     this.skillCd = 2;
     this.skill = null;
     this.skillAnim = -1;
-    this.buffs = { frenzy: 0, fortress: 0, sprint: 0, power: 0, shield: 0, rage: 0 };
+    this.buffs = { frenzy: 0, fortress: 0, sprint: 0, power: 0, shield: 0, rage: 0, magnet: 0 };
+    this.rampAir = false;
+    this.flipT = 0;
     this.baseScale = this.root.scale.x;
     this.rageScale = 1;
     this.rageWaveT = 0;
@@ -176,6 +180,8 @@ export class Player {
       case 'shield': this.buffs.shield = 8; break;
       case 'skill': this.skillCd = 0; break;
       case 'xp': this.addXp(25); break;
+      case 'magnet': this.buffs.magnet = 10; break;
+      // 'gamble' 由 game.rollGamble 结算
     }
   }
 
@@ -250,7 +256,7 @@ export class Player {
       g.audio.play('jump', { pitch: 1.2 - this.size.height * 0.08 });
       g.fx.dust.burst(this.pos, { count: 10, speed: 3, life: 0.6, size: 0.8, sizeEnd: 2, color: g.dustColor, alpha: 0.5, flat: true, up: 1 });
     }
-    this.vy -= (sk && sk.air ? GRAVITY * 0.8 : GRAVITY) * dt;
+    this.vy -= (this.rampAir ? RAMP_GRAV : sk && sk.air ? GRAVITY * 0.8 : GRAVITY) * dt;
     this.pos.y += this.vy * dt;
     const gy = g.heightAt(this.pos.x, this.pos.z);
     if (this.pos.y <= gy) {
@@ -258,7 +264,9 @@ export class Player {
         g.audio.play('land', { volume: 0.5 });
         g.fx.dust.burst(this.pos, { count: 12, speed: 4, life: 0.6, size: 1, sizeEnd: 2.2, color: g.dustColor, alpha: 0.45, flat: true, up: 1 });
         if (sk && sk.air) this.landSkill();
+        else if (this.rampAir) this.landStomp(-this.vy, 1.6);
         else if (!sk) this.landStomp(-this.vy);
+        this.rampAir = false;
       }
       this.pos.y = gy; this.vy = 0; this.onGround = true;
     } else if (this.pos.y > gy + 0.05) this.onGround = false;
@@ -302,7 +310,18 @@ export class Player {
     // --- 模型 ---
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.heading + this.spinAngle;
-    this.root.rotation.x = this.onGround ? damp(this.root.rotation.x, -Math.atan(this.slope) * 0.9, 8, dt) : damp(this.root.rotation.x, 0, 3, dt);
+    if (this.rampAir) {
+      // 跳台飞行：绕身体中心前空翻一圈
+      this.flipT += dt;
+      const th = Math.PI * 2 * smoothstep01(clamp((this.flipT - 0.15) / 1.35, 0, 1));
+      const hc = this.size.height * 0.5;
+      this.root.rotation.x = th;
+      this.root.position.y += hc * (1 - Math.cos(th));
+      this.root.position.z -= hc * Math.sin(th);
+    } else {
+      if (this.root.rotation.x > Math.PI) this.root.rotation.x -= Math.PI * 2;
+      this.root.rotation.x = this.onGround ? damp(this.root.rotation.x, -Math.atan(this.slope) * 0.9, 8, dt) : damp(this.root.rotation.x, 0, 3, dt);
+    }
     const runAmt = this.fwd > 1 ? clamp(this.fwd / RUN_SPEED, 0, 1.8) : clamp(Math.abs(vxEff) / lat, 0, 1) * 0.8;
     this.anim.move = runAmt;
     this.anim.air = !this.onGround;
@@ -523,19 +542,36 @@ export class Player {
     g.audio.play('wave');
   }
 
-  /** 普通跳跃落地：踩踏震地，伤害并击飞脚边的怪物（体型越大范围越大） */
-  landStomp(fall) {
+  /** 跳台起跳 */
+  launch() {
+    const g = this.game;
+    this.vy = LAUNCH_VY;
+    this.onGround = false;
+    this.rampAir = true;
+    this.flipT = 0;
+    this.pos.y += 0.4;
+    g.audio.play('jump', { pitch: 0.8 });
+    g.audio.play('whoosh', { volume: 0.8 });
+    g.juice.fovKick(7);
+    g.juice.radial(0.8);
+    g.floatText(this.pos, t('float.ramp'), 'info', this.top + 2);
+    g.fx.dust.burst(this.pos, { count: 16, speed: 5, life: 0.6, size: 1, sizeEnd: 2.4, color: g.dustColor, alpha: 0.5, flat: true, up: 1 });
+  }
+
+  /** 普通跳跃落地：踩踏震地，伤害并击飞脚边的怪物（体型越大范围越大）；跳台落地 mul > 1 */
+  landStomp(fall, mul = 1) {
     const g = this.game;
     const k = clamp((fall - 8) / 6, 0, 1);
-    const R = 2.4 + this.radius * 0.9 + this.size.height * 0.35;
-    const dmg = this.stats.atk * (0.7 + 0.4 * k) * (this.buffs.power > 0 ? 1.5 : 1);
+    const R = (2.4 + this.radius * 0.9 + this.size.height * 0.35) * mul;
+    const dmg = this.stats.atk * (0.7 + 0.4 * k) * (this.buffs.power > 0 ? 1.5 : 1) * mul;
     const hits = g.aoe(this.pos, R, dmg, { knock: 8, up: 6, stun: 0.35, source: 'melee' });
     g.fx.rings.ring(this.pos, { r0: 0.8, r1: R * 1.25, life: 0.45, color: 0xfff0c8, opacity: 0.55 });
     g.fx.dust.burst(this.pos, { count: 26, speed: 6 + R, life: 0.7, size: 1.1, sizeEnd: 2.8, color: g.dustColor, alpha: 0.5, flat: true, drag: 2.5, up: 1.5 });
     g.audio.play('stomp', { volume: 0.55 + 0.25 * k, pitch: 1.2 - this.size.height * 0.08 });
     g.shake.add(0.12 + 0.1 * k);
     g.fx.debris.burst(this.pos, { count: 4 + Math.round(4 * k), speed: 5, up: 6, size: 0.25, color: g.rockColor ?? 0x7a6a5a });
-    g.juice.fovKick(-1.5 - 2 * k);
+    g.juice.fovKick(-1.5 - 2 * k * mul);
+    if (mul > 1) { g.fx.scorch.add(this.pos, R * 0.5, 4); g.juice.flash(0xfff0c0, 0.12); g.juice.aberr(0.8); g.hitstop(0.05); }
     if (hits > 0) {
       g.hitstop(0.035);
       if (hits >= 3) g.floatText(this.pos, t('float.stomp', { n: hits }), 'crit', this.top + 2);

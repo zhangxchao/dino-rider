@@ -393,6 +393,8 @@ export const GATES = {
   shield: { icon: '🛡️', name: '护盾 8 秒',  color: 0xffe070 },
   skill:  { icon: '✨', name: '技能充能',    color: 0x70e0ff },
   xp:     { icon: '⭐', name: '武器经验 +25', color: 0xfff080 },
+  magnet: { icon: '🧲', name: '磁力 10 秒',  color: 0x60a0ff },
+  gamble: { icon: '🎲', name: '命运骰子',    color: 0xff60c0 },
 };
 
 export const BIOME_NAMES = {

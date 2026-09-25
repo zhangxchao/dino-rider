@@ -206,6 +206,13 @@ export class Enemy {
         const top = this.pos.y + (this.flying ? this.hoverY + 0.8 : this.height + 0.3) + this.lift;
         g.fx.sparks.spawn(this.pos.x + Math.cos(a) * 0.6, top, this.pos.z + Math.sin(a) * 0.6, 0, 0.3, 0, 0.35, 0.45, 0.2, 0xffee60, 0xffffff, 1, 0, 0);
       }
+    } else if (this.flee) {
+      // 宝藏哥布林：往前逃、左右乱窜，时间到了就溜走
+      vz = this.flee * this.slowMul;
+      vx = Math.sin(this.anim.t * 2.1 + this.phase) * 5;
+      this.fleeT -= dt;
+      if (this.fleeT <= 0 || dz > 90) { g.onGoblinEscape(this); return; }
+      if (Math.random() < 0.35) { this.getCenter(_v); g.fx.sparks.burst(_v, { count: 1, speed: 1, life: 0.5, size: 0.6, color: 0xffe070, color2: 0xffa000, up: 1, radius: 0.5 }); }
     } else if (active) {
       const sp = this.speed * this.slowMul;
       vz = -sp * MARCH[this.kind];
@@ -254,7 +261,7 @@ export class Enemy {
     this.pos.x = clamp(this.pos.x, -lim, lim);
     this.pos.y = g.heightAt(this.pos.x, this.pos.z);
 
-    const face = dz > 1 ? Math.atan2(pl.pos.x - this.pos.x, pl.pos.z - this.pos.z) : Math.PI;
+    const face = this.flee ? 0 : dz > 1 ? Math.atan2(pl.pos.x - this.pos.x, pl.pos.z - this.pos.z) : Math.PI;
     this.heading = turnToward(this.heading, face, 5 * dt);
     this.root.position.set(this.pos.x, this.pos.y + this.lift, this.pos.z);
     this.root.rotation.y = this.heading;

@@ -418,7 +418,8 @@ export class UI {
           </div>
           <div class="help-tip">
             ${t('help.tips')}<br>
-            ${t('help.tips2')}
+            ${t('help.tips2')}<br>
+            ${t('help.tips3')}
           </div>
           <div class="row-btns"><button class="btn" data-back>${t('help.ok')}</button></div>
         </div>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>恐龙骑士：远古征途</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦖</text></svg>" />
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <div id="loading" class="screen show">
+      <div class="loading-inner">
+        <div class="logo-big">恐龙骑士</div>
+        <div class="logo-sub">DINO RIDERS · 远古征途</div>
+        <div class="loading-bar"><div id="loading-fill"></div></div>
+        <div id="loading-text">正在唤醒远古巨兽…</div>
+      </div>
+    </div>
+    <div id="screens"></div>
+    <div id="hud" class="hidden"></div>
+    <div id="fx-layer"></div>
+    <div id="banner"></div>
+    <div id="toast"></div>
+    <div id="touch" class="hidden"></div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

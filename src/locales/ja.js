@@ -133,7 +133,7 @@ export default {
     'result.menu': '⌂ メインメニュー',
 
     'ending.title': '全ステージクリア！',
-    'ending.story': 'きみと恐竜の仲間たちは、ジャングル・砂漠・雪原・沼地・火山を越え、<br>ついに影の要塞で影の魔王を打ち倒した。<br>太古の大陸に平和と陽の光が戻ってきた！🌅',
+    'ending.story': 'きみと恐竜の仲間たちは、ジャングル・砂漠・雪原・沼地・火山を越えて影の魔王を倒し、<br>さらに地底の虫の巣へ踏み込み、すべてを操っていたカマキリ王を斬り伏せた。<br>太古の大陸に平和と陽の光が戻ってきた！🌅',
     'ending.kills': '累計撃破',
     'ending.bosses': 'ボス撃破',
     'ending.stars': '集めた星',
@@ -192,6 +192,7 @@ export default {
     'hazard.swamp': '⚠ 毒の泡！',
     'hazard.volcano': '⚠ 溶岩弾の雨！',
     'hazard.shadow': '⚠ 影の雷雨！',
+    'hazard.hive': '⚠ 酸の卵嚢！',
     'hazard.sub': '赤い円を見て左右によけろ！',
     'banner.ambush': '⚠ エリートの待ち伏せ！',
     'banner.ambushSub': '撃退すると宝箱が出現',
@@ -305,6 +306,7 @@ export default {
       hydra: { name: '沼地のヒドラ', title: '霧の悪夢' },
       magmaGolem: { name: '溶岩の巨魔', title: '火山の心臓' },
       overlord: { name: '影の魔王', title: '太古の終焉' },
+      mantis: { name: 'カマキリ王', title: '虫の巣の主' },
     },
     levels: {
       0: { name: '緑のジャングル', desc: 'ジャングルの小道を駆け抜け、モンスターの大群を突破して毒蜘蛛の女王を倒せ！' },
@@ -312,7 +314,8 @@ export default {
       2: { name: '氷結の雪原', desc: '吹雪の中からオオカミの群れが襲いかかる。雪道の果てには氷の巨人が待つ。' },
       3: { name: '霧の沼地', desc: '沼地の桟橋を渡れ。毒キノコと鬼火が霧の中に潜んでいる。' },
       4: { name: '溶岩火山', desc: '溶岩がほとばしる火山の大道。ファイアインプが空を舞う。' },
-      5: { name: '影の要塞', desc: '要塞へ続く最後の道。影の魔王を倒し、太古の大陸を救え！' },
+      5: { name: '影の要塞', desc: '要塞のルーンの道を駆け抜け、影の魔王を倒せ——だが真の脅威はさらに奥深くに……' },
+      6: { name: 'カマキリの巣', desc: '魔王が倒れたあと、地の底から刃のこすれる音が響く——虫の巣に乗り込み、カマキリ王を討て！' },
     },
     weaponLevels: {
       1: { name: '初期武器' }, 2: { name: 'ダメージ強化' }, 3: { name: 'ダブルショット' }, 4: { name: '連射強化' },
@@ -323,7 +326,7 @@ export default {
       count: { name: '弾数 +1' }, rate: { name: '連射 +25%' }, dmg: { name: '威力 +30%' }, pierce: { name: '貫通 +1' },
       heal: { name: 'HP 40% 回復' }, shield: { name: 'シールド 8秒' }, skill: { name: 'スキルチャージ' }, xp: { name: '武器経験値 +25' }, magnet: { name: 'マグネット 10秒' }, gamble: { name: '運命のダイス' },
     },
-    biomes: { jungle: 'ジャングル', desert: '砂漠', frost: '雪原', swamp: '沼地', volcano: '火山', shadow: '影' },
+    biomes: { jungle: 'ジャングル', desert: '砂漠', frost: '雪原', swamp: '沼地', volcano: '火山', shadow: '影', hive: '虫の巣' },
     upgrades: {
       hp: { name: '生命強化', desc: '最大 HP +10%' },
       atk: { name: '牙みがき', desc: '近接ダメージ +10%' },

@@ -133,7 +133,7 @@ export default {
     'result.menu': '⌂ 主菜单',
 
     'ending.title': '恭喜通关！',
-    'ending.story': '你和你的恐龙伙伴穿越了丛林、沙海、雪原、沼泽与火山，<br>最终在暗影要塞击败了暗影魔王。<br>远古大陆重新迎来了和平与阳光！🌅',
+    'ending.story': '你和你的恐龙伙伴穿越了丛林、沙海、雪原、沼泽与火山，击败了暗影魔王，<br>又深入地底虫巢，斩落了操纵一切的螳螂王。<br>远古大陆重新迎来了和平与阳光！🌅',
     'ending.kills': '累计击杀',
     'ending.bosses': '击败首领',
     'ending.stars': '收集星星',
@@ -192,6 +192,7 @@ export default {
     'hazard.swamp': '⚠ 毒泡沼泽！',
     'hazard.volcano': '⚠ 熔岩弹雨！',
     'hazard.shadow': '⚠ 暗影雷暴！',
+    'hazard.hive': '⚠ 酸液虫卵！',
     'hazard.sub': '看准红圈，左右躲开！',
     'banner.ambush': '⚠ 精英伏击！',
     'banner.ambushSub': '击退伏兵可获得宝箱',

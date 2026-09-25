@@ -513,6 +513,15 @@ const THEMES = {
     drums: { toll: 'x...............', kick: 'x.......x.....o.', snare: '............o...' },
     rev: 0.5, vol: 1,
   },
+  hive: {
+    bpm: 96, root: 45, scale: PHRYG_DOM, prog: [0, 1, 0, 6, 0, 1, 3, 1], density: 'medium', melOct: 1, intro: 2,
+    lead: 'bell', leadVol: 0.7, lead2: 'lead', lead2Vol: 0.3,
+    pad: 'choir', padOct: 0, padEvery: 16, padVol: 0.9,
+    bass: 'bassSub', bassOct: -1, bassPat: 'R..R....R..R....', bassVol: 0.95, bassHold: 3,
+    arp: 'lowPluck', arpOct: 0, arpPat: '0.1.2.1.0.1.3.1.', arpVol: 0.36,
+    drums: { toll: 'x...............', kick: 'x..x....x..x..o.', snare: '....o.......o...' },
+    rev: 0.45, vol: 1,
+  },
   boss: {
     bpm: 150, root: 42, scale: HARM_MINOR, prog: [0, 0, 5, 4, 0, 0, 3, 4], density: 'dense', melOct: 2, intro: 0,
     lead: 'brass', leadVol: 0.75, lead2: 'lead', lead2Vol: 0.4,

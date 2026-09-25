@@ -34,6 +34,8 @@ function load() {
       stats: { ...d.stats, ...(s.stats || {}) },
       settings: { ...d.settings, ...(s.settings || {}) },
       dinoWins: { ...(s.dinoWins || {}) },
+      // 新增关卡后：已经通关原最后一关的老存档，自动解锁新关卡
+      unlocked: Math.min(LEVELS.length, Math.max(s.unlocked || 1, ...LEVELS.map((_, i) => ((s.stars && s.stars[i]) > 0 ? i + 2 : 1)))),
     };
   } catch {
     return d;

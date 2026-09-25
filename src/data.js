@@ -334,6 +334,9 @@ export const BOSSES = {
   overlord:   { name: '暗影魔王', title: '远古终焉',   hp: 12500, dmg: 32, speed: 6, radius: 3.0, height: 7,
                 patterns: ['barrage', 'volley', 'meteor', 'summon', 'charge', 'slam', 'breath'], summon: ['skeleton', 'mage', 'darkKnight'],
                 projColor: 0xb04aff, color: 0x1a1024, phases: 3 },
+  mantis:     { name: '螳螂王', title: '虫巢之主', hp: 15000, dmg: 34, speed: 7.5, radius: 3.2, height: 7.5,
+                patterns: ['scythe', 'sweep', 'blink', 'slam', 'summon', 'volley'], summon: ['scorpion', 'bat'],
+                projColor: 0x9cff3a, color: 0x5a9a3a, phases: 3 },
 };
 
 // ---------------------------------------------------------------------
@@ -356,8 +359,11 @@ export const LEVELS = [
     desc: '岩浆奔涌的火山大道，火焰小鬼漫天飞舞。',
     pool: { imp: 4, bat: 3, goblin: 2 }, elite: 'golem', reward: 380, mul: 2.1 },
   { id: 5, name: '暗影要塞', biome: 'shadow',  boss: 'overlord',   length: 1550,
-    desc: '通往要塞的最后一段路，打倒暗影魔王，拯救远古大陆！',
+    desc: '穿过暗影要塞的符文大道，打倒暗影魔王——但真正的威胁还藏在更深处……',
     pool: { skeleton: 4, archer: 2, mage: 2, wisp: 2 }, elite: 'darkKnight', reward: 500, mul: 2.5 },
+  { id: 6, name: '螳螂巢穴', biome: 'hive',    boss: 'mantis',     length: 1650,
+    desc: '暗影魔王倒下后，大地深处传来镰刃的摩擦声——闯进虫巢，斩落螳螂王！',
+    pool: { scorpion: 3, bat: 3, mushroom: 2, skeleton: 2 }, elite: 'darkKnight', reward: 650, mul: 2.9 },
 ];
 
 // 跑道参数
@@ -398,7 +404,7 @@ export const GATES = {
 };
 
 export const BIOME_NAMES = {
-  jungle: '丛林', desert: '沙漠', frost: '雪原', swamp: '沼泽', volcano: '火山', shadow: '暗影',
+  jungle: '丛林', desert: '沙漠', frost: '雪原', swamp: '沼泽', volcano: '火山', shadow: '暗影', hive: '虫巢',
 };
 
 // ---------------------------------------------------------------------

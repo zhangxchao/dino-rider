@@ -26,7 +26,7 @@ const rampGeo = (() => {
   const g = new THREE.ExtrudeGeometry(sh, { depth: RAMP_W, bevelEnabled: false });
   g.rotateY(-Math.PI / 2);          // 形状的 x → 世界 z，挤出方向 → 世界 -x
   g.translate(RAMP_W / 2, 0, 0);
-  return g.toNonIndexed();
+  return g;
 })();
 const slopeLen = Math.hypot(RAMP_L, RAMP_H);
 const chevronGeo = new THREE.PlaneGeometry(RAMP_W * 0.82, slopeLen * 0.92).rotateX(-Math.PI / 2);
@@ -46,8 +46,8 @@ function chevronTexture() {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
-const RAMP_COL = { jungle: 0x8a5a30, desert: 0xb07a40, frost: 0x8aa8c0, swamp: 0x6a5a3a, volcano: 0x4a3a34, shadow: 0x4a3a6a };
-const RAMP_GLOW = { jungle: 0xffe070, desert: 0xffc040, frost: 0x80e8ff, swamp: 0xa0ff60, volcano: 0xff8030, shadow: 0xc080ff };
+const RAMP_COL = { jungle: 0x8a5a30, desert: 0xb07a40, frost: 0x8aa8c0, swamp: 0x6a5a3a, volcano: 0x4a3a34, shadow: 0x4a3a6a, hive: 0x3a1a1a };
+const RAMP_GLOW = { jungle: 0xffe070, desert: 0xffc040, frost: 0x80e8ff, swamp: 0xa0ff60, volcano: 0xff8030, shadow: 0xc080ff, hive: 0x9cff3a };
 
 // —— 天灾 ——
 const HAZ = {
@@ -57,6 +57,7 @@ const HAZ = {
   swamp: { type: 'erupt', color: 0x80ff40, obj: 0x70ff40, debris: 0x4a5a30, poison: 3 },
   volcano: { type: 'fall', color: 0xff4010, obj: 0xff7020, glow: true, debris: 0x3a2a24, geo: 'rock', fire: true },
   shadow: { type: 'bolt', color: 0xb050ff, obj: 0xd090ff, debris: 0x3a2a5a },
+  hive: { type: 'erupt', color: 0xa0ff30, obj: 0xc060ff, debris: 0x3a1a1a, poison: 3 },
 };
 const hazRockGeo = new THREE.IcosahedronGeometry(1.1, 0);
 const hazSpikeGeo = new THREE.ConeGeometry(0.7, 3.4, 6).rotateX(Math.PI);

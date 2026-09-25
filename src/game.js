@@ -24,10 +24,10 @@ const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
 const _one = new THREE.Vector3(1, 1, 1);
 
-const DUST = { jungle: 0x8f8a5a, desert: 0xe0c890, frost: 0xeef4ff, swamp: 0x6a7050, volcano: 0x4a403c, shadow: 0x6a5a7a };
-const ROCK = { jungle: 0x7a7a66, desert: 0xc0864a, frost: 0xb8c8d8, swamp: 0x5a6048, volcano: 0x3a3030, shadow: 0x4a4058 };
+const DUST = { jungle: 0x8f8a5a, desert: 0xe0c890, frost: 0xeef4ff, swamp: 0x6a7050, volcano: 0x4a403c, shadow: 0x6a5a7a, hive: 0x6a3a34 };
+const ROCK = { jungle: 0x7a7a66, desert: 0xc0864a, frost: 0xb8c8d8, swamp: 0x5a6048, volcano: 0x3a3030, shadow: 0x4a4058, hive: 0x4a2a2a };
 const ENDLESS_POOL = ['slime', 'goblin', 'bat', 'skeleton', 'wolf', 'scorpion', 'archer', 'mushroom', 'imp', 'wisp', 'yeti', 'mage', 'golem', 'darkKnight'];
-const BIOMES = ['jungle', 'desert', 'frost', 'swamp', 'volcano', 'shadow'];
+const BIOMES = ['jungle', 'desert', 'frost', 'swamp', 'volcano', 'shadow', 'hive'];
 const SPAWN_AHEAD = 115;
 const ENDLESS_BOSS_EVERY = 1400;
 const COMBO_TIERS = [10, 25, 50, 100];
@@ -1322,7 +1322,10 @@ export class Game {
     tmp.add(new THREE.Mesh(new THREE.CylinderGeometry(), new THREE.MeshStandardMaterial({ color: 0x3a3a44, metalness: 0.4, roughness: 0.5 })));
     const kinds = [[this.rider.weapon.type], ['wave', undefined, 5], ['wave', undefined, 7], ['meteor'], ['venom'], ['spike']];
     for (const t of types) { const r = ENEMIES[t].ranged; if (r) kinds.push([{ arrow: 'earrow', spore: 'spore', orb: 'orb', fireball: 'efire', ice: 'ice' }[r.kind] || 'orb', r.kind === 'orb' ? r.color : undefined]); }
-    for (const b of bossTypes) kinds.push(['borb', BOSSES[b].projColor]);
+    for (const b of bossTypes) {
+      kinds.push(['borb', BOSSES[b].projColor]);
+      if (BOSSES[b].patterns.includes('sweep')) kinds.push(['scythewave', undefined, this.track.roadHalf * 2 + 2]);
+    }
     this.projectiles.warm(kinds);
     for (const k of Object.keys(GATES)) { const t = gateLabel(GATES[k]); try { renderer.initTexture(t); } catch { /* ignore */ } }
     const models = [...tmp.children];

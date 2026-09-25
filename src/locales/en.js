@@ -183,7 +183,7 @@ export default {
     'hud.fever': 'FEVER',
     'touch.ult': 'Awaken',
     'help.ultKey': 'R',
-    'help.ult': 'When the fever gauge is full, unleash Primal Awakening: grow huge, become invincible, double your barrage, and end with a screen-wide shockwave',
+    'help.ult': 'When the fever gauge is full, unleash Primal Awakening: grow huge, become invincible, boost your barrage, and end with a screen-wide shockwave',
     'help.tips2': '🔥 Higher combos mean faster fire and more coins. Jumping over monsters or barely dodging boss attacks triggers a <b>perfect dodge</b> that fills the fever gauge fast.',
 
     'hazard.jungle': '⚠ Rockfall!',

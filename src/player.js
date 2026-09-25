@@ -17,7 +17,7 @@ const _up = new THREE.Vector3(0, 1, 0);
 const FWD = new THREE.Vector3(0, 0, 1);
 const GRAVITY = 32;
 const smoothstep01 = (x) => x * x * (3 - 2 * x);
-export const RAGE_TIME = 7;
+export const RAGE_TIME = 6;
 const RAGE_COL = new THREE.Color(0xffb020);
 const _rc = new THREE.Color();
 
@@ -144,13 +144,13 @@ export class Player {
     const L = WEAPON_LEVELS[this.weapon.level];
     const W = this.weapon;
     const rage = this.buffs.rage > 0;
-    const count = Math.min(rage ? 11 : 9, (w.count || 1) + L.count + W.count + (rage ? 2 : 0));
-    const rate = L.rate * W.rate * (this.buffs.frenzy > 0 ? 1.8 : 1) * (this.buffs.sprint > 0 ? 1.4 : 1) * (rage ? 1.3 : 1) * (1 + this.game.comboBonus());
+    const count = Math.min(rage ? 11 : 9, (w.count || 1) + L.count + W.count + (rage ? 1 : 0));
+    const rate = L.rate * W.rate * (this.buffs.frenzy > 0 ? 1.8 : 1) * (this.buffs.sprint > 0 ? 1.4 : 1) * (rage ? 1.15 : 1) * (1 + this.game.comboBonus());
     return {
       count,
-      dmg: w.dmg * this.stats.riderMul * L.dmg * W.dmg * (this.buffs.power > 0 ? 1.5 : 1) * (rage ? 1.25 : 1),
+      dmg: w.dmg * this.stats.riderMul * L.dmg * W.dmg * (this.buffs.power > 0 ? 1.5 : 1) * (rage ? 1.1 : 1),
       cd: w.cd / rate,
-      pierce: (w.pierce || 0) + L.pierce + W.pierce + (rage ? 2 : 0),
+      pierce: (w.pierce || 0) + L.pierce + W.pierce + (rage ? 1 : 0),
       homing: w.homing || L.homing || 0,
       spread: count > 1 ? Math.min(w.spread || 9, 44 / (count - 1)) : 0,
     };
@@ -598,8 +598,8 @@ export class Player {
     if (on) {
       this.rageWaveT -= dt;
       if (this.rageWaveT <= 0 && this.alive) {
-        this.rageWaveT = 0.75;
-        this.launchWave(this.stats.atk * 1.2, 8, 1.2);
+        this.rageWaveT = 1.5;
+        this.launchWave(this.stats.atk * 0.8, 8, 1.2);
       }
     } else if (this.rageWas) {
       this.rageWas = false;

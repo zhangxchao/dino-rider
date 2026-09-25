@@ -13,6 +13,7 @@ import { UI } from './ui.js';
 import { Showcase } from './showcase.js';
 import { renderThumbnails } from './thumbs.js';
 import { t } from './i18n.js';
+import { Juice } from './juice.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -33,6 +34,8 @@ class App {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.45, 0.85);
     this.composer.addPass(this.bloom);
+    this.juice = new Juice(this);
+    this.juice.install(this.composer, 2);
     this.composer.addPass(new OutputPass());
 
     this.audio = audio;
@@ -130,6 +133,7 @@ class App {
     this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.juice.setSize(w, h);
     if (this.game) this.game.resize(w, h);
   }
 
@@ -189,6 +193,7 @@ class App {
 
   exitToMenu(screen = 'title') {
     if (this.game) { this.game.dispose(); this.game = null; }
+    this.juice.reset();
     input.gameActive = false;
     input.exitLock();
     input.releaseAll();
@@ -233,6 +238,7 @@ class App {
       } else if (this.showcase) {
         this.showcase.update(dt);
       }
+      this.juice.update(this.game && this.game.paused ? 0 : dt);
       if (this.useComposer) this.composer.render(dt);
       else this.renderer.render(this.scene, this.camera);
       this.lastCalls = this.renderer.info.render.calls;

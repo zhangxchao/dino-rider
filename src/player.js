@@ -4,7 +4,7 @@ import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
 import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED } from './data.js';
 import { clamp, damp, prepareModel, mergeStaticMeshes } from './util.js';
-import { createShield } from './effects.js';
+import { createShield, Afterimages } from './effects.js';
 import { t } from './i18n.js';
 import { curvature } from './bend.js';
 
@@ -71,6 +71,7 @@ export class Player {
     });
     game.scene.add(this.root);
     this.flash = prepareModel(this.root, { cast: true });
+    this.afterimages = new Afterimages(game.scene, this.root, 6);
 
     this.size = this.model.size;
     this.top = this.size.top || this.size.height;
@@ -454,6 +455,7 @@ export class Player {
     const g = this.game;
     const d = this.def.skill;
     const s = { type: d.type, t: 0, dur: 1, fired: false, hit: new Set(), count: 0, running };
+    this.skillJuice(d.type);
     switch (d.type) {
       case 'roar': s.dur = 1.2; break;
       case 'charge':
@@ -519,9 +521,26 @@ export class Player {
     g.fx.dust.burst(this.pos, { count: 26, speed: 6 + R, life: 0.7, size: 1.1, sizeEnd: 2.8, color: g.dustColor, alpha: 0.5, flat: true, drag: 2.5, up: 1.5 });
     g.audio.play('stomp', { volume: 0.55 + 0.25 * k, pitch: 1.2 - this.size.height * 0.08 });
     g.shake.add(0.12 + 0.1 * k);
+    g.fx.debris.burst(this.pos, { count: 4 + Math.round(4 * k), speed: 5, up: 6, size: 0.25, color: g.rockColor ?? 0x7a6a5a });
+    g.juice.fovKick(-1.5 - 2 * k);
     if (hits > 0) {
       g.hitstop(0.035);
       if (hits >= 3) g.floatText(this.pos, t('float.stomp', { n: hits }), 'crit', this.top + 2);
+    }
+  }
+
+  /** 技能释放的画面冲击 */
+  skillJuice(type) {
+    const J = this.game.juice;
+    J.bloom(0.35);
+    switch (type) {
+      case 'roar': case 'sonic': J.radial(1.6); J.aberr(1); J.fovKick(-4); break;
+      case 'charge': case 'sprint': J.fovKick(7); J.radial(0.8); break;
+      case 'pounce': case 'dive': J.fovKick(5); break;
+      case 'stomp': case 'wave': J.aberr(0.8); J.fovKick(-3); break;
+      case 'frenzy': J.flash(0xff3020, 0.25); J.aberr(0.8); break;
+      case 'fortress': J.flash(0xffd060, 0.25); break;
+      default: J.aberr(0.5); J.fovKick(-2);
     }
   }
 
@@ -541,6 +560,11 @@ export class Player {
     g.audio.play('quake', { volume: 0.8 });
     g.shake.add(0.35);
     g.hitstop(0.06);
+    g.fx.debris.burst(this.pos, { count: 16, speed: 9, up: 9, size: 0.35, color: g.rockColor ?? 0x7a6a5a });
+    g.fx.scorch.add(this.pos, R * 0.6, 5);
+    g.juice.fovKick(-5);
+    g.juice.flash(0xfff0c0, 0.14);
+    g.juice.aberr(1);
     this.launchWave(atk * d.power, 7);
   }
 
@@ -699,10 +723,18 @@ export class Player {
 
   updateBuffFx(dt) {
     const g = this.game;
+    this.afterimages.update(dt);
     this.auraAcc += dt;
     if (this.auraAcc < 0.05) return;
     this.auraAcc = 0;
     const c = this.center;
+    // 残影：疾跑 / 冲锋 / 飞扑 / 俯冲时留下一串半透明的影子
+    const sk = this.skill;
+    if (this.alive) {
+      if (this.buffs.sprint > 0) this.afterimages.spawn(0x3aa8d8, 0.22);
+      else if (sk && sk.type === 'charge') this.afterimages.spawn(0xd87a20, 0.22);
+      else if (sk && sk.air && !this.onGround) this.afterimages.spawn(sk.type === 'dive' ? 0xd86a20 : 0xc8b070, 0.2);
+    }
     if (this.buffs.frenzy > 0) g.fx.sparks.burst(c, { count: 2, speed: 1.5, life: 0.6, size: 0.8, color: 0xff3020, color2: 0x600000, radius: this.radius, up: 2 });
     if (this.buffs.power > 0) g.fx.sparks.burst(c, { count: 2, speed: 1, life: 0.6, size: 0.7, color: 0xffd040, color2: 0xff6000, radius: this.radius, up: 2 });
     if (this.buffs.sprint > 0) {
@@ -749,6 +781,11 @@ export class Player {
       g.audio.play(this.buffs.fortress > 0 || this.buffs.shield > 0 ? 'shieldHit' : 'playerHurt', { volume: 0.7 });
       g.shake.add(Math.min(0.3, 0.1 + dmg / this.stats.maxHp * 1.2));
       g.hud && g.hud.damageFlash();
+      const heavy = Math.min(1, dmg / this.stats.maxHp * 6);
+      g.juice.flash(0xff2020, 0.08 + heavy * 0.2);
+      g.juice.aberr(0.5 + heavy * 1.2);
+      if (o.dir) g.shake.kick(o.dir, 0.25 + heavy * 0.35);
+      else if (o.attacker) g.shake.kick(_dir.set(this.pos.x - o.attacker.pos.x, 0, this.pos.z - o.attacker.pos.z).normalize(), 0.25 + heavy * 0.35);
       if (this.buffs.fortress > 0 && o.attacker && o.attacker.targetable) {
         _dir.set(o.attacker.pos.x - this.pos.x, 0, o.attacker.pos.z - this.pos.z).normalize();
         g.damageEnemy(o.attacker, amount * (this.def.skill.thorns || 0.5) + this.stats.atk * 0.5, { dir: _dir, knock: 6, source: 'thorns' });
@@ -776,5 +813,6 @@ export class Player {
     this.game.scene.remove(this.shield);
     this.shield.geometry.dispose();
     this.shield.material.dispose();
+    this.afterimages.dispose();
   }
 }

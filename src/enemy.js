@@ -466,6 +466,11 @@ export class Boss {
       g.fx.rings.ring(this.pos, { r0: 2, r1: 16, life: 0.8, color: this.def.projColor });
       g.fx.rings.pillar(this.pos, { r: this.radius * 1.4, h: 20, life: 1.2, color: this.def.projColor });
       g.fx.sparks.burst(this.getCenter(_v), { count: 80, speed: 14, life: 1, size: 1.2, color: this.def.projColor, color2: 0xffffff });
+      g.juice.flash(this.def.projColor, 0.45);
+      g.juice.aberr(1.8);
+      g.juice.radial(1.2);
+      g.juice.bloom(0.9);
+      g.fx.debris.burst(this.pos, { count: 24, speed: 12, up: 12, size: 0.5, color: g.rockColor ?? 0x7a6a5a });
       g.showBanner(t('banner.enrage'), t('banner.phase', { name: this.def.name, n: this.phase }), true);
       this.pattern = { name: 'summon', t: 0, dur: 1.6, fired: true, teles: [] };
     }
@@ -673,6 +678,8 @@ export class Boss {
             g.fx.rings.ring(_v, { r0: 1, r1: 5, life: 0.45, color: 0xffd0a0 });
             g.fx.dust.burst(_v, { count: 24, speed: 6, life: 0.9, size: 1.4, sizeEnd: 3.5, color: g.dustColor, alpha: 0.6, flat: true, drag: 2, up: 3 });
             g.fx.sparks.burst(_v, { count: 14, speed: 7, life: 0.4, size: 0.8, color: 0xffe0a0, color2: color, up: 3 });
+            g.fx.debris.burst(_v, { count: 7, speed: 7, up: 8, size: 0.4, color: g.rockColor ?? 0x7a6a5a });
+            g.fx.scorch.add(_v, 3.2, 3.5);
             if (ph >= 2) {
               for (let i = 0; i < 6; i++) {
                 const a = (i / 6) * Math.PI * 2;
@@ -683,6 +690,8 @@ export class Boss {
           }
           g.audio.play('stomp', { volume: 1, pitch: 0.7 });
           g.audio.play('quake', { volume: 0.6 });
+          g.juice.fovKick(-2.5);
+          g.juice.aberr(0.6);
           g.shake.add(0.3);
         }
         break;

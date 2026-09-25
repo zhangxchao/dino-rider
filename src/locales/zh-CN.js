@@ -169,6 +169,9 @@ export default {
 
     'float.stomp': '震地踩踏 ×{n}！',
 
+    'float.eliteDown': '精英击破！',
+    'float.multi': '多重击杀 ×{n}！',
+
     'enemy.chest': '宝箱',
     'enemy.rock': '落石',
 

@@ -169,6 +169,9 @@ export default {
 
     'float.stomp': 'Stomp ×{n}!',
 
+    'float.eliteDown': 'Elite down!',
+    'float.multi': 'Multi-kill ×{n}!',
+
     'enemy.chest': 'Treasure Chest',
     'enemy.rock': 'Falling Rock',
 

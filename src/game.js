@@ -1,8 +1,8 @@
 // 一局游戏（跑道模式）：沿路线自动前进，怪物从前方涌来，终点首领战
 import * as THREE from 'three';
-import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS } from './data.js';
+import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, RUN_SPEED } from './data.js';
 import { createTrack } from './track.js';
-import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars } from './effects.js';
+import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars, Debris, Scorch, LightFlashes, Streaks } from './effects.js';
 import { Projectiles } from './projectiles.js';
 import { Player, computeStats } from './player.js';
 import { Enemy, Boss, Prop, buildEnemyModel, buildBossModel } from './enemy.js';
@@ -201,7 +201,15 @@ export class Game {
       sparks: new Particles(this.scene, 3500, true),
       dust: new Particles(this.scene, 2200, false),
       rings: new Rings(this.scene),
+      debris: new Debris(this.scene, this.heightAt, this.quality === 'high' ? 220 : 90),
+      scorch: new Scorch(this.scene, this.heightAt),
+      lights: this.quality === 'high' ? new LightFlashes(this.scene, 2) : null,
+      streaks: new Streaks(this.scene),
     };
+    this.juice = app.juice;
+    this.juice.reset();
+    this.killTimes = [];
+    this.multiCd = 0;
     this.tele = new Telegraphs(this.scene, this.heightAt);
     this.text = new FloatingText(app.fxLayer);
     this.shake = new Shake();
@@ -387,7 +395,7 @@ export class Game {
     }
     for (const s of spots) {
       const e = this.spawnEnemy(s.t, s.x, s.z, mul, true);
-      if (s.elite) { e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
+      if (s.elite) { e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
     }
   }
 
@@ -454,6 +462,10 @@ export class Game {
     this.fx.sparks.update(dt);
     this.fx.dust.update(dt);
     this.fx.rings.update(dt);
+    this.fx.debris.update(dt);
+    this.fx.scorch.update(dt);
+    this.fx.lights?.update(dt);
+    if (this.multiCd > 0) this.multiCd -= realDt;
     this.tele.update(dt);
     this.track.update(dt, this.time + this.stateT, p.pos);
 
@@ -515,6 +527,14 @@ export class Game {
   onBossDeath(boss) {
     this.slowmoT = 2;
     this.shake.add(0.5);
+    this.juice.flash(0xffffff, 0.8);
+    this.juice.radial(2.2);
+    this.juice.aberr(2);
+    this.juice.bloom(1.2);
+    this.juice.fovKick(-6);
+    this.fx.debris.burst(boss.pos, { count: 40, speed: 14, up: 14, size: 0.6, color: boss.def.color ?? 0x5a4a4a, color2: this.rockColor });
+    this.fx.rings.pillar(boss.pos, { r: boss.radius * 1.5, h: 40, life: 1.6, color: boss.def.projColor, opacity: 0.8 });
+    this.fx.lights?.flash(boss.pos, boss.def.projColor, 120, 40, 1.2);
     this.audio.play('bossDie');
     this.stats.bosses++;
     this.bossCount++;
@@ -610,6 +630,16 @@ export class Game {
     this.hud.levelUp(lv, L.name);
     this.fx.sparks.burst(this.player.center, { count: 40, speed: 6, life: 0.8, size: 0.8, color: 0x7fe8ff, color2: 0xffffff, up: 3, radius: this.player.radius });
     this.fx.rings.ring(this.player.pos, { r0: 1, r1: 6, life: 0.5, color: 0x7fe8ff });
+    // 螺旋上升的能量喷泉 + 光柱
+    const pp = this.player.pos, R = this.player.radius + 0.8;
+    for (let i = 0; i < 48; i++) {
+      const a = i * 0.52, k = i / 48;
+      this.fx.sparks.spawn(pp.x + Math.cos(a) * R, pp.y + 0.3 + k * 1.5, pp.z + Math.sin(a) * R,
+        -Math.sin(a) * 3.5, 5 + k * 6, Math.cos(a) * 3.5, 0.9 + k * 0.4, 0.9, 0.1, 0x7fe8ff, k > 0.5 ? 0xffffff : 0x46a0ff, 1, -2, 1.5);
+    }
+    this.fx.rings.pillar(pp, { r: R, h: 10, life: 0.7, color: 0x7fe8ff, opacity: 0.5 });
+    this.juice.flash(0x7fe8ff, 0.18);
+    this.juice.bloom(0.35);
   }
 
   onGate(kind, panel) {
@@ -621,6 +651,8 @@ export class Game {
     panel.getWorldPosition(_v);
     _v.y += 2.4;
     this.fx.sparks.burst(_v, { count: 50, speed: 8, life: 0.8, size: 0.9, color: opt.color, color2: 0xffffff });
+    this.juice.flash(opt.color, 0.22);
+    this.juice.fovKick(3);
   }
 
   // ------------------------------------------------------------------
@@ -662,12 +694,46 @@ export class Game {
       const cls = o.crit ? 'crit' : isDot ? (o.dotColor === 'poison' ? 'poison' : 'burn') : '';
       this.text.add(_v, Math.round(d) + (o.crit ? '!' : ''), cls, isDot ? 0.6 : 0.8);
     }
-    if (o.crit) this.audio.play('crit', { volume: 0.45 });
+    if (o.crit) {
+      this.audio.play('crit', { volume: 0.45 });
+      // 暴击：星形火花 + 小冲击环
+      e.getCenter(_v2);
+      this.fx.sparks.burst(_v2, { count: 14, speed: 9, life: 0.28, size: 0.7, sizeEnd: 0, color: 0xffffff, color2: 0xffd040, drag: 3 });
+      if (!isDot) this.fx.rings.ring(_v2, { r0: 0.3, r1: 2.2 + e.radius, life: 0.22, color: 0xffe070, opacity: 0.8, y: 0 });
+    }
     else if (!isDot) this.audio.play('enemyHurt', { volume: 0.22, pitch: rand(0.9, 1.25) });
     if (!isDot && this.player.buffs.frenzy > 0 && o.source === 'melee') this.player.heal(d * (this.dino.skill.lifesteal || 0.2));
     if (e.isBoss) e.checkPhase();
     if (e.hp <= 0) this.killEnemy(e);
     return d;
+  }
+
+  /** 击杀演出：精英击破 / 多重击杀 */
+  onKillFx(e) {
+    const now = this.time;
+    this.killTimes.push(now);
+    while (this.killTimes.length && now - this.killTimes[0] > 0.45) this.killTimes.shift();
+    if (e.elite) {
+      e.getCenter(_v2);
+      this.fx.rings.pillar(e.pos, { r: e.radius + 0.6, h: 16, life: 0.9, color: 0xffd040, opacity: 0.75 });
+      this.fx.rings.ring(e.pos, { r0: 1, r1: 10, life: 0.6, color: 0xffd040 });
+      this.fx.sparks.burst(_v2, { count: 70, speed: 12, life: 0.9, size: 1, color: 0xffe080, color2: 0xff8000, up: 6 });
+      for (let i = 0; i < 8; i++) this.spawnPickup('coin', e.pos, 2);
+      this.floatText(e.pos, t('float.eliteDown'), 'crit', e.halfHeight * 2 + 2);
+      this.juice.flash(0xffd040, 0.3);
+      this.juice.bloom(0.5);
+      this.hitstop(0.07);
+      this.audio.play('powerup', { volume: 0.6, pitch: 0.8 });
+    }
+    const n = this.killTimes.length;
+    if (n >= 5 && this.multiCd <= 0) {
+      this.multiCd = 1.2;
+      this.slowmoT = Math.max(this.slowmoT, 0.22);
+      this.juice.radial(1.1);
+      this.juice.aberr(0.6);
+      this.floatText(this.player.pos, t('float.multi', { n }), 'crit', this.player.top + 3);
+      this.audio.play('levelUp', { volume: 0.45, pitch: 1.4 });
+    }
   }
 
   killEnemy(e, silent = false) {
@@ -682,6 +748,7 @@ export class Game {
     if (silent) return;
     if (!e.isProp) {
       this.stats.kills++;
+      this.onKillFx(e);
       this.stats.score += (e.def.score || 10) * (1 + Math.min(this.combo, 50) * 0.02);
       this.audio.play('enemyDie', { volume: 0.4, pitch: rand(0.85, 1.15) });
     } else {
@@ -919,7 +986,29 @@ export class Game {
     this.camera.position.copy(pos);
     this.camera.lookAt(look);
     this.camera.rotateZ(cam.roll);
+    this.updateJuice();
     this.camFade.value = Math.max(0, pos.distanceTo(p.pos) - 3);
+  }
+
+  /** 持续画面状态：速度感（FOV / 速度线 / 径向模糊）、低血量去饱和 */
+  updateJuice() {
+    const pl = this.player, sk = pl.skill, J = this.juice.hold;
+    let spd = clamp((pl.fwd - RUN_SPEED * 1.08) / (RUN_SPEED * 0.8), 0, 1);
+    if (sk && (sk.type === 'pounce' || sk.type === 'dive') && !pl.onGround) spd = Math.max(spd, 0.75);
+    if (this.state === 'win' || this.state === 'intro') spd = 0;
+    J.speed = spd;
+    J.fov = spd * 12;
+    J.radial = spd * 0.4;
+    const low = pl.alive ? clamp(1 - pl.hp / (pl.stats.maxHp * 0.3), 0, 1) : 1;
+    J.desat = pl.alive ? low * 0.35 : 0.75;
+    J.vig = low * 0.3;
+    const fov = 60 + this.juice.fov;
+    if (Math.abs(this.camera.fov - fov) > 0.02) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+      this.fx.sparks.setScale(this.viewH, fov);
+      this.fx.dust.setScale(this.viewH, fov);
+    }
   }
 
   // ------------------------------------------------------------------
@@ -991,7 +1080,8 @@ export class Game {
     this.camera.getWorldDirection(_v2);
     const at = _v.copy(this.camera.position).addScaledVector(_v2, 14);
     _m.makeTranslation(at.x, at.y, at.z);
-    const inst = [this.shadows.mesh, this.bars.bg, this.bars.fg, this.coinMesh];
+    const inst = [this.shadows.mesh, this.bars.bg, this.bars.fg, this.coinMesh, this.fx.debris.mesh, this.fx.scorch.mesh, this.fx.streaks.mesh];
+    this.player.afterimages?.spawn(0xffffff, 0.01, 0.05);
     for (const b of this.projectiles.batches.values()) inst.push(...b.layers);
     for (const im of inst) { im.setMatrixAt(0, _m); im.count = 1; im.instanceMatrix.needsUpdate = true; }
     tmp.position.copy(at).addScaledVector(_v2, 6);
@@ -1058,6 +1148,11 @@ export class Game {
     this.fx.sparks.dispose();
     this.fx.dust.dispose();
     this.fx.rings.dispose();
+    this.fx.debris.dispose();
+    this.fx.scorch.dispose();
+    this.fx.lights?.dispose();
+    this.fx.streaks.dispose();
+    this.juice.reset();
     this.tele.clear();
     this.text.clear();
     this.hud.dispose();

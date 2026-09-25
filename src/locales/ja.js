@@ -169,6 +169,9 @@ export default {
 
     'float.stomp': 'ふみつけ ×{n}！',
 
+    'float.eliteDown': 'エリート撃破！',
+    'float.multi': 'マルチキル ×{n}！',
+
     'enemy.chest': '宝箱',
     'enemy.rock': '落石',
 

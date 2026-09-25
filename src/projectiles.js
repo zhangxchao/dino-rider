@@ -4,6 +4,7 @@ import * as THREE from 'three';
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _dir = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
 
 // ---------------------------------------------------------------------
 //  外观
@@ -103,6 +104,21 @@ const TRAILS = {
   spike: { color: 0xf6ecd0, size: 0.2, life: 0.15, rate: 20 },
 };
 
+// 弹体光尾：k = 长度 / 速度，max = 最长，w = 宽度
+const STREAK = {
+  spear: { k: 0.09, max: 4.5, w: 0.35, color: 0xffe27a },
+  arrow: { k: 0.07, max: 3.2, w: 0.22, color: 0x9cff7a },
+  laser: { k: 0.08, max: 5.5, w: 0.3 },
+  bullet: { k: 0.06, max: 3.5, w: 0.18, color: 0xffd070, boost: 2 },
+  missile: { k: 0.1, max: 3.5, w: 0.45, color: 0xff7a3a },
+  ice: { k: 0.08, max: 3.2, w: 0.35, color: 0xaaddff },
+  fireball: { k: 0.1, max: 3.5, w: 0.8, color: 0xff7a2a },
+  earrow: { k: 0.06, max: 2.4, w: 0.18, color: 0xff6060 },
+  efire: { k: 0.08, max: 2.6, w: 0.6, color: 0xff6a1a },
+  orb: { k: 0.05, max: 2, w: 0.5 },
+  borb: { k: 0.05, max: 2.4, w: 0.6 },
+};
+
 // ---------------------------------------------------------------------
 //  系统
 // ---------------------------------------------------------------------
@@ -170,7 +186,17 @@ export class Projectiles {
 
   _render() {
     for (const b of this.batches.values()) b.begin();
+    const st = this.game.fx.streaks;
+    st.begin(this.game.camera);
     for (const p of this.list) {
+      const sk = STREAK[p.kind];
+      if (sk && !p.gravity) {
+        // 光尾长度按玩家参考系的相对速度（弹体继承了玩家前进速度）
+        _v.copy(p.vel);
+        if (p.owner === 'player') _v.z -= this.game.player.fwd;
+        const sp = _v.length();
+        if (sp > 4) st.add(p.pos, _v, Math.min(sk.max, sp * sk.k) * p.scale, sk.w * p.scale, sk.color ?? p.color ?? 0xffffff, sk.boost);
+      }
       _sc.setScalar(p.scale);
       if (p.kind === 'shuriken') _q.setFromEuler(_e.set(0, p.spinT, 0));
       else if (p.kind === 'rock' || p.kind === 'cannon') _q.setFromEuler(_e.set(p.spinT, p.spinT * 0.7, 0));
@@ -183,6 +209,7 @@ export class Projectiles {
       p.batch.add(_m);
     }
     for (const b of this.batches.values()) b.end();
+    st.end();
   }
 
   /**
@@ -340,6 +367,18 @@ export class Projectiles {
     fx.sparks.burst(at, { count: 20 + r * 6, speed: r * 3, life: 0.5, size: 0.9, sizeEnd: 0.2, color: c1, color2: c2, up: 2 });
     fx.dust.burst(at, { count: 10 + r * 3, speed: r * 1.2, life: 0.9, size: 1.2, sizeEnd: 3, color: isFire ? 0x3a3a3a : 0xb8a888, alpha: 0.55, up: 2.5, drag: 2 });
     game.fx.rings.ring(at, { r0: 0.5, r1: r * 1.1, life: 0.45, color: c1, opacity: 0.9 });
+    // 爆炸升级：地面闪光圆盘 + 第二道冲击环 + 碎石 + 焦痕 + 点光源闪光 + 泛光脉冲
+    const gy = game.heightAt(at.x, at.z);
+    _v3.set(at.x, gy, at.z);
+    game.fx.rings.disc(_v3, { r: r * 0.9, life: 0.25, color: c1, opacity: 0.8, y: 0.15 });
+    game.fx.rings.ring(_v3, { r0: r * 0.3, r1: r * 1.9, life: 0.7, color: c2, opacity: 0.45, y: 0.2 });
+    if (at.y - gy < 3) {
+      game.fx.debris.burst(_v3, { count: Math.round(3 + r * 1.6), speed: 3 + r * 1.4, up: 5 + r, size: 0.22 + r * 0.03, color: p.kind === 'rock' ? 0xb8a888 : game.rockColor ?? 0x7a6a5a, color2: isFire ? 0x2a2420 : undefined });
+      if (isFire || r >= 4) game.fx.scorch.add(_v3, r * 0.8, 4 + r * 0.4);
+    }
+    game.fx.lights?.flash(at, isFire ? 0xff8a30 : c1, 25 + r * 10, 8 + r * 3.5);
+    game.juice.bloom(Math.min(0.5, r * 0.06));
+    if (r >= 5) { game.juice.flash(c1, Math.min(0.2, r * 0.025)); game.hitstop(0.035); }
     game.audio.play('explosion', { volume: Math.min(1, 0.35 + r * 0.08), pitch: 1.3 - Math.min(0.5, r * 0.05) });
     game.shakeAt(at, Math.min(0.5, r * 0.06));
     if (p.owner === 'player') {

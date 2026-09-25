@@ -313,7 +313,10 @@ export class Projectiles {
           const dx = p.pos.x - pl.pos.x, dz = p.pos.z - pl.pos.z;
           const rr = pl.radius * 0.8 + p.radius;
           const top = pl.pos.y + pl.size.height * 1.35 + 0.6;
-          if (dx * dx + dz * dz < rr * rr && p.pos.y > pl.pos.y - 0.6 && p.pos.y < top) {
+          const d2 = dx * dx + dz * dz;
+          // 擦弹：敌方弹体从身边 1.2 米内飞过
+          if (!p.grazed && d2 < (rr + 1.2) * (rr + 1.2) && d2 >= rr * rr && dz < 0) { p.grazed = true; game.onPerfect(p.pos, false); }
+          if (d2 < rr * rr && p.pos.y > pl.pos.y - 0.6 && p.pos.y < top) {
             if (p.aoe) this.explode(p, p.pos, null);
             else {
               _dir.copy(p.vel).setY(0).normalize();

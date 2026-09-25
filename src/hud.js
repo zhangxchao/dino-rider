@@ -52,9 +52,10 @@ export class Hud {
           <div class="hud-stat">⏱ <span class="time">0:00</span></div>
         </div>
       </div>
-      <div class="combo"><div class="n">0</div><div class="l">${t('hud.combo')}</div></div>
+      <div class="combo"><div class="n">0</div><div class="l">${t('hud.combo')}</div><div class="tier"></div></div>
       <div class="lvlup"></div>
       <div class="hud-skills">
+        <div class="fever-gauge"><div class="lbl">${t('hud.fever')}</div><div class="tube"><div class="fill"></div></div><div class="key">R</div></div>
         <div class="skill-ico big skill"><div class="lbl">${dino.skill.name}</div>${SKILL_ICON[dino.skill.type] || '✨'}<div class="cd"></div><div class="cdt"></div><div class="key">Q</div></div>
       </div>
       <div class="hud-hints">
@@ -68,6 +69,7 @@ export class Hud {
       routeFill: $('.route-fill'), routeDino: $('.route-dino'), routeText: $('.route-text'), dist: $('.endless-dist'),
       bossWrap: $('.boss-wrap'), route: $('.route'),
       coins: $('.coins'), kills: $('.kills'), time: $('.time'), combo: $('.combo'), comboN: $('.combo .n'),
+      fever: $('.fever-gauge'), feverFill: $('.fever-gauge .fill'), comboTier: $('.combo .tier'),
       skillCd: $('.skill .cd'), skillCdt: $('.skill .cdt'), skill: $('.skill'), lvlup: $('.lvlup'),
     };
     this.reticle = document.createElement('div');
@@ -90,6 +92,15 @@ export class Hud {
     f.style.transition = 'none';
     f.style.opacity = '0.7';
     requestAnimationFrame(() => { f.style.transition = 'opacity .45s'; f.style.opacity = ''; });
+  }
+
+  comboTier(tier, name) {
+    const el = this.el.comboTier;
+    this.el.combo.dataset.tier = tier;
+    el.textContent = name;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
   }
 
   levelUp(lv, name) {
@@ -186,7 +197,16 @@ export class Hud {
     this.set('kills', game.stats.kills, (v) => { this.el.kills.textContent = v; });
     this.set('time', Math.floor(game.time), () => { this.el.time.textContent = formatTime(game.time); });
 
+    const rage = game.player.buffs.rage;
+    const fv = rage > 0 ? rage / 7 * 100 : game.fever;
+    this.set('fever', Math.round(fv * 2) + (rage > 0 ? 'r' : game.fever >= 100 ? 'f' : ''), () => {
+      this.el.feverFill.style.height = fv.toFixed(1) + '%';
+      this.el.fever.classList.toggle('ready', rage <= 0 && game.fever >= 100);
+      this.el.fever.classList.toggle('active', rage > 0);
+    });
+
     const c = game.combo;
+    if (c < 10 && this.el.combo.dataset.tier !== '0') { this.el.combo.dataset.tier = '0'; this.el.comboTier.textContent = ''; }
     this.set('combo', c, (v) => {
       this.el.combo.classList.toggle('show', v >= 5);
       this.el.comboN.textContent = v;

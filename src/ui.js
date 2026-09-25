@@ -413,10 +413,12 @@ export class UI {
             <div><kbd>${t('help.mouse')}</kbd></div><div>${t('help.drag')}</div>
             <div><kbd>${t('help.space')}</kbd> / <kbd>W</kbd></div><div>${t('help.jump')}</div>
             <div><kbd>Q</kbd> / <kbd>E</kbd> / <kbd>Shift</kbd></div><div>${t('help.skill')}</div>
+            <div><kbd>R</kbd></div><div>${t('help.ult')}</div>
             <div><kbd>Esc</kbd> / <kbd>P</kbd></div><div>${t('help.pause')}</div>
           </div>
           <div class="help-tip">
-            ${t('help.tips')}
+            ${t('help.tips')}<br>
+            ${t('help.tips2')}
           </div>
           <div class="row-btns"><button class="btn" data-back>${t('help.ok')}</button></div>
         </div>

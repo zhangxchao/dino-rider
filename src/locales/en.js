@@ -172,12 +172,26 @@ export default {
     'float.eliteDown': 'Elite down!',
     'float.multi': 'Multi-kill ×{n}!',
 
+    'toast.feverReady': '🦖 Primal Awakening ready! Press R',
+    'combo.tier1': 'Frenzy!',
+    'combo.tier2': 'Unstoppable!',
+    'combo.tier3': 'Rampage!',
+    'combo.tier4': 'Primal Fury!',
+    'banner.rage': 'PRIMAL AWAKENING!',
+    'banner.rageSub': 'Invincible · rainbow barrage · shockwaves',
+    'float.perfect': 'Perfect dodge!',
+    'hud.fever': 'FEVER',
+    'touch.ult': 'Awaken',
+    'help.ultKey': 'R',
+    'help.ult': 'When the fever gauge is full, unleash Primal Awakening: grow huge, become invincible, double your barrage, and end with a screen-wide shockwave',
+    'help.tips2': '🔥 Higher combos mean faster fire and more coins. Jumping over monsters or barely dodging boss attacks triggers a <b>perfect dodge</b> that fills the fever gauge fast.',
+
     'enemy.chest': 'Treasure Chest',
     'enemy.rock': 'Falling Rock',
 
     'hud.combo': 'COMBO',
     'hud.hints': '<kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> move (or hold & drag the mouse)<br>'
-      + '<kbd>Space</kbd> jump · <kbd>Q</kbd> skill · rider fires automatically · <kbd>Esc</kbd> pause',
+      + '<kbd>Space</kbd> jump · <kbd>Q</kbd> skill · rider fires automatically · <kbd>R</kbd> awaken · <kbd>Esc</kbd> pause',
     'hud.levelUp': 'Weapon Up!',
     'hud.toBoss': 'Boss in {n} m',
     'hud.bossFight': 'Boss fight!',

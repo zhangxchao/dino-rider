@@ -29,6 +29,7 @@ const ENDLESS_POOL = ['slime', 'goblin', 'bat', 'skeleton', 'wolf', 'scorpion', 
 const BIOMES = ['jungle', 'desert', 'frost', 'swamp', 'volcano', 'shadow'];
 const SPAWN_AHEAD = 115;
 const ENDLESS_BOSS_EVERY = 1400;
+const COMBO_TIERS = [10, 25, 50, 100];
 
 // ---------------------------------------------------------------------
 //  拾取物外观
@@ -210,6 +211,10 @@ export class Game {
     this.juice.reset();
     this.killTimes = [];
     this.multiCd = 0;
+    this.fever = 0;           // 狂热槽 0..100，满了按 R 释放“远古觉醒”
+    this.feverReady = false;
+    this.comboTier = 0;
+    this.perfectCd = 0;
     this.tele = new Telegraphs(this.scene, this.heightAt);
     this.text = new FloatingText(app.fxLayer);
     this.shake = new Shake();
@@ -430,6 +435,7 @@ export class Game {
       dragScale: (this.track.roadHalf * 2) / Math.max(400, this.viewW * 0.55),
       jump: input.pressed('jump'),
       skill: input.pressed('skill'),
+      ult: input.pressed('ult'),
     });
 
     // 路线事件
@@ -458,7 +464,8 @@ export class Game {
     this.updatePickups(dt);
     this.updateFlow(dt);
 
-    if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) this.combo = 0; }
+    if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) { this.combo = 0; this.comboTier = 0; } }
+    if (this.perfectCd > 0) this.perfectCd -= realDt;
     this.fx.sparks.update(dt);
     this.fx.dust.update(dt);
     this.fx.rings.update(dt);
@@ -599,6 +606,7 @@ export class Game {
   }
 
   onPlayerDeath() {
+    this.audio.setMusicRate(1);
     if (this.finished) return;
     this.finished = true;
     this.state = 'lose';
@@ -685,7 +693,9 @@ export class Game {
         this.combo++;
         this.comboT = 2.6;
         if (this.combo > this.stats.maxCombo) this.stats.maxCombo = this.combo;
+        this.checkComboTier();
       }
+      if (e.isBoss) this.addFever(d / e.maxHp * 160);
       e.applyStatus({ ...o, dotBase: d });
     }
     if (o.source !== 'ram' || e.hp > 0) {
@@ -706,6 +716,93 @@ export class Game {
     if (e.isBoss) e.checkPhase();
     if (e.hp <= 0) this.killEnemy(e);
     return d;
+  }
+
+  // ------------------------------------------------------------------
+  //  狂热槽 / 远古觉醒 / 连击档位 / 完美闪避
+  // ------------------------------------------------------------------
+  addFever(n) {
+    if (this.player.buffs.rage > 0 || !this.player.alive) return;
+    this.fever = Math.min(100, this.fever + n);
+    if (this.fever >= 100 && !this.feverReady) {
+      this.feverReady = true;
+      this.toast(t('toast.feverReady'));
+      this.audio.play('powerup', { volume: 0.7, pitch: 1.25 });
+      this.juice.flash(0xffc040, 0.15);
+    }
+  }
+
+  /** 连击射速加成（最多 +30%） */
+  comboBonus() { return Math.min(this.combo, 100) * 0.003; }
+
+  checkComboTier() {
+    let tier = 0;
+    for (let i = 0; i < COMBO_TIERS.length; i++) if (this.combo >= COMBO_TIERS[i]) tier = i + 1;
+    if (tier <= this.comboTier) return;
+    this.comboTier = tier;
+    this.hud.comboTier(tier, t('combo.tier' + tier));
+    this.addFever(4 + tier * 3);
+    this.audio.play('star', { volume: 0.55, pitch: 0.9 + tier * 0.12 });
+    this.juice.aberr(0.4 + tier * 0.2);
+    if (tier >= 3) this.juice.bloom(0.3);
+  }
+
+  onRageStart() {
+    const p = this.player;
+    this.feverReady = false;
+    this.slowmoT = Math.max(this.slowmoT, 0.45);
+    this.showBanner(t('banner.rage'), t('banner.rageSub'), false, 1300);
+    this.audio.roar(1.6, { volume: 1 });
+    this.audio.play('frenzy', { volume: 0.8 });
+    this.audio.setMusicRate(1.25);
+    this.juice.flash(0xffc040, 0.55);
+    this.juice.radial(1.8);
+    this.juice.aberr(1.4);
+    this.juice.bloom(0.9);
+    this.juice.fovKick(-6);
+    this.juice.setTint(0xffb040);
+    this.fx.rings.ring(p.pos, { r0: 1, r1: 18, life: 0.7, color: 0xffc040 });
+    this.fx.rings.pillar(p.pos, { r: p.radius * 1.6, h: 30, life: 1, color: 0xffb020, opacity: 0.8 });
+    this.fx.sparks.burst(p.center, { count: 90, speed: 14, life: 0.9, size: 1.1, color: 0xffe070, color2: 0xff3000, up: 5 });
+    this.fx.lights?.flash(p.pos, 0xffb040, 90, 30, 0.8);
+  }
+
+  onRageEnd() {
+    const p = this.player;
+    this.audio.setMusicRate(1);
+    // 觉醒结束：全屏冲击波清场
+    const n = this.aoe(p.pos, 24, p.stats.atk * 3, { knock: 16, up: 10, stun: 1, source: 'skill' });
+    this.fx.rings.ring(p.pos, { r0: 2, r1: 26, life: 0.8, color: 0xffe0a0, opacity: 0.9 });
+    this.fx.rings.disc(p.pos, { r: 14, life: 0.35, color: 0xffd080, opacity: 0.6 });
+    this.fx.debris.burst(p.pos, { count: 30, speed: 14, up: 12, size: 0.45, color: this.rockColor ?? 0x7a6a5a });
+    this.fx.scorch.add(p.pos, 7, 6);
+    this.audio.play('quake', { volume: 1 });
+    this.audio.play('explosion', { volume: 0.8, pitch: 0.7 });
+    this.shake.add(0.5);
+    this.juice.flash(0xfff0c0, 0.5);
+    this.juice.radial(1.5);
+    this.juice.fovKick(-5);
+    this.hitstop(n > 0 ? 0.08 : 0.04);
+  }
+
+  /** 完美闪避：跳过怪物 / 首领攻击擦身而过 */
+  onPerfect(pos, big = true) {
+    if (this.perfectCd > 0 || !this.player.alive) return;
+    this.perfectCd = big ? 0.6 : 0.25;
+    if (!big) {
+      // 擦弹：小奖励
+      this.addFever(2.5);
+      this.fx.sparks.burst(pos, { count: 8, speed: 5, life: 0.25, size: 0.5, color: 0x9ff0ff, color2: 0xffffff });
+      return;
+    }
+    this.addFever(12);
+    this.slowmoT = Math.max(this.slowmoT, 0.18);
+    this.juice.flash(0x60e0ff, 0.18);
+    this.juice.aberr(0.6);
+    this.floatText(this.player.pos, t('float.perfect'), 'info', this.player.top + 2.5);
+    this.fx.rings.ring(this.player.pos, { r0: 0.5, r1: 5, life: 0.35, color: 0x60e0ff });
+    for (let i = 0; i < 3; i++) this.spawnPickup('coin', this.player.pos, 1);
+    this.audio.play('star', { volume: 0.6, pitch: 1.5 });
   }
 
   /** 击杀演出：精英击破 / 多重击杀 */
@@ -749,6 +846,7 @@ export class Game {
     if (!e.isProp) {
       this.stats.kills++;
       this.onKillFx(e);
+      this.addFever(e.elite ? 10 : 2.2);
       this.stats.score += (e.def.score || 10) * (1 + Math.min(this.combo, 50) * 0.02);
       this.audio.play('enemyDie', { volume: 0.4, pitch: rand(0.85, 1.15) });
     } else {
@@ -863,7 +961,10 @@ export class Game {
       if (dz > p.frontReach * 0.7 + e.radius || dz < -p.radius - e.radius) continue;
       if (Math.abs(e.pos.x - p.pos.x) > p.radius * 0.85 + e.radius * 0.8) continue;
       if (e.flying) { if (e.hoverY > p.top + 2.5) continue; }
-      else if (air > (e.height || 2) * 0.8) continue; // 跳过去了
+      else if (air > (e.height || 2) * 0.8) { // 跳过去了
+        if (!e.dodged && !e.isProp) { e.dodged = true; this.onPerfect(e.pos); }
+        continue;
+      }
       e.collideCd = 0.7;
       p.collide(e);
     }
@@ -919,7 +1020,7 @@ export class Game {
     switch (pk.kind) {
       case 'coin': {
         // 无尽模式金币收益打折，避免刷金币让升级失去意义
-        this.coinFrac = (this.coinFrac || 0) + pk.value * p.stats.coinMul * (this.endless ? 0.35 : 1);
+        this.coinFrac = (this.coinFrac || 0) + pk.value * p.stats.coinMul * (this.endless ? 0.35 : 1) * (1 + Math.min(this.combo, 100) / 200);
         const v = Math.floor(this.coinFrac);
         this.coinFrac -= v;
         this.stats.coins += v;
@@ -996,9 +1097,12 @@ export class Game {
     let spd = clamp((pl.fwd - RUN_SPEED * 1.08) / (RUN_SPEED * 0.8), 0, 1);
     if (sk && (sk.type === 'pounce' || sk.type === 'dive') && !pl.onGround) spd = Math.max(spd, 0.75);
     if (this.state === 'win' || this.state === 'intro') spd = 0;
+    const rage = pl.buffs.rage > 0;
+    if (rage) spd = Math.max(spd, 0.5);
     J.speed = spd;
-    J.fov = spd * 12;
+    J.fov = spd * 12 + (rage ? 4 : 0);
     J.radial = spd * 0.4;
+    J.tint = rage ? 0.4 : 0;
     const low = pl.alive ? clamp(1 - pl.hp / (pl.stats.maxHp * 0.3), 0, 1) : 1;
     J.desat = pl.alive ? low * 0.35 : 0.75;
     J.vig = low * 0.3;
@@ -1153,6 +1257,7 @@ export class Game {
     this.fx.lights?.dispose();
     this.fx.streaks.dispose();
     this.juice.reset();
+    this.audio.setMusicRate(1);
     this.tele.clear();
     this.text.clear();
     this.hud.dispose();

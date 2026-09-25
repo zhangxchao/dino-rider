@@ -172,12 +172,26 @@ export default {
     'float.eliteDown': 'エリート撃破！',
     'float.multi': 'マルチキル ×{n}！',
 
+    'toast.feverReady': '🦖 太古の覚醒 準備完了！R で発動',
+    'combo.tier1': '熱狂！',
+    'combo.tier2': '無双！',
+    'combo.tier3': '暴走！',
+    'combo.tier4': '太古の怒り！',
+    'banner.rage': '太古の覚醒！',
+    'banner.rageSub': '無敵 · 虹色弾幕 · 衝撃波',
+    'float.perfect': 'パーフェクト回避！',
+    'hud.fever': 'フィーバー',
+    'touch.ult': '覚醒',
+    'help.ultKey': 'R',
+    'help.ult': 'フィーバーゲージが満タンで「太古の覚醒」：巨大化・無敵・弾幕倍増、終了時に全画面衝撃波',
+    'help.tips2': '🔥 コンボが高いほど連射が速くなり、コインも増える。モンスターを飛び越えたり、ボスの攻撃をギリギリでかわすと<b>パーフェクト回避</b>、フィーバーゲージが一気にたまる。',
+
     'enemy.chest': '宝箱',
     'enemy.rock': '落石',
 
     'hud.combo': 'コンボ',
     'hud.hints': '<kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> 左右移動（マウスのドラッグでも可）<br>'
-      + '<kbd>スペース</kbd> ジャンプ · <kbd>Q</kbd> スキル · ライダーは自動射撃 · <kbd>Esc</kbd> 一時停止',
+      + '<kbd>スペース</kbd> ジャンプ · <kbd>Q</kbd> スキル · ライダーは自動射撃 · <kbd>R</kbd> 覚醒 · <kbd>Esc</kbd> 一時停止',
     'hud.levelUp': '武器レベルアップ！',
     'hud.toBoss': 'ボスまで {n}m',
     'hud.bossFight': 'ボス戦！',

@@ -172,12 +172,26 @@ export default {
     'float.eliteDown': '精英击破！',
     'float.multi': '多重击杀 ×{n}！',
 
+    'toast.feverReady': '🦖 远古觉醒就绪！按 R 释放',
+    'combo.tier1': '狂热！',
+    'combo.tier2': '无双！',
+    'combo.tier3': '暴走！',
+    'combo.tier4': '远古之怒！',
+    'banner.rage': '远古觉醒！',
+    'banner.rageSub': '无敌 · 彩虹弹幕 · 冲击波',
+    'float.perfect': '完美闪避！',
+    'hud.fever': '狂热',
+    'touch.ult': '觉醒',
+    'help.ultKey': 'R',
+    'help.ult': '狂热槽满后释放“远古觉醒”：变大、无敌、弹幕翻倍，结束时全屏冲击波',
+    'help.tips2': '🔥 连击越高射速越快、金币越多；跳过怪物或在首领攻击边缘躲开会触发<b>完美闪避</b>，迅速充满狂热槽。',
+
     'enemy.chest': '宝箱',
     'enemy.rock': '落石',
 
     'hud.combo': '连击',
     'hud.hints': '<kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> 左右移动（也可按住鼠标拖动）<br>'
-      + '<kbd>空格</kbd> 跳跃 · <kbd>Q</kbd> 技能 · 骑手自动射击 · <kbd>Esc</kbd> 暂停',
+      + '<kbd>空格</kbd> 跳跃 · <kbd>Q</kbd> 技能 · 骑手自动射击 · <kbd>R</kbd> 觉醒 · <kbd>Esc</kbd> 暂停',
     'hud.levelUp': '武器升级！',
     'hud.toBoss': '距离首领 {n} 米',
     'hud.bossFight': '首领战！',

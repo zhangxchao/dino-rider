@@ -773,6 +773,9 @@ export class AudioSystem {
     }
   }
 
+  /** 音乐速度倍率（大招期间加速） */
+  setMusicRate(r = 1) { this.musicRate = r; }
+
   stopMusic(fade = 1) {
     this._wantTheme = null;
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
@@ -1130,7 +1133,7 @@ export class AudioSystem {
     if (!tr || !c) return;
     const now = c.currentTime;
     if (tr.nextTime < now - 0.25) tr.nextTime = now + 0.05; // 标签页休眠后重新对齐
-    const sd = 60 / tr.T.bpm / 4;
+    const sd = 60 / tr.T.bpm / 4 / (this.musicRate || 1);
     let guard = 0;
     while (tr.nextTime < now + 0.12 && guard++ < 24) {
       try { this._scheduleStep(tr, tr.step, tr.nextTime); } catch (e) { if (this.debug) console.warn('[audio] music', e); }
@@ -1145,7 +1148,7 @@ export class AudioSystem {
     const barAbs = Math.floor(step / 16);
     const bar = barAbs % 8;
     const phrase = Math.floor(barAbs / 8);
-    const sd = 60 / T.bpm / 4;
+    const sd = 60 / T.bpm / 4 / (this.musicRate || 1);
     const tt = T.swing && (s & 1) ? t + T.swing * sd : t;
     const cd = T.prog[bar % T.prog.length];
     const chord = [0, 2, 4].map((k) => degMidi(T, cd + k));

@@ -671,10 +671,11 @@ export class Boss {
           P.fired = true;
           for (const s of P.spots) {
             _v.set(s.x, g.heightAt(s.x, s.z), s.z);
-            if (Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z) < 4.3 + pl.radius * 0.4 && pl.pos.y - _v.y < 2.5) {
+            const dd = Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z), hitR = 4.3 + pl.radius * 0.4;
+            if (dd < hitR && pl.pos.y - _v.y < 2.5) {
               _dir.set(pl.pos.x - s.x, 0, pl.pos.z - s.z).normalize();
               pl.takeDamage(this.dmg * 1.2, { dir: _dir, knock: 10, attacker: this, kind: 'melee' });
-            }
+            } else if (dd < hitR + 2.4) g.onPerfect(pl.pos); // 擦身躲过 / 跳过砸地
             g.fx.rings.ring(_v, { r0: 1, r1: 5, life: 0.45, color: 0xffd0a0 });
             g.fx.dust.burst(_v, { count: 24, speed: 6, life: 0.9, size: 1.4, sizeEnd: 3.5, color: g.dustColor, alpha: 0.6, flat: true, drag: 2, up: 3 });
             g.fx.sparks.burst(_v, { count: 14, speed: 7, life: 0.4, size: 0.8, color: 0xffe0a0, color2: color, up: 3 });

@@ -15,6 +15,9 @@ const _inherit = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const FWD = new THREE.Vector3(0, 0, 1);
 const GRAVITY = 32;
+export const RAGE_TIME = 7;
+const RAGE_COL = new THREE.Color(0xffb020);
+const _rc = new THREE.Color();
 
 export function computeStats(dino, rider, up) {
   const s = dino.stats;
@@ -96,7 +99,11 @@ export class Player {
     this.skillCd = 2;
     this.skill = null;
     this.skillAnim = -1;
-    this.buffs = { frenzy: 0, fortress: 0, sprint: 0, power: 0, shield: 0 };
+    this.buffs = { frenzy: 0, fortress: 0, sprint: 0, power: 0, shield: 0, rage: 0 };
+    this.baseScale = this.root.scale.x;
+    this.rageScale = 1;
+    this.rageWaveT = 0;
+    this.rageWas = false;
     this.slowT = 0; this.slowMul = 1;
     this.poisonT = 0; this.poisonDps = 0; this.poisonTick = 0;
     this.invuln = 0;
@@ -123,7 +130,7 @@ export class Player {
 
   get center() { return _v.set(this.pos.x, this.pos.y + this.size.height * 0.75, this.pos.z); }
   getCenter(out) { return out.set(this.pos.x, this.pos.y + this.size.height * 0.75, this.pos.z); }
-  get invulnerable() { return this.buffs.sprint > 0 || !!(this.skill && this.skill.invuln); }
+  get invulnerable() { return this.buffs.sprint > 0 || this.buffs.rage > 0 || !!(this.skill && this.skill.invuln); }
 
   // ------------------------------------------------------------------
   //  武器
@@ -132,13 +139,14 @@ export class Player {
     const w = this.riderDef.weapon;
     const L = WEAPON_LEVELS[this.weapon.level];
     const W = this.weapon;
-    const count = Math.min(9, (w.count || 1) + L.count + W.count);
-    const rate = L.rate * W.rate * (this.buffs.frenzy > 0 ? 1.8 : 1) * (this.buffs.sprint > 0 ? 1.4 : 1);
+    const rage = this.buffs.rage > 0;
+    const count = Math.min(rage ? 11 : 9, (w.count || 1) + L.count + W.count + (rage ? 2 : 0));
+    const rate = L.rate * W.rate * (this.buffs.frenzy > 0 ? 1.8 : 1) * (this.buffs.sprint > 0 ? 1.4 : 1) * (rage ? 1.3 : 1) * (1 + this.game.comboBonus());
     return {
       count,
-      dmg: w.dmg * this.stats.riderMul * L.dmg * W.dmg * (this.buffs.power > 0 ? 1.5 : 1),
+      dmg: w.dmg * this.stats.riderMul * L.dmg * W.dmg * (this.buffs.power > 0 ? 1.5 : 1) * (rage ? 1.25 : 1),
       cd: w.cd / rate,
-      pierce: (w.pierce || 0) + L.pierce + W.pierce,
+      pierce: (w.pierce || 0) + L.pierce + W.pierce + (rage ? 2 : 0),
       homing: w.homing || L.homing || 0,
       spread: count > 1 ? Math.min(w.spread || 9, 44 / (count - 1)) : 0,
     };
@@ -273,6 +281,10 @@ export class Player {
     if (ctl.enabled) {
       if (this.fireCd <= 0) this.fire();
       if (this.biteCd <= 0 && this.atkT < 0 && !(sk && sk.noBite)) this.tryBite();
+      if (ctl.ult && this.buffs.rage <= 0) {
+        if (g.fever >= 100) this.startRage();
+        else g.audio.play('error', { volume: 0.35 });
+      }
       if (ctl.skill) {
         if (this.skillCd <= 0 && !this.skill) this.startSkill(ctl.run);
         else if (this.skillCd > 0) g.audio.play('error', { volume: 0.35 });
@@ -306,6 +318,7 @@ export class Player {
     this.riderModel.update(dt, this.riderAnim);
 
     if (this.flashT > 0) this.flash.setFlash(this.flashT / 0.15);
+    else if (this.buffs.rage > 0) this.flash.setFlash(0.16 + 0.08 * Math.sin(this.anim.t * 14), RAGE_COL);
     else if (this.buffs.frenzy > 0) this.flash.setFlash(0.22 + 0.12 * Math.sin(this.anim.t * 12), FRENZY_COL);
     else if (this.buffs.sprint > 0 || (sk && sk.type === 'charge')) this.flash.setFlash(0.3, SPRINT_COL);
     else if (this.poisonT > 0) this.flash.setFlash(0.2 + 0.1 * Math.sin(this.anim.t * 8), POISON_COL);
@@ -369,7 +382,7 @@ export class Player {
         radius: (RADII[w.type] ?? 0.6) * (this.weapon.level >= 9 ? 1.25 : 1), life: w.type === 'missile' ? 3.5 : 2.4,
         pierce: ws.pierce, bounce: w.bounce || 0, homing: ws.homing, target: ws.homing ? target : null,
         aoe: w.aoe || 0, slow: w.slow || 0, slowTime: w.slowTime || 0, burn: w.burn || 0,
-        knock: w.knock ?? 2, gravity, color: w.color, explodeOnExpire: !!w.aoe,
+        knock: w.knock ?? 2, gravity, color: this.buffs.rage > 0 ? _rc.setHSL((this.anim.t * 0.9 + i / n) % 1, 1, 0.6).getHex() : w.color, explodeOnExpire: !!w.aoe,
         scale: this.weapon.level >= 9 ? 1.3 : 1,
       });
     }
@@ -428,7 +441,7 @@ export class Player {
   /** 与怪物相撞（由 game 检测） */
   collide(e) {
     const g = this.game;
-    const charging = (this.skill && this.skill.type === 'charge') || this.buffs.sprint > 0;
+    const charging = (this.skill && this.skill.type === 'charge') || this.buffs.sprint > 0 || this.buffs.rage > 0;
     const dxs = Math.sign(e.pos.x - this.pos.x) || (Math.random() < 0.5 ? -1 : 1);
     if (charging || (!e.isBoss && (!e.isProp || e.type === 'chest') && e.hp <= this.stats.ram * (this.buffs.power > 0 ? 1.5 : 1))) {
       // 撞飞！
@@ -526,6 +539,35 @@ export class Player {
     if (hits > 0) {
       g.hitstop(0.035);
       if (hits >= 3) g.floatText(this.pos, t('float.stomp', { n: hits }), 'crit', this.top + 2);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  //  远古觉醒（狂热槽满后按 R）：变大、无敌、彩虹弹幕、周期冲击波，结束时全屏震荡
+  // ------------------------------------------------------------------
+  startRage() {
+    const g = this.game;
+    g.fever = 0;
+    this.buffs.rage = RAGE_TIME;
+    this.rageWaveT = 0.3;
+    this.rageWas = true;
+    g.onRageStart();
+  }
+
+  updateRage(dt) {
+    const g = this.game;
+    const on = this.buffs.rage > 0;
+    this.rageScale = damp(this.rageScale, on ? 1.35 : 1, on ? 6 : 3, dt);
+    this.root.scale.setScalar(this.baseScale * this.rageScale);
+    if (on) {
+      this.rageWaveT -= dt;
+      if (this.rageWaveT <= 0 && this.alive) {
+        this.rageWaveT = 0.75;
+        this.launchWave(this.stats.atk * 1.2, 8, 1.2);
+      }
+    } else if (this.rageWas) {
+      this.rageWas = false;
+      if (this.alive) g.onRageEnd();
     }
   }
 
@@ -724,12 +766,18 @@ export class Player {
   updateBuffFx(dt) {
     const g = this.game;
     this.afterimages.update(dt);
+    this.updateRage(dt);
     this.auraAcc += dt;
     if (this.auraAcc < 0.05) return;
     this.auraAcc = 0;
     const c = this.center;
     // 残影：疾跑 / 冲锋 / 飞扑 / 俯冲时留下一串半透明的影子
     const sk = this.skill;
+    if (this.buffs.rage > 0) {
+      // 金色火焰包裹全身 + 金色残影
+      g.fx.sparks.burst(c, { count: 4, speed: 1.2, life: 0.5, size: 0.85, sizeEnd: 0.1, color: 0xffd060, color2: 0xff3000, alpha: 0.8, radius: this.radius * 1.2, up: 4, gravity: -3 });
+      this.afterimages.spawn(0xd89020, 0.2, 0.25);
+    }
     if (this.alive) {
       if (this.buffs.sprint > 0) this.afterimages.spawn(0x3aa8d8, 0.22);
       else if (sk && sk.type === 'charge') this.afterimages.spawn(0xd87a20, 0.22);

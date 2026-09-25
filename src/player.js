@@ -6,6 +6,7 @@ import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED } from './data.js';
 import { clamp, damp, prepareModel, mergeStaticMeshes } from './util.js';
 import { createShield } from './effects.js';
 import { t } from './i18n.js';
+import { curvature } from './bend.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -104,6 +105,7 @@ export class Player {
     this.alive = true;
     this.deadT = 0;
     this.lean = 0;
+    this.slope = 0;
     this.cheer = false;
     this.stepAcc = 0;
     this.auraAcc = 0;
@@ -208,6 +210,10 @@ export class Player {
     const sk = this.skill;
     // --- 前进 ---
     let fwdT = ctl.run ? RUN_SPEED : 0;
+    // 上坡减速、下坡加速
+    const base = g.track.baseAt;
+    this.slope = damp(this.slope, (base(this.pos.z + 3) - base(this.pos.z - 3)) / 6, 6, dt);
+    fwdT *= clamp(1 - this.slope * 1.3, 0.86, 1.14);
     if (ctl.run && this.buffs.sprint > 0) fwdT *= 1.6;
     if (ctl.run && sk && sk.type === 'charge') fwdT *= 2;
     this.fwd = damp(this.fwd, fwdT * (ctl.run ? this.slowMul : 1), ctl.run ? 2.5 : 2, dt);
@@ -219,6 +225,9 @@ export class Player {
     this.vel.x = damp(this.vel.x, vxT, 12, dt);
     let dx = this.vel.x * dt;
     if (ctl.enabled && ctl.drag) dx -= ctl.drag * ctl.dragScale;
+    // 弯道离心力：把恐龙往弯道外侧推，需要主动往内侧打方向
+    const kap = curvature();
+    if (ctl.run && this.onGround) dx -= kap * this.fwd * this.fwd * 0.55 * dt;
     this.pos.x += dx;
     const lim = g.track.roadHalf - Math.min(1.2, this.radius * 0.5);
     this.pos.x = clamp(this.pos.x, -lim, lim);
@@ -240,6 +249,7 @@ export class Player {
         g.audio.play('land', { volume: 0.5 });
         g.fx.dust.burst(this.pos, { count: 12, speed: 4, life: 0.6, size: 1, sizeEnd: 2.2, color: g.dustColor, alpha: 0.45, flat: true, up: 1 });
         if (sk && sk.air) this.landSkill();
+        else if (!sk) this.landStomp(-this.vy);
       }
       this.pos.y = gy; this.vy = 0; this.onGround = true;
     } else if (this.pos.y > gy + 0.05) this.onGround = false;
@@ -247,7 +257,7 @@ export class Player {
     // 朝向：随左右移动微微转头
     const hT = clamp(Math.atan2(vxEff, Math.max(7, this.fwd)), -0.55, 0.55);
     this.heading = damp(this.heading, hT, 8, dt);
-    this.lean = damp(this.lean, clamp(-vxEff / Math.max(1, lat), -1, 1), 8, dt);
+    this.lean = damp(this.lean, clamp(-vxEff / Math.max(1, lat) + kap * this.fwd * this.fwd * 0.12, -1, 1), 8, dt);
 
     // 脚步
     if (this.onGround && this.fwd > 2) {
@@ -279,6 +289,7 @@ export class Player {
     // --- 模型 ---
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.heading + this.spinAngle;
+    this.root.rotation.x = this.onGround ? damp(this.root.rotation.x, -Math.atan(this.slope) * 0.9, 8, dt) : damp(this.root.rotation.x, 0, 3, dt);
     const runAmt = this.fwd > 1 ? clamp(this.fwd / RUN_SPEED, 0, 1.8) : clamp(Math.abs(vxEff) / lat, 0, 1) * 0.8;
     this.anim.move = runAmt;
     this.anim.air = !this.onGround;
@@ -495,6 +506,23 @@ export class Player {
     _v.set(this.pos.x, this.pos.y + 1.2, this.pos.z + this.frontReach);
     g.projectiles.spawn({ kind: 'wave', owner: 'player', source: 'skill', pos: _v, dir: FWD, speed: 36, inherit: _inherit.set(0, 0, this.fwd), dmg, radius: width / 2 + 0.6, life: 1.5, pierce: 999, knock: 12, stun: 0.8, width, hover: 1.3, scale });
     g.audio.play('wave');
+  }
+
+  /** 普通跳跃落地：踩踏震地，伤害并击飞脚边的怪物（体型越大范围越大） */
+  landStomp(fall) {
+    const g = this.game;
+    const k = clamp((fall - 8) / 6, 0, 1);
+    const R = 2.4 + this.radius * 0.9 + this.size.height * 0.35;
+    const dmg = this.stats.atk * (0.7 + 0.4 * k) * (this.buffs.power > 0 ? 1.5 : 1);
+    const hits = g.aoe(this.pos, R, dmg, { knock: 8, up: 6, stun: 0.35, source: 'melee' });
+    g.fx.rings.ring(this.pos, { r0: 0.8, r1: R * 1.25, life: 0.45, color: 0xfff0c8, opacity: 0.55 });
+    g.fx.dust.burst(this.pos, { count: 26, speed: 6 + R, life: 0.7, size: 1.1, sizeEnd: 2.8, color: g.dustColor, alpha: 0.5, flat: true, drag: 2.5, up: 1.5 });
+    g.audio.play('stomp', { volume: 0.55 + 0.25 * k, pitch: 1.2 - this.size.height * 0.08 });
+    g.shake.add(0.12 + 0.1 * k);
+    if (hits > 0) {
+      g.hitstop(0.035);
+      if (hits >= 3) g.floatText(this.pos, t('float.stomp', { n: hits }), 'crit', this.top + 2);
+    }
   }
 
   landSkill() {

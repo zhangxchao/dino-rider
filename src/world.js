@@ -4,6 +4,7 @@
 //  全部程序化生成（带种子，布局稳定），低多边形 flatShading 风格。
 // =====================================================================
 import * as THREE from 'three';
+import { attachBend } from './bend.js';
 
 export const ARENA_RADIUS = 62;
 const SIZE = 260;             // 地形边长
@@ -318,6 +319,7 @@ function waterMaterial(ctx, color, opacity, amp) {
   const timeU = ctx.timeU;
   const A = amp.toFixed(3);
   m.onBeforeCompile = (sh) => {
+    attachBend(sh);
     sh.uniforms.uTime = timeU;
     sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace(
       '#include <begin_vertex>',
@@ -334,6 +336,7 @@ function bannerMaterial(ctx, color) {
   const m = new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide, flatShading: true });
   const timeU = ctx.timeU;
   m.onBeforeCompile = (sh) => {
+    attachBend(sh);
     sh.uniforms.uTime = timeU;
     sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace(
       '#include <begin_vertex>',
@@ -372,9 +375,11 @@ function lavaMaterial(ctx, { fog = true, hot = 0xffa21a, cool = 0x4a0a02, scale 
     vertexShader: /* glsl */`
       varying vec3 vWorld;
       #include <fog_pars_vertex>
+      #include <bend_pars_vertex>
       void main() {
         vec4 wp = modelMatrix * vec4(position, 1.0);
         vWorld = wp.xyz;
+        wp = bendWorld(wp);
         vec4 mvPosition = viewMatrix * wp;
         gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>

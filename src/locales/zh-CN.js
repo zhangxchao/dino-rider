@@ -167,6 +167,8 @@ export default {
     'float.fortress': '铁甲堡垒！',
     'float.sprint': '疾风！无敌冲刺',
 
+    'float.stomp': '震地踩踏 ×{n}！',
+
     'enemy.chest': '宝箱',
     'enemy.rock': '落石',
 

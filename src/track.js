@@ -628,6 +628,7 @@ const TB = {
   // ============================== 沼泽 ==============================
   swamp: {
     amp: [1.2, 0.3, 1.2],
+    hill: [2.4, 2.2, 2.6, 0.35],
     deck: true,
     roadDip: -1.9,
     waterY: -0.8,
@@ -859,13 +860,27 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
   const prand = mulberry32(seed);
   const noise = makeNoise(mulberry32(seed ^ 0x9e3779b9));
 
-  // —— 道路纵断面（只在 z 方向起伏，坡度 ≤ ~3%） ——
-  const AMP = tb.amp;
-  const PH = [prand() * TAU, prand() * TAU, prand() * TAU];
-  const K = [TAU / 820, TAU / 310, TAU / 1700];
-  const rawBase = (z) => AMP[0] * Math.sin(z * K[0] + PH[0]) + AMP[1] * Math.sin(z * K[1] + PH[1]) + AMP[2] * Math.sin(z * K[2] + PH[2]);
+  // —— 道路纵断面：只在 z 方向起伏，上坡 / 下坡最陡约 12%（弯道由 bend.js 在渲染时弯曲） ——
+  //    起点与首领战场（opts.flat / addFlat）处压平，保证开场和首领战在平地上进行
+  const HILL = tb.hill || [3.4, 3.2, 4.2, 0.8];
+  const AMP = [tb.amp[0] * HILL[0], tb.amp[1] * HILL[1], tb.amp[2] * HILL[2], HILL[3]];
+  const PH = [prand() * TAU, prand() * TAU, prand() * TAU, prand() * TAU];
+  const K = [TAU / 820, TAU / 310, TAU / 1700, TAU / 190];
+  const rawBase = (z) => AMP[0] * Math.sin(z * K[0] + PH[0]) + AMP[1] * Math.sin(z * K[1] + PH[1])
+    + AMP[2] * Math.sin(z * K[2] + PH[2]) + AMP[3] * Math.sin(z * K[3] + PH[3]);
   const B0 = rawBase(0);
-  const base = (z) => rawBase(z) - B0;
+  const FLAT_RAMP = 150;
+  const flats = [];                   // { a, b, h }：[a, b] 内高度固定为 h，两侧 FLAT_RAMP 米平滑过渡
+  const addFlat = (a, b) => { flats.push({ a, b, h: rawBase((a + b) / 2) - B0 }); };
+  for (const [a0, b0] of opts.flat || []) addFlat(a0, b0);
+  const base = (z) => {
+    let h = (rawBase(z) - B0) * smooth(40, 300, z);
+    for (const f of flats) {
+      const d = z < f.a ? f.a - z : z > f.b ? z - f.b : 0;
+      if (d < FLAT_RAMP) h = lerp(f.h, h, smooth(0, FLAT_RAMP, d));
+    }
+    return h;
+  };
   const sideFn = tb.side(noise);
   const roadDip = tb.roadDip || 0;
   const tH = (x, z) => {
@@ -972,12 +987,14 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
     const glow = new THREE.Mesh(new THREE.BufferGeometry(), roadGlowMat);
     glow.name = 'roadGlow' + i;
     const extra = { terrain, road, glow, water: null, chunk: null };
-    for (const m of [terrain, road, glow]) { m.visible = false; root.add(m); }
+    // 弯道在顶点着色器里平移，包围球与实际位置不符，块网格不做视锥剔除
+    for (const m of [terrain, road, glow]) { m.visible = false; m.frustumCulled = false; root.add(m); }
     if (surfaceMat) {
       extra.water = new THREE.Mesh(new THREE.BufferGeometry(), surfaceMat);
       extra.water.name = (tb.water ? 'water' : 'lava') + i;
       extra.water.receiveShadow = !!tb.water;
       extra.water.visible = false;
+      extra.water.frustumCulled = false;
       root.add(extra.water);
     }
     slotMeshes.push(extra);
@@ -1142,6 +1159,7 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
     roadHalf: ROAD_HALF,
     heightAt,
     baseAt: base,
+    addFlat,           // 首领战场压平（只影响尚未生成的地形块）
     sun,
     fogColor: horizon.clone(),
     update(dt, t, focus) {

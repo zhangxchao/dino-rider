@@ -11,6 +11,7 @@ import { input } from './input.js';
 import { save, persist } from './save.js';
 import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut } from './util.js';
 import { t } from './i18n.js';
+import { setBendProfile, updateBend, resetBend, bendX, bendVec, curvature } from './bend.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -184,7 +185,11 @@ export class Game {
     this.biome = this.endless ? pick(BIOMES) : this.level.biome;
     this.length = this.endless ? Infinity : this.level.length;
     this.quality = save.settings.quality;
-    this.track = createTrack(this.biome, this.scene, { quality: this.quality });
+    // 首领战场压平：普通关卡在终点，无尽模式在每只首领出现处（后续由 addFlat 追加）
+    const bossZ = this.endless ? ENDLESS_BOSS_EVERY : this.length;
+    this.track = createTrack(this.biome, this.scene, { quality: this.quality, flat: [[bossZ - 40, bossZ + 140]] });
+    setBendProfile(this.biome);
+    updateBend(0, 1);
     this.world = this.track;
     this.heightAt = (x, z) => this.track.heightAt(x, z);
     this.dustColor = DUST[this.biome] ?? 0xa09070;
@@ -220,7 +225,7 @@ export class Game {
     this.player = new Player(this, this.dino, this.rider, computeStats(this.dino, this.rider, save.upgrades));
     this.player.pos.set(0, this.heightAt(0, 0), 0);
 
-    this.cam = { x: 0, gy: this.heightAt(0, 0), boss: 0 };
+    this.cam = { x: 0, gy: this.heightAt(0, 0), gl: this.heightAt(0, 20), boss: 0, roll: 0 };
     this.camera.fov = 60;
     this.camera.updateProjectionMatrix();
     this.viewW = window.innerWidth;
@@ -452,6 +457,7 @@ export class Game {
     this.tele.update(dt);
     this.track.update(dt, this.time + this.stateT, p.pos);
 
+    updateBend(p.pos.z, 1);
     this.updateCamera(realDt);
     this.shake.apply(this.camera, realDt);
     this.renderBatches();
@@ -524,6 +530,7 @@ export class Game {
         this.boss = null;
         this.audio.startMusic(this.biome);
         this.nextBossAt = this.player.pos.z + ENDLESS_BOSS_EVERY;
+        this.track.addFlat(this.nextBossAt - 40, this.nextBossAt + 140);
         this.routeGen = this.player.pos.z + 60;
         this.nextGate = this.routeGen + 40;
         this.extendRoute(this.player.pos.z + 700);
@@ -885,9 +892,12 @@ export class Game {
     const ahead = 20 + cam.boss * 8;
     cam.x = damp(cam.x, p.pos.x * 0.55, 4, dt);
     cam.gy = damp(cam.gy, this.heightAt(0, p.pos.z), 3, dt);
+    // 上下坡：视线跟随前方路面高度（看向坡顶 / 坡底），镜头不会钻进身后的坡里
+    cam.gl = damp(cam.gl, this.heightAt(0, p.pos.z + ahead), 2.5, dt);
     const jumpY = Math.max(0, p.pos.y - this.heightAt(p.pos.x, p.pos.z)) * 0.3;
-    const pos = _v.set(cam.x, cam.gy + camH + jumpY, p.pos.z - camD);
-    const look = _v2.set(cam.x * 0.8 + p.pos.x * 0.2, cam.gy + 1.3 + cam.boss * 2, p.pos.z + ahead);
+    const camY = Math.max(cam.gy + camH, this.heightAt(0, p.pos.z - camD) + 2.5);
+    const pos = _v.set(cam.x, camY + jumpY, p.pos.z - camD);
+    const look = _v2.set(cam.x * 0.8 + p.pos.x * 0.2, lerp(cam.gy, cam.gl, 0.6) + 1.3 + cam.boss * 2, p.pos.z + ahead);
 
     let blend = 0;
     const t = this.stateT;
@@ -901,8 +911,14 @@ export class Game {
       blend = easeInOut(clamp(t / 1.8, 0, 1));
     }
     if (blend > 0) { pos.lerp(_cinePos, blend); look.lerp(_cineLook, blend); }
+    // 弯道：镜头与视点按同一弯曲函数平移，并提前看向弯道内侧、轻微侧倾
+    bendVec(pos);
+    bendVec(look);
+    look.x += (bendX(p.pos.z + 55) - bendX(p.pos.z + ahead)) * 0.35 * (1 - blend);
+    cam.roll = damp(cam.roll, clamp(curvature() * 14, -0.07, 0.07) * (1 - blend), 2, dt);
     this.camera.position.copy(pos);
     this.camera.lookAt(look);
+    this.camera.rotateZ(cam.roll);
     this.camFade.value = Math.max(0, pos.distanceTo(p.pos) - 3);
   }
 
@@ -1046,5 +1062,6 @@ export class Game {
     this.text.clear();
     this.hud.dispose();
     this.track.dispose();
+    resetBend();
   }
 }

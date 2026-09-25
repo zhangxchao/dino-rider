@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED } from './data.js';
 import { formatTime } from './util.js';
 import { t } from './i18n.js';
+import { bendVec } from './bend.js';
 
 export const SKILL_ICON = {
   roar: '🗯️', charge: '🐂', pounce: '🐾', spin: '🌀', stomp: '💥', frenzy: '🔥', fortress: '🛡️',
@@ -207,7 +208,7 @@ export class Hud {
     // 自动瞄准标记
     const aim = game.aimTarget;
     if (aim && game.state !== 'win') {
-      aim.getCenter(_v).project(game.camera);
+      bendVec(aim.getCenter(_v)).project(game.camera);
       if (_v.z < 1) {
         this.reticle.style.display = 'block';
         this.reticle.style.left = ((_v.x * 0.5 + 0.5) * game.viewW).toFixed(0) + 'px';

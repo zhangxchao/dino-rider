@@ -1,5 +1,6 @@
 // 视觉特效：GPU 粒子、冲击波环、光柱、地面预警、护盾、伤害飘字
 import * as THREE from 'three';
+import { bendVec } from './bend.js';
 
 const _c = new THREE.Color();
 const _v = new THREE.Vector3();
@@ -14,10 +15,11 @@ const PARTICLE_VS = /* glsl */`
   varying vec3 vColor;
   varying float vAlpha;
   uniform float uScale;
+  #include <bend_pars_vertex>
   void main() {
     vColor = color;
     vAlpha = alpha;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vec4 mv = viewMatrix * bendWorld(modelMatrix * vec4(position, 1.0));
     gl_PointSize = max(1.0, size * uScale / -mv.z);
     gl_Position = projectionMatrix * mv;
   }`;
@@ -259,7 +261,8 @@ export class Rings {
 // ---------------------------------------------------------------------
 const TELE_VS = /* glsl */`
   varying vec2 vUv;
-  void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  #include <bend_pars_vertex>
+  void main() { vUv = uv; gl_Position = projectionMatrix * viewMatrix * bendWorld(modelMatrix * vec4(position, 1.0)); }`;
 const TELE_FS = /* glsl */`
   uniform vec3 uColor;
   uniform float uProgress;
@@ -381,8 +384,9 @@ export function createShield(color = 0xffd060) {
     uniforms: { uColor: { value: new THREE.Color(color) }, uTime: { value: 0 }, uAlpha: { value: 1 } },
     vertexShader: /* glsl */`
       varying vec3 vN; varying vec3 vV; varying vec3 vP;
+      #include <bend_pars_vertex>
       void main() {
-        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vec4 wp = bendWorld(modelMatrix * vec4(position, 1.0));
         vN = normalize(mat3(modelMatrix) * normal);
         vV = normalize(cameraPosition - wp.xyz);
         vP = position;
@@ -439,7 +443,7 @@ export class FloatingText {
       it.t += dt;
       const k = it.t / it.life;
       if (k >= 1) { this._kill(i); continue; }
-      _v.set(it.x, it.y, it.z).project(camera);
+      bendVec(_v.set(it.x, it.y, it.z)).project(camera);
       if (_v.z > 1) { it.el.style.opacity = 0; continue; }
       const sx = (_v.x * 0.5 + 0.5) * w + it.vx * k;
       const sy = (-_v.y * 0.5 + 0.5) * h - it.rise * (1 - (1 - k) * (1 - k));

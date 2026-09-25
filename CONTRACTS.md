@@ -104,3 +104,11 @@ export class AudioSystem {
 }
 ```
 音效名见 `src/audio.js` 顶部注释。
+
+## 6. `src/bend.js`（弯道）
+
+玩法坐标仍是笔直的 +Z 跑道；弯道只在渲染时出现。`bend.js` 改写了 `ShaderChunk` 的 `project_vertex` / `worldpos_vertex`，在世界空间把顶点沿 x 平移，所有内置材质（含阴影深度材质）都会自动弯曲。
+- 自定义 `ShaderMaterial`：顶点着色器里 `#include <bend_pars_vertex>`，并用 `bendWorld(modelMatrix * vec4(position, 1.0))` 代替 `modelMatrix * ...`。
+- 自己改写 `onBeforeCompile` 的材质：要在回调里调用 `attachBend(shader)`（否则拿不到 uniform）。
+- CPU 端把世界坐标投影到屏幕（飘字、准星等）前，先调用 `bendVec(v)`。
+- 弯曲后的网格与包围球不一致，大块网格（地形块）需要 `frustumCulled = false`。

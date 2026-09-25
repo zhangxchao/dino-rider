@@ -167,6 +167,8 @@ export default {
     'float.fortress': '鉄甲の要塞！',
     'float.sprint': '疾風！無敵ダッシュ',
 
+    'float.stomp': 'ふみつけ ×{n}！',
+
     'enemy.chest': '宝箱',
     'enemy.rock': '落石',
 

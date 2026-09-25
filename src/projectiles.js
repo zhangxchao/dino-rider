@@ -254,6 +254,11 @@ export class Projectiles {
       // 地面
       if (p.groundHit && p.hover === null) {
         const h = game.heightAt(p.pos.x, p.pos.z);
+        // 玩家的直射弹体贴着坡顶飞过去，不会被上坡路面挡掉
+        if (p.owner === 'player' && !p.gravity && p.pos.y < h + 0.6) {
+          p.pos.y = h + 0.6;
+          if (p.vel.y < 0) { p.vel.y = 0; p.vel.setLength(p.speed); }
+        }
         if (p.pos.y < h + 0.05) {
           if (p.aoe) this.explode(p, p.pos, null);
           else fx.dust.burst(p.pos, { count: 5, speed: 3, life: 0.4, size: 0.5, sizeEnd: 1.2, color: 0xb0a080, alpha: 0.6, up: 2 });

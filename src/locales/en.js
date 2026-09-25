@@ -167,6 +167,8 @@ export default {
     'float.fortress': 'Iron Fortress!',
     'float.sprint': 'Gale! Invincible dash',
 
+    'float.stomp': 'Stomp ×{n}!',
+
     'enemy.chest': 'Treasure Chest',
     'enemy.rock': 'Falling Rock',
 

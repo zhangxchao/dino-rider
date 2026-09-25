@@ -66,7 +66,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.3, riderScale: 1.0,
     features: ['sail', 'crocSnout'],
     colors: { main: 0x4f5f6a, belly: 0xc8bfa8, accent: 0xd46a2a, extra: 0x2a3a44, eye: 0xffb000 },
-    stats: { hp: 220, atk: 28, def: 0.15, speed: 10, reach: 2.6, atkRate: 0.95 },
+    stats: { hp: 270, atk: 28, def: 0.15, speed: 10, reach: 2.6, atkRate: 0.95 },
     attack: 'bite',
     skill: { type: 'frenzy', name: '狂暴撕咬', desc: '6 秒内射速翻倍、撕咬加速，并且撕咬可以吸血。', cd: 14, duration: 6, rateMul: 2.2, lifesteal: 0.25 },
   },

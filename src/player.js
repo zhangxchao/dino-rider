@@ -5,6 +5,7 @@ import { createRiderModel } from './models/riders.js';
 import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED } from './data.js';
 import { clamp, damp, prepareModel, mergeStaticMeshes } from './util.js';
 import { createShield } from './effects.js';
+import { t } from './i18n.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -467,20 +468,20 @@ export class Player {
         this.buffs.frenzy = d.duration;
         g.audio.play('frenzy'); g.audio.roar(0.8 + this.size.height * 0.15);
         g.fx.sparks.burst(this.center, { count: 40, speed: 8, life: 0.6, size: 0.8, color: 0xff4020, color2: 0xff0000 });
-        g.floatText(this.pos, '狂暴！射速翻倍', 'crit', this.top + 2);
+        g.floatText(this.pos, t('float.frenzy'), 'crit', this.top + 2);
         break;
       case 'fortress':
         s.dur = 0.8;
         this.buffs.fortress = d.duration;
         g.audio.play('fortress');
-        g.floatText(this.pos, '铁甲堡垒！', 'info', this.top + 2);
+        g.floatText(this.pos, t('float.fortress'), 'info', this.top + 2);
         break;
       case 'sprint':
         s.dur = 0.6;
         this.buffs.sprint = d.duration;
         this.sprintTouched.clear();
         g.audio.play('sprint');
-        g.floatText(this.pos, '疾风！无敌冲刺', 'info', this.top + 2);
+        g.floatText(this.pos, t('float.sprint'), 'info', this.top + 2);
         break;
     }
     this.skill = s;

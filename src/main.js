@@ -12,6 +12,7 @@ import { Game } from './game.js';
 import { UI } from './ui.js';
 import { Showcase } from './showcase.js';
 import { renderThumbnails } from './thumbs.js';
+import { t } from './i18n.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -135,12 +136,15 @@ class App {
   async init() {
     const fill = document.getElementById('loading-fill');
     const text = document.getElementById('loading-text');
+    document.querySelector('#loading .logo-big').textContent = t('game.logo');
+    document.querySelector('#loading .logo-sub').textContent = t('game.sub');
+    text.textContent = t('loading.wake');
     await nextFrame();
     this.thumbs = await renderThumbnails((p, name) => {
       fill.style.width = (p * 85).toFixed(0) + '%';
-      text.textContent = `正在孵化恐龙蛋：${name}…`;
+      text.textContent = t('loading.hatch', { name });
     });
-    text.textContent = '正在生成远古大陆…';
+    text.textContent = t('loading.world');
     fill.style.width = '92%';
     await nextFrame();
     this.showcase = new Showcase(this, this.menuBiome());
@@ -245,7 +249,7 @@ class App {
     this.errorShown = true;
     const d = document.createElement('div');
     d.style.cssText = 'position:fixed;left:12px;bottom:12px;max-width:60vw;padding:10px 14px;background:rgba(120,0,0,.85);color:#fff;font:12px/1.5 monospace;border-radius:8px;z-index:99;white-space:pre-wrap;pointer-events:auto';
-    d.textContent = '⚠️ 运行出错（请截图反馈）：\n' + (e && e.stack ? e.stack.split('\n').slice(0, 4).join('\n') : String(e));
+    d.textContent = t('error.runtime') + '\n' + (e && e.stack ? e.stack.split('\n').slice(0, 4).join('\n') : String(e));
     d.onclick = () => d.remove();
     document.body.appendChild(d);
   }
@@ -255,6 +259,6 @@ const app = new App();
 window.__app = app;
 app.init().catch((e) => {
   app.showError(e);
-  const t = document.getElementById('loading-text');
-  if (t) t.textContent = '加载失败：' + e.message;
+  const el = document.getElementById('loading-text');
+  if (el) el.textContent = t('error.load', { msg: e.message });
 });

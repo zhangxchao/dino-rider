@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { ENEMIES, BOSSES } from './data.js';
 import { createEnemyModel, createBossModel } from './models/enemies.js';
 import { clamp, damp, turnToward, prepareModel, rand, pick, mergeStaticMeshes } from './util.js';
+import { t } from './i18n.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -324,7 +325,7 @@ export class Prop {
     this.lift = 0;
     this.root = new THREE.Group();
     if (kind === 'chest') {
-      this.def = { name: '宝箱', score: 20, coins: 14, color: 0xffc040 };
+      this.def = { name: t('enemy.chest'), score: 20, coins: 14, color: 0xffc040 };
       const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a2a, roughness: 0.8, flatShading: true });
       const gold = new THREE.MeshStandardMaterial({ color: 0xffc933, metalness: 0.8, roughness: 0.3, emissive: 0x6a4400, emissiveIntensity: 0.6 });
       const body = new THREE.Mesh(chestBodyGeo, wood); body.position.y = 0.5;
@@ -337,7 +338,7 @@ export class Prop {
       this.maxHp = this.hp = Math.round(40 * mul);
       this.dmg = 0; this.xp = 8;
     } else {
-      this.def = { name: '落石', score: 5, coins: 2, color: 0x8a8070 };
+      this.def = { name: t('enemy.rock'), score: 5, coins: 2, color: 0x8a8070 };
       const mat = new THREE.MeshStandardMaterial({ color: game.rockColor || 0x7a7266, roughness: 0.95, flatShading: true });
       const sizes = [[0, 0.9, 0, 1.25], [0.9, 0.6, 0.3, 0.8], [-0.8, 0.55, -0.2, 0.75]];
       for (const [px, py, pz, s] of sizes) {
@@ -465,7 +466,7 @@ export class Boss {
       g.fx.rings.ring(this.pos, { r0: 2, r1: 16, life: 0.8, color: this.def.projColor });
       g.fx.rings.pillar(this.pos, { r: this.radius * 1.4, h: 20, life: 1.2, color: this.def.projColor });
       g.fx.sparks.burst(this.getCenter(_v), { count: 80, speed: 14, life: 1, size: 1.2, color: this.def.projColor, color2: 0xffffff });
-      g.showBanner('暴怒！', `${this.def.name} 进入第 ${this.phase} 阶段`, true);
+      g.showBanner(t('banner.enrage'), t('banner.phase', { name: this.def.name, n: this.phase }), true);
       this.pattern = { name: 'summon', t: 0, dur: 1.6, fired: true, teles: [] };
     }
   }

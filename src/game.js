@@ -10,6 +10,7 @@ import { Hud } from './hud.js';
 import { input } from './input.js';
 import { save, persist } from './save.js';
 import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut } from './util.js';
+import { t } from './i18n.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -77,7 +78,10 @@ function gateLabel(opt) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '104px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   ctx.fillText(opt.icon, 256, 82);
-  ctx.font = 'bold 66px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  const font = (px) => `bold ${px}px -apple-system,"PingFang SC","Hiragino Sans","Microsoft YaHei","Yu Gothic",sans-serif`;
+  ctx.font = font(66);
+  const w = ctx.measureText(opt.name).width;
+  if (w > 480) ctx.font = font(Math.floor(66 * 480 / w));
   ctx.lineWidth = 12; ctx.strokeStyle = 'rgba(0,0,0,0.65)';
   ctx.strokeText(opt.name, 256, 196);
   ctx.fillStyle = '#ffffff';
@@ -245,14 +249,14 @@ export class Game {
     this.extendRoute(this.endless ? 600 : this.length - 45);
 
     this.audio.startMusic(this.biome);
-    if (this.endless) this.showBanner('无尽模式', `${this.biomeName()} · 你能跑多远？`);
-    else this.showBanner(this.level.name, `第 ${this.levelIdx + 1} 关 · 全程 ${this.length} 米 · 终点首领：${BOSSES[this.level.boss].name}`);
+    if (this.endless) this.showBanner(t('banner.endless'), t('banner.endlessSub', { biome: this.biomeName() }));
+    else this.showBanner(this.level.name, t('banner.levelSub', { n: this.levelIdx + 1, len: this.length, boss: BOSSES[this.level.boss].name }));
     this.resize(this.viewW, this.viewH);
     this.updateCamera(1);
     this.warmup(app.renderer);
   }
 
-  biomeName() { return { jungle: '翠绿丛林', desert: '炽热沙海', frost: '冰封雪原', swamp: '迷雾沼泽', volcano: '熔岩火山', shadow: '暗影要塞' }[this.biome]; }
+  biomeName() { return LEVELS.find((l) => l.biome === this.biome)?.name ?? this.biome; }
 
   resize(w, h) {
     this.viewW = w; this.viewH = h;
@@ -459,12 +463,12 @@ export class Game {
     const p = this.player;
     switch (this.state) {
       case 'intro': {
-        const t = this.stateT;
-        const c = t < 1.6 ? -1 : t < 2.1 ? 3 : t < 2.6 ? 2 : t < 3.1 ? 1 : 0;
+        const st = this.stateT;
+        const c = st < 1.6 ? -1 : st < 2.1 ? 3 : st < 2.6 ? 2 : st < 3.1 ? 1 : 0;
         if (c !== this.countdown && c >= 0) {
           this.countdown = c;
           if (c > 0) { this.showBanner(String(c), '', false, 450); this.audio.play('countdown'); }
-          else { this.showBanner('出发！', '←→ 或 A/D 左右移动 · 自动射击', false, 1400); this.audio.play('waveStart'); this.state = 'run'; this.stateT = 0; }
+          else { this.showBanner(t('banner.go'), t('banner.goSub'), false, 1400); this.audio.play('waveStart'); this.state = 'run'; this.stateT = 0; }
         }
         break;
       }
@@ -499,7 +503,7 @@ export class Game {
     this.audio.startMusic('boss');
     this.audio.play('bossAppear');
     p.heal(p.stats.maxHp * 0.25);
-    this.after(0.3, () => this.showBanner(this.boss.def.name, `${this.boss.def.title} · 左右走位，躲开红色预警！`, true));
+    this.after(0.3, () => this.showBanner(this.boss.def.name, t('banner.bossSub', { title: this.boss.def.title }), true));
   }
 
   onBossDeath(boss) {
@@ -514,7 +518,7 @@ export class Game {
     this.projectiles.list.filter((pr) => pr.owner === 'enemy').forEach((pr) => { pr.life = 0; });
     this.tele.clear();
     if (this.endless) {
-      this.showBanner('首领击破！', '继续前进，更强的敌人正在逼近…');
+      this.showBanner(t('banner.bossDown'), t('banner.bossDownSub'));
       this.after(2.6, () => {
         this.hud.hideBoss();
         this.boss = null;
@@ -539,7 +543,7 @@ export class Game {
     this.hud.hideBoss();
     this.audio.startMusic('victory');
     this.audio.play('victory');
-    this.showBanner('胜利！', `${this.level.name} 已征服`);
+    this.showBanner(t('banner.win'), t('banner.winSub', { name: this.level.name }));
     for (const pk of this.pickups) pk.magnet = true;
     input.releaseAll();
     const hpR = this.player.hp / this.player.stats.maxHp;
@@ -576,7 +580,7 @@ export class Game {
     this.audio.play('defeat');
     this.audio.stopMusic(2);
     const dist = Math.round(this.player.pos.z);
-    this.showBanner(this.endless ? '冒险结束' : '战败…', this.endless ? `跑了 ${dist} 米` : '重整旗鼓，再战一次！', true);
+    this.showBanner(this.endless ? t('banner.endlessOver') : t('banner.lose'), this.endless ? t('banner.distSub', { n: dist }) : t('banner.loseSub'), true);
     input.releaseAll();
     this.after(3, () => {
       save.coins += this.stats.coins;
@@ -627,7 +631,7 @@ export class Game {
   damageEnemy(e, dmg, o = {}) {
     if (!e.alive) return 0;
     if (e.isBoss && (e.invulnT > 0 || e.state !== 'fight' || e.anim.burrow > 0.5)) {
-      if (o.source !== 'dot' && Math.random() < 0.2) { e.getCenter(_v); _v.y += e.halfHeight; this.text.add(_v, '免疫', 'info', 0.6); }
+      if (o.source !== 'dot' && Math.random() < 0.2) { e.getCenter(_v); _v.y += e.halfHeight; this.text.add(_v, t('float.immune'), 'info', 0.6); }
       return 0;
     }
     const d = Math.max(1, dmg);
@@ -856,13 +860,13 @@ export class Game {
         const cd = p.def.skill.cd * p.stats.cdMul;
         p.skillCd = Math.max(0, p.skillCd - cd * 0.6);
         this.audio.play('powerup');
-        this.floatText(p.pos, '技能充能！', 'info', p.top + 2);
+        this.floatText(p.pos, t('float.skillCharge'), 'info', p.top + 2);
         break;
       }
       case 'power':
         p.buffs.power = 10;
         this.audio.play('powerup', { pitch: 0.8 });
-        this.floatText(p.pos, '力量 +50%！', 'crit', p.top + 2);
+        this.floatText(p.pos, t('float.power'), 'crit', p.top + 2);
         break;
     }
   }

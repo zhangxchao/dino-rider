@@ -11,7 +11,7 @@
   --info: #4fc9ff;
   --gold: #ffd54a;
   --radius: 14px;
-  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans CJK JP", "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -80,7 +80,11 @@ button { font-family: inherit; }
 #s-title .current .lbl { color: var(--muted); font-size: 13px; letter-spacing: .2em; }
 #s-title .current .nm { font-size: 34px; font-weight: 900; text-shadow: 0 3px 12px rgba(0,0,0,.8); }
 #s-title .current .rd { font-size: 18px; color: #ffe0a0; text-shadow: 0 2px 8px rgba(0,0,0,.8); }
+#s-title .lang-btn { position: absolute; right: 4vw; top: 74px; }
 #s-title .tagline { margin-top: 18px; max-width: 520px; color: #f0e6cc; font-size: 16px; line-height: 1.7; text-shadow: 0 2px 8px rgba(0,0,0,.9); }
+html:not([data-lang="zh-CN"]) .logo-big { font-size: clamp(40px, 6.8vw, 92px); }
+html:not([data-lang="zh-CN"]) #s-title .tagline { max-width: 600px; font-size: 15px; }
+html:not([data-lang="zh-CN"]) #s-title .menu { width: 300px; }
 #s-title .ver { position: absolute; right: 16px; top: 12px; color: rgba(255,255,255,.35); font-size: 12px; }
 
 /* ---------------- 选择 ---------------- */

@@ -1,4 +1,6 @@
 // 输入：键盘 / 鼠标（指针锁定）/ 触屏虚拟摇杆
+import { t } from './i18n.js';
+
 const ACTIONS = {
   jump: ['Space', 'KeyW', 'ArrowUp', 'T_jump'],
   skill: ['KeyQ', 'KeyE', 'KeyK', 'KeyL', 'ShiftLeft', 'ShiftRight', 'Mouse2', 'T_skill'],
@@ -114,9 +116,9 @@ class Input {
     this.isTouch = true;
     root.innerHTML = `
       <div class="look" style="left:0;width:100%;height:100%"></div>
-      <div class="tbtn" data-a="skill" style="right:24px;bottom:120px;width:86px;height:86px"><span>✨</span>技能</div>
-      <div class="tbtn" data-a="jump" style="right:120px;bottom:34px"><span>⤴️</span>跳跃</div>
-      <button class="btn small ghost tpause" data-a="pause">⏸ 暂停</button>`;
+      <div class="tbtn" data-a="skill" style="right:24px;bottom:120px;width:86px;height:86px"><span>✨</span>${t('touch.skill')}</div>
+      <div class="tbtn" data-a="jump" style="right:120px;bottom:34px"><span>⤴️</span>${t('touch.jump')}</div>
+      <button class="btn small ghost tpause" data-a="pause">${t('touch.pause')}</button>`;
     const look = root.querySelector('.look');
     const lastPos = new Map();
     look.addEventListener('touchstart', (e) => { for (const t of e.changedTouches) lastPos.set(t.identifier, t.clientX); e.preventDefault(); }, { passive: false });

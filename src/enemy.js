@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { ENEMIES, BOSSES } from './data.js';
 import { createEnemyModel, createBossModel } from './models/enemies.js';
 import { clamp, damp, turnToward, prepareModel, rand, pick, mergeStaticMeshes } from './util.js';
+import { t } from './i18n.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -205,6 +206,13 @@ export class Enemy {
         const top = this.pos.y + (this.flying ? this.hoverY + 0.8 : this.height + 0.3) + this.lift;
         g.fx.sparks.spawn(this.pos.x + Math.cos(a) * 0.6, top, this.pos.z + Math.sin(a) * 0.6, 0, 0.3, 0, 0.35, 0.45, 0.2, 0xffee60, 0xffffff, 1, 0, 0);
       }
+    } else if (this.flee) {
+      // 宝藏哥布林：往前逃、左右乱窜，时间到了就溜走
+      vz = this.flee * this.slowMul;
+      vx = Math.sin(this.anim.t * 2.1 + this.phase) * 5;
+      this.fleeT -= dt;
+      if (this.fleeT <= 0 || dz > 90) { g.onGoblinEscape(this); return; }
+      if (Math.random() < 0.35) { this.getCenter(_v); g.fx.sparks.burst(_v, { count: 1, speed: 1, life: 0.5, size: 0.6, color: 0xffe070, color2: 0xffa000, up: 1, radius: 0.5 }); }
     } else if (active) {
       const sp = this.speed * this.slowMul;
       vz = -sp * MARCH[this.kind];
@@ -253,7 +261,7 @@ export class Enemy {
     this.pos.x = clamp(this.pos.x, -lim, lim);
     this.pos.y = g.heightAt(this.pos.x, this.pos.z);
 
-    const face = dz > 1 ? Math.atan2(pl.pos.x - this.pos.x, pl.pos.z - this.pos.z) : Math.PI;
+    const face = this.flee ? 0 : dz > 1 ? Math.atan2(pl.pos.x - this.pos.x, pl.pos.z - this.pos.z) : Math.PI;
     this.heading = turnToward(this.heading, face, 5 * dt);
     this.root.position.set(this.pos.x, this.pos.y + this.lift, this.pos.z);
     this.root.rotation.y = this.heading;
@@ -324,7 +332,7 @@ export class Prop {
     this.lift = 0;
     this.root = new THREE.Group();
     if (kind === 'chest') {
-      this.def = { name: '宝箱', score: 20, coins: 14, color: 0xffc040 };
+      this.def = { name: t('enemy.chest'), score: 20, coins: 14, color: 0xffc040 };
       const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a2a, roughness: 0.8, flatShading: true });
       const gold = new THREE.MeshStandardMaterial({ color: 0xffc933, metalness: 0.8, roughness: 0.3, emissive: 0x6a4400, emissiveIntensity: 0.6 });
       const body = new THREE.Mesh(chestBodyGeo, wood); body.position.y = 0.5;
@@ -337,7 +345,7 @@ export class Prop {
       this.maxHp = this.hp = Math.round(40 * mul);
       this.dmg = 0; this.xp = 8;
     } else {
-      this.def = { name: '落石', score: 5, coins: 2, color: 0x8a8070 };
+      this.def = { name: t('enemy.rock'), score: 5, coins: 2, color: 0x8a8070 };
       const mat = new THREE.MeshStandardMaterial({ color: game.rockColor || 0x7a7266, roughness: 0.95, flatShading: true });
       const sizes = [[0, 0.9, 0, 1.25], [0.9, 0.6, 0.3, 0.8], [-0.8, 0.55, -0.2, 0.75]];
       for (const [px, py, pz, s] of sizes) {
@@ -465,7 +473,12 @@ export class Boss {
       g.fx.rings.ring(this.pos, { r0: 2, r1: 16, life: 0.8, color: this.def.projColor });
       g.fx.rings.pillar(this.pos, { r: this.radius * 1.4, h: 20, life: 1.2, color: this.def.projColor });
       g.fx.sparks.burst(this.getCenter(_v), { count: 80, speed: 14, life: 1, size: 1.2, color: this.def.projColor, color2: 0xffffff });
-      g.showBanner('暴怒！', `${this.def.name} 进入第 ${this.phase} 阶段`, true);
+      g.juice.flash(this.def.projColor, 0.45);
+      g.juice.aberr(1.8);
+      g.juice.radial(1.2);
+      g.juice.bloom(0.9);
+      g.fx.debris.burst(this.pos, { count: 24, speed: 12, up: 12, size: 0.5, color: g.rockColor ?? 0x7a6a5a });
+      g.showBanner(t('banner.enrage'), t('banner.phase', { name: this.def.name, n: this.phase }), true);
       this.pattern = { name: 'summon', t: 0, dur: 1.6, fired: true, teles: [] };
     }
   }
@@ -665,13 +678,16 @@ export class Boss {
           P.fired = true;
           for (const s of P.spots) {
             _v.set(s.x, g.heightAt(s.x, s.z), s.z);
-            if (Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z) < 4.3 + pl.radius * 0.4 && pl.pos.y - _v.y < 2.5) {
+            const dd = Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z), hitR = 4.3 + pl.radius * 0.4;
+            if (dd < hitR && pl.pos.y - _v.y < 2.5) {
               _dir.set(pl.pos.x - s.x, 0, pl.pos.z - s.z).normalize();
               pl.takeDamage(this.dmg * 1.2, { dir: _dir, knock: 10, attacker: this, kind: 'melee' });
-            }
+            } else if (dd < hitR + 2.4) g.onPerfect(pl.pos); // 擦身躲过 / 跳过砸地
             g.fx.rings.ring(_v, { r0: 1, r1: 5, life: 0.45, color: 0xffd0a0 });
             g.fx.dust.burst(_v, { count: 24, speed: 6, life: 0.9, size: 1.4, sizeEnd: 3.5, color: g.dustColor, alpha: 0.6, flat: true, drag: 2, up: 3 });
             g.fx.sparks.burst(_v, { count: 14, speed: 7, life: 0.4, size: 0.8, color: 0xffe0a0, color2: color, up: 3 });
+            g.fx.debris.burst(_v, { count: 7, speed: 7, up: 8, size: 0.4, color: g.rockColor ?? 0x7a6a5a });
+            g.fx.scorch.add(_v, 3.2, 3.5);
             if (ph >= 2) {
               for (let i = 0; i < 6; i++) {
                 const a = (i / 6) * Math.PI * 2;
@@ -682,6 +698,8 @@ export class Boss {
           }
           g.audio.play('stomp', { volume: 1, pitch: 0.7 });
           g.audio.play('quake', { volume: 0.6 });
+          g.juice.fovKick(-2.5);
+          g.juice.aberr(0.6);
           g.shake.add(0.3);
         }
         break;

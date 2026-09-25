@@ -1,8 +1,8 @@
 // 一局游戏（跑道模式）：沿路线自动前进，怪物从前方涌来，终点首领战
 import * as THREE from 'three';
-import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS } from './data.js';
+import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED } from './data.js';
 import { createTrack } from './track.js';
-import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars } from './effects.js';
+import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars, Debris, Scorch, LightFlashes, Streaks } from './effects.js';
 import { Projectiles } from './projectiles.js';
 import { Player, computeStats } from './player.js';
 import { Enemy, Boss, Prop, buildEnemyModel, buildBossModel } from './enemy.js';
@@ -10,6 +10,9 @@ import { Hud } from './hud.js';
 import { input } from './input.js';
 import { save, persist } from './save.js';
 import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut } from './util.js';
+import { t } from './i18n.js';
+import { Hazards } from './hazards.js';
+import { setBendProfile, updateBend, resetBend, bendX, bendVec, curvature } from './bend.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -27,6 +30,7 @@ const ENDLESS_POOL = ['slime', 'goblin', 'bat', 'skeleton', 'wolf', 'scorpion', 
 const BIOMES = ['jungle', 'desert', 'frost', 'swamp', 'volcano', 'shadow'];
 const SPAWN_AHEAD = 115;
 const ENDLESS_BOSS_EVERY = 1400;
+const COMBO_TIERS = [10, 25, 50, 100];
 
 // ---------------------------------------------------------------------
 //  拾取物外观
@@ -45,12 +49,45 @@ const PICKUP_MAKERS = (() => {
     const crystalGeo = new THREE.OctahedronGeometry(0.42, 0).scale(0.8, 1.4, 0.8);
     const powerMat = new THREE.MeshBasicMaterial({ color: 0xff7a20 }); powerMat.color.multiplyScalar(2.4);
     const powerGeo = new THREE.IcosahedronGeometry(0.4, 0);
+    // 恐龙蛋：奶白色蛋壳 + 绿色斑点
+    const eggGeo = new THREE.SphereGeometry(0.5, 14, 10).scale(1, 1.3, 1);
+    { const pos = eggGeo.attributes.position, col = new Float32Array(pos.count * 3);
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const spot = Math.sin(x * 9.1 + y * 3.7) * Math.sin(z * 8.3 - y * 5.1) > 0.45;
+        col[i * 3] = spot ? 0.45 : 1; col[i * 3 + 1] = spot ? 0.75 : 0.96; col[i * 3 + 2] = spot ? 0.35 : 0.86;
+      }
+      eggGeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); }
+    const eggMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, emissive: 0x302818, emissiveIntensity: 0.6 });
+    // 磁铁：红色 U 形 + 银色磁极
+    const magGeo = new THREE.TorusGeometry(0.34, 0.12, 8, 16, Math.PI).rotateZ(Math.PI);
+    const magMat = new THREE.MeshStandardMaterial({ color: 0xe03030, roughness: 0.4, emissive: 0x600000, emissiveIntensity: 0.6 });
+    const tipGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.2, 8);
+    const tipMat = new THREE.MeshStandardMaterial({ color: 0xe8eef8, metalness: 0.9, roughness: 0.25 });
+    // 炸弹：黑球 + 发光引信
+    const bombGeo = new THREE.SphereGeometry(0.45, 12, 10);
+    const bombMat = new THREE.MeshStandardMaterial({ color: 0x1e1e26, metalness: 0.3, roughness: 0.4 });
+    const fuseMat = new THREE.MeshBasicMaterial({ color: 0xffa040 }); fuseMat.color.multiplyScalar(2.6);
+    const fuseGeo = new THREE.SphereGeometry(0.12, 6, 5);
     cache = {
       coinGeo, gold,
       coin: () => new THREE.Mesh(coinGeo, gold),
       meat: () => { const g = new THREE.Group(); g.add(new THREE.Mesh(meatGeo, meatMat), new THREE.Mesh(boneGeo, boneMat)); return g; },
       crystal: () => new THREE.Mesh(crystalGeo, crystalMat),
       power: () => new THREE.Mesh(powerGeo, powerMat),
+      egg: () => new THREE.Mesh(eggGeo, eggMat),
+      magnet: () => {
+        const g = new THREE.Group();
+        g.add(new THREE.Mesh(magGeo, magMat));
+        for (const sx of [-0.34, 0.34]) { const tip = new THREE.Mesh(tipGeo, tipMat); tip.position.set(sx, -0.1, 0); g.add(tip); }
+        return g;
+      },
+      bomb: () => {
+        const g = new THREE.Group();
+        g.add(new THREE.Mesh(bombGeo, bombMat));
+        const f = new THREE.Mesh(fuseGeo, fuseMat); f.position.set(0.2, 0.45, 0); g.add(f);
+        return g;
+      },
     };
     return cache;
   };
@@ -77,7 +114,10 @@ function gateLabel(opt) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '104px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   ctx.fillText(opt.icon, 256, 82);
-  ctx.font = 'bold 66px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  const font = (px) => `bold ${px}px -apple-system,"PingFang SC","Hiragino Sans","Microsoft YaHei","Yu Gothic",sans-serif`;
+  ctx.font = font(66);
+  const w = ctx.measureText(opt.name).width;
+  if (w > 480) ctx.font = font(Math.floor(66 * 480 / w));
   ctx.lineWidth = 12; ctx.strokeStyle = 'rgba(0,0,0,0.65)';
   ctx.strokeText(opt.name, 256, 196);
   ctx.fillStyle = '#ffffff';
@@ -180,7 +220,11 @@ export class Game {
     this.biome = this.endless ? pick(BIOMES) : this.level.biome;
     this.length = this.endless ? Infinity : this.level.length;
     this.quality = save.settings.quality;
-    this.track = createTrack(this.biome, this.scene, { quality: this.quality });
+    // 首领战场压平：普通关卡在终点，无尽模式在每只首领出现处（后续由 addFlat 追加）
+    const bossZ = this.endless ? ENDLESS_BOSS_EVERY : this.length;
+    this.track = createTrack(this.biome, this.scene, { quality: this.quality, flat: [[bossZ - 40, bossZ + 140]] });
+    setBendProfile(this.biome);
+    updateBend(0, 1);
     this.world = this.track;
     this.heightAt = (x, z) => this.track.heightAt(x, z);
     this.dustColor = DUST[this.biome] ?? 0xa09070;
@@ -192,7 +236,22 @@ export class Game {
       sparks: new Particles(this.scene, 3500, true),
       dust: new Particles(this.scene, 2200, false),
       rings: new Rings(this.scene),
+      debris: new Debris(this.scene, this.heightAt, this.quality === 'high' ? 220 : 60),
+      scorch: new Scorch(this.scene, this.heightAt),
+      lights: null,
+      streaks: new Streaks(this.scene),
     };
+    this.fx.lights = this.quality === 'high' ? new LightFlashes(this.fx.rings) : null;
+    this.fx.scorch.enabled = this.quality === 'high';
+    this.juice = app.juice;
+    this.juice.reset();
+    this.killTimes = [];
+    this.multiCd = 0;
+    this.hazards = null;      // 跑图事件 / 路面机关（在玩家创建后初始化）
+    this.fever = 0;           // 狂热槽 0..100，满了按 R 释放“远古觉醒”
+    this.feverReady = false;
+    this.comboTier = 0;
+    this.perfectCd = 0;
     this.tele = new Telegraphs(this.scene, this.heightAt);
     this.text = new FloatingText(app.fxLayer);
     this.shake = new Shake();
@@ -214,9 +273,10 @@ export class Game {
     this.rider = RIDERS.find((r) => r.id === opts.riderId) || RIDERS[0];
     this.stats = { kills: 0, spawned: 0, coins: 0, dmgDealt: 0, dmgTaken: 0, maxCombo: 0, score: 0, skills: 0, bosses: 0, gates: 0 };
     this.player = new Player(this, this.dino, this.rider, computeStats(this.dino, this.rider, save.upgrades));
+    this.hazards = new Hazards(this);
     this.player.pos.set(0, this.heightAt(0, 0), 0);
 
-    this.cam = { x: 0, gy: this.heightAt(0, 0), boss: 0 };
+    this.cam = { x: 0, gy: this.heightAt(0, 0), gl: this.heightAt(0, 20), boss: 0, roll: 0 };
     this.camera.fov = 60;
     this.camera.updateProjectionMatrix();
     this.viewW = window.innerWidth;
@@ -237,6 +297,7 @@ export class Game {
     this.bannerTimer = null;
     this.timers = [];
     this.route = [];
+    this.routeEvents = { ramp: -999, hazard: 0, goblin: 0, ambush: 0, egg: 0 };
     this.routeGen = 50;
     this.nextGate = 160;
     this.nextBossAt = this.endless ? ENDLESS_BOSS_EVERY : Infinity;
@@ -245,14 +306,14 @@ export class Game {
     this.extendRoute(this.endless ? 600 : this.length - 45);
 
     this.audio.startMusic(this.biome);
-    if (this.endless) this.showBanner('无尽模式', `${this.biomeName()} · 你能跑多远？`);
-    else this.showBanner(this.level.name, `第 ${this.levelIdx + 1} 关 · 全程 ${this.length} 米 · 终点首领：${BOSSES[this.level.boss].name}`);
+    if (this.endless) this.showBanner(t('banner.endless'), t('banner.endlessSub', { biome: this.biomeName() }));
+    else this.showBanner(this.level.name, t('banner.levelSub', { n: this.levelIdx + 1, len: this.length, boss: BOSSES[this.level.boss].name }));
     this.resize(this.viewW, this.viewH);
     this.updateCamera(1);
     this.warmup(app.renderer);
   }
 
-  biomeName() { return { jungle: '翠绿丛林', desert: '炽热沙海', frost: '冰封雪原', swamp: '迷雾沼泽', volcano: '熔岩火山', shadow: '暗影要塞' }[this.biome]; }
+  biomeName() { return LEVELS.find((l) => l.biome === this.biome)?.name ?? this.biome; }
 
   resize(w, h) {
     this.viewW = w; this.viewH = h;
@@ -304,8 +365,26 @@ export class Game {
         z += 30;
         continue;
       }
+      const ev = this.routeEvents;
+      const nearGate = Math.abs(z - this.nextGate) < 45;
+      // 跑图事件：跳台 / 天灾区 / 宝藏哥布林 / 精英伏击 / 恐龙蛋（各自有最小间隔）
+      if (p > 0.12 && !nearGate && z - ev.ambush > 380 && Math.random() < 0.07 + p * 0.05) {
+        ev.ambush = z;
+        this.route.push({ z, kind: 'ambush' });
+        z += 45;
+        continue;
+      }
+      if (p > 0.18 && !nearGate && z - ev.hazard > 300 && Math.random() < 0.09) {
+        ev.hazard = z;
+        this.route.push({ z, kind: 'hazard', len: 60 + p * 30 });
+      }
       this.route.push({ z, kind: 'formation', p });
-      if (Math.random() < 0.55) this.route.push({ z: z + rand(14, 20), kind: 'coins' });
+      if (!nearGate && z - ev.ramp > 150 && Math.random() < 0.16) {
+        ev.ramp = z;
+        this.route.push({ z: z + rand(16, 22), kind: 'ramp', x: rand(-4, 4) });
+      } else if (Math.random() < 0.55) this.route.push({ z: z + rand(14, 20), kind: 'coins' });
+      if (p > 0.08 && z - ev.goblin > 340 && Math.random() < 0.06) { ev.goblin = z; this.route.push({ z: z + 10, kind: 'goblin' }); }
+      if (z - ev.egg > 420 && Math.random() < 0.05) { ev.egg = z; this.route.push({ z: z + rand(10, 20), kind: 'egg', x: rand(-5, 5) }); }
       if (p > 0.1 && Math.random() < 0.26) this.route.push({ z: z + rand(18, 26), kind: 'prop', prop: Math.random() < 0.35 ? 'chest' : 'rock' });
       z += lerp(38, 25, p) * rand(0.85, 1.15);
     }
@@ -314,15 +393,17 @@ export class Game {
   }
 
   spawnEvent(ev) {
+    if (this.hazards.spawn(ev)) return;
     const rh = this.track.roadHalf;
     const mul = this.mulAt(ev.z);
     if (ev.kind === 'gate') {
       const OFF = ['count', 'rate', 'dmg', 'pierce'];
-      const UTIL = ['heal', 'shield', 'skill', 'xp'];
+      const UTIL = ['heal', 'shield', 'skill', 'xp', 'magnet'];
       const a = pick(OFF);
       let b;
       if (this.player.hp / this.player.stats.maxHp < 0.5) b = 'heal';
-      else b = Math.random() < 0.55 ? pick(OFF.filter((k) => k !== a)) : pick(UTIL);
+      else if (Math.random() < 0.2) b = 'gamble';
+      else b = Math.random() < 0.5 ? pick(OFF.filter((k) => k !== a)) : pick(UTIL);
       this.gates.push(new Gate(this, ev.z, shuffle([a, b])));
       return;
     }
@@ -378,7 +459,7 @@ export class Game {
     }
     for (const s of spots) {
       const e = this.spawnEnemy(s.t, s.x, s.z, mul, true);
-      if (s.elite) { e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
+      if (s.elite) { e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
     }
   }
 
@@ -413,6 +494,7 @@ export class Game {
       dragScale: (this.track.roadHalf * 2) / Math.max(400, this.viewW * 0.55),
       jump: input.pressed('jump'),
       skill: input.pressed('skill'),
+      ult: input.pressed('ult'),
     });
 
     // 路线事件
@@ -430,6 +512,7 @@ export class Game {
         if (e === this.boss && this.state !== 'bossDown' && this.state !== 'win') this.boss = null;
       }
     }
+    this.hazards.update(dt);
     this.separate();
     this.collisions();
     for (let i = this.gates.length - 1; i >= 0; i--) {
@@ -441,13 +524,19 @@ export class Game {
     this.updatePickups(dt);
     this.updateFlow(dt);
 
-    if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) this.combo = 0; }
+    if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) { this.combo = 0; this.comboTier = 0; } }
+    if (this.perfectCd > 0) this.perfectCd -= realDt;
     this.fx.sparks.update(dt);
     this.fx.dust.update(dt);
     this.fx.rings.update(dt);
+    this.fx.debris.update(dt);
+    this.fx.scorch.update(dt);
+    this.fx.lights?.update(dt);
+    if (this.multiCd > 0) this.multiCd -= realDt;
     this.tele.update(dt);
     this.track.update(dt, this.time + this.stateT, p.pos);
 
+    updateBend(p.pos.z, 1);
     this.updateCamera(realDt);
     this.shake.apply(this.camera, realDt);
     this.renderBatches();
@@ -459,12 +548,12 @@ export class Game {
     const p = this.player;
     switch (this.state) {
       case 'intro': {
-        const t = this.stateT;
-        const c = t < 1.6 ? -1 : t < 2.1 ? 3 : t < 2.6 ? 2 : t < 3.1 ? 1 : 0;
+        const st = this.stateT;
+        const c = st < 1.6 ? -1 : st < 2.1 ? 3 : st < 2.6 ? 2 : st < 3.1 ? 1 : 0;
         if (c !== this.countdown && c >= 0) {
           this.countdown = c;
           if (c > 0) { this.showBanner(String(c), '', false, 450); this.audio.play('countdown'); }
-          else { this.showBanner('出发！', '←→ 或 A/D 左右移动 · 自动射击', false, 1400); this.audio.play('waveStart'); this.state = 'run'; this.stateT = 0; }
+          else { this.showBanner(t('banner.go'), t('banner.goSub'), false, 1400); this.audio.play('waveStart'); this.state = 'run'; this.stateT = 0; }
         }
         break;
       }
@@ -493,18 +582,28 @@ export class Game {
     for (const e of this.enemies) if (e.alive && !e.isBoss) this.killEnemy(e, true);
     this.projectiles.list.filter((pr) => pr.owner === 'enemy').forEach((pr) => { pr.life = 0; });
     this.route.length = 0;
+    this.hazards.clearZones();
+    this.tele.clear();
     this.boss = new Boss(this, type, 0, p.pos.z + 30, mul);
     this.enemies.push(this.boss);
     this.hud.showBoss(this.boss);
     this.audio.startMusic('boss');
     this.audio.play('bossAppear');
     p.heal(p.stats.maxHp * 0.25);
-    this.after(0.3, () => this.showBanner(this.boss.def.name, `${this.boss.def.title} · 左右走位，躲开红色预警！`, true));
+    this.after(0.3, () => this.showBanner(this.boss.def.name, t('banner.bossSub', { title: this.boss.def.title }), true));
   }
 
   onBossDeath(boss) {
     this.slowmoT = 2;
     this.shake.add(0.5);
+    this.juice.flash(0xffffff, 0.8);
+    this.juice.radial(2.2);
+    this.juice.aberr(2);
+    this.juice.bloom(1.2);
+    this.juice.fovKick(-6);
+    this.fx.debris.burst(boss.pos, { count: 40, speed: 14, up: 14, size: 0.6, color: boss.def.color ?? 0x5a4a4a, color2: this.rockColor });
+    this.fx.rings.pillar(boss.pos, { r: boss.radius * 1.5, h: 40, life: 1.6, color: boss.def.projColor, opacity: 0.8 });
+    this.fx.lights?.flash(boss.pos, boss.def.projColor, 120, 40, 1.2);
     this.audio.play('bossDie');
     this.stats.bosses++;
     this.bossCount++;
@@ -514,12 +613,13 @@ export class Game {
     this.projectiles.list.filter((pr) => pr.owner === 'enemy').forEach((pr) => { pr.life = 0; });
     this.tele.clear();
     if (this.endless) {
-      this.showBanner('首领击破！', '继续前进，更强的敌人正在逼近…');
+      this.showBanner(t('banner.bossDown'), t('banner.bossDownSub'));
       this.after(2.6, () => {
         this.hud.hideBoss();
         this.boss = null;
         this.audio.startMusic(this.biome);
         this.nextBossAt = this.player.pos.z + ENDLESS_BOSS_EVERY;
+        this.track.addFlat(this.nextBossAt - 40, this.nextBossAt + 140);
         this.routeGen = this.player.pos.z + 60;
         this.nextGate = this.routeGen + 40;
         this.extendRoute(this.player.pos.z + 700);
@@ -539,7 +639,7 @@ export class Game {
     this.hud.hideBoss();
     this.audio.startMusic('victory');
     this.audio.play('victory');
-    this.showBanner('胜利！', `${this.level.name} 已征服`);
+    this.showBanner(t('banner.win'), t('banner.winSub', { name: this.level.name }));
     for (const pk of this.pickups) pk.magnet = true;
     input.releaseAll();
     const hpR = this.player.hp / this.player.stats.maxHp;
@@ -568,6 +668,7 @@ export class Game {
   }
 
   onPlayerDeath() {
+    this.audio.setMusicRate(1);
     if (this.finished) return;
     this.finished = true;
     this.state = 'lose';
@@ -576,7 +677,7 @@ export class Game {
     this.audio.play('defeat');
     this.audio.stopMusic(2);
     const dist = Math.round(this.player.pos.z);
-    this.showBanner(this.endless ? '冒险结束' : '战败…', this.endless ? `跑了 ${dist} 米` : '重整旗鼓，再战一次！', true);
+    this.showBanner(this.endless ? t('banner.endlessOver') : t('banner.lose'), this.endless ? t('banner.distSub', { n: dist }) : t('banner.loseSub'), true);
     input.releaseAll();
     this.after(3, () => {
       save.coins += this.stats.coins;
@@ -599,17 +700,30 @@ export class Game {
     this.hud.levelUp(lv, L.name);
     this.fx.sparks.burst(this.player.center, { count: 40, speed: 6, life: 0.8, size: 0.8, color: 0x7fe8ff, color2: 0xffffff, up: 3, radius: this.player.radius });
     this.fx.rings.ring(this.player.pos, { r0: 1, r1: 6, life: 0.5, color: 0x7fe8ff });
+    // 螺旋上升的能量喷泉 + 光柱
+    const pp = this.player.pos, R = this.player.radius + 0.8;
+    for (let i = 0; i < 48; i++) {
+      const a = i * 0.52, k = i / 48;
+      this.fx.sparks.spawn(pp.x + Math.cos(a) * R, pp.y + 0.3 + k * 1.5, pp.z + Math.sin(a) * R,
+        -Math.sin(a) * 3.5, 5 + k * 6, Math.cos(a) * 3.5, 0.9 + k * 0.4, 0.9, 0.1, 0x7fe8ff, k > 0.5 ? 0xffffff : 0x46a0ff, 1, -2, 1.5);
+    }
+    this.fx.rings.pillar(pp, { r: R, h: 10, life: 0.7, color: 0x7fe8ff, opacity: 0.5 });
+    this.juice.flash(0x7fe8ff, 0.18);
+    this.juice.bloom(0.35);
   }
 
   onGate(kind, panel) {
     const opt = GATES[kind];
     this.player.applyGate(kind);
+    if (kind === 'gamble') this.after(0.35, () => this.rollGamble());
     this.stats.gates++;
     this.audio.play('powerup');
     this.toast(`${opt.icon} ${opt.name}`);
     panel.getWorldPosition(_v);
     _v.y += 2.4;
     this.fx.sparks.burst(_v, { count: 50, speed: 8, life: 0.8, size: 0.9, color: opt.color, color2: 0xffffff });
+    this.juice.flash(opt.color, 0.22);
+    this.juice.fovKick(3);
   }
 
   // ------------------------------------------------------------------
@@ -627,7 +741,7 @@ export class Game {
   damageEnemy(e, dmg, o = {}) {
     if (!e.alive) return 0;
     if (e.isBoss && (e.invulnT > 0 || e.state !== 'fight' || e.anim.burrow > 0.5)) {
-      if (o.source !== 'dot' && Math.random() < 0.2) { e.getCenter(_v); _v.y += e.halfHeight; this.text.add(_v, '免疫', 'info', 0.6); }
+      if (o.source !== 'dot' && Math.random() < 0.2) { e.getCenter(_v); _v.y += e.halfHeight; this.text.add(_v, t('float.immune'), 'info', 0.6); }
       return 0;
     }
     const d = Math.max(1, dmg);
@@ -642,7 +756,9 @@ export class Game {
         this.combo++;
         this.comboT = 2.6;
         if (this.combo > this.stats.maxCombo) this.stats.maxCombo = this.combo;
+        this.checkComboTier();
       }
+      if (e.isBoss) this.addFever(d / e.maxHp * 160);
       e.applyStatus({ ...o, dotBase: d });
     }
     if (o.source !== 'ram' || e.hp > 0) {
@@ -651,12 +767,201 @@ export class Game {
       const cls = o.crit ? 'crit' : isDot ? (o.dotColor === 'poison' ? 'poison' : 'burn') : '';
       this.text.add(_v, Math.round(d) + (o.crit ? '!' : ''), cls, isDot ? 0.6 : 0.8);
     }
-    if (o.crit) this.audio.play('crit', { volume: 0.45 });
+    if (o.crit) {
+      this.audio.play('crit', { volume: 0.45 });
+      // 暴击：星形火花 + 小冲击环
+      e.getCenter(_v2);
+      this.fx.sparks.burst(_v2, { count: 14, speed: 9, life: 0.28, size: 0.7, sizeEnd: 0, color: 0xffffff, color2: 0xffd040, drag: 3 });
+      if (!isDot) this.fx.rings.ring(_v2, { r0: 0.3, r1: 2.2 + e.radius, life: 0.22, color: 0xffe070, opacity: 0.8, y: 0 });
+    }
     else if (!isDot) this.audio.play('enemyHurt', { volume: 0.22, pitch: rand(0.9, 1.25) });
     if (!isDot && this.player.buffs.frenzy > 0 && o.source === 'melee') this.player.heal(d * (this.dino.skill.lifesteal || 0.2));
     if (e.isBoss) e.checkPhase();
+    if (e.treasure && !isDot && Math.random() < 0.45) this.spawnPickup('coin', e.pos, 1);
     if (e.hp <= 0) this.killEnemy(e);
     return d;
+  }
+
+  // ------------------------------------------------------------------
+  //  狂热槽 / 远古觉醒 / 连击档位 / 完美闪避
+  // ------------------------------------------------------------------
+  addFever(n) {
+    if (this.player.buffs.rage > 0 || !this.player.alive) return;
+    this.fever = Math.min(100, this.fever + n);
+    if (this.fever >= 100 && !this.feverReady) {
+      this.feverReady = true;
+      this.toast(t('toast.feverReady'));
+      this.audio.play('powerup', { volume: 0.7, pitch: 1.25 });
+      this.juice.flash(0xffc040, 0.15);
+    }
+  }
+
+  /** 连击射速加成（最多 +30%） */
+  comboBonus() { return Math.min(this.combo, 100) * 0.003; }
+
+  checkComboTier() {
+    let tier = 0;
+    for (let i = 0; i < COMBO_TIERS.length; i++) if (this.combo >= COMBO_TIERS[i]) tier = i + 1;
+    if (tier <= this.comboTier) return;
+    this.comboTier = tier;
+    this.hud.comboTier(tier, t('combo.tier' + tier));
+    this.addFever(4 + tier * 3);
+    this.audio.play('star', { volume: 0.55, pitch: 0.9 + tier * 0.12 });
+    this.juice.aberr(0.4 + tier * 0.2);
+    if (tier >= 3) this.juice.bloom(0.3);
+  }
+
+  onRageStart() {
+    const p = this.player;
+    this.feverReady = false;
+    this.slowmoT = Math.max(this.slowmoT, 0.45);
+    this.showBanner(t('banner.rage'), t('banner.rageSub'), false, 1300);
+    this.audio.roar(1.6, { volume: 1 });
+    this.audio.play('frenzy', { volume: 0.8 });
+    this.audio.setMusicRate(1.25);
+    this.juice.flash(0xffc040, 0.55);
+    this.juice.radial(1.8);
+    this.juice.aberr(1.4);
+    this.juice.bloom(0.9);
+    this.juice.fovKick(-6);
+    this.juice.setTint(0xffb040);
+    this.fx.rings.ring(p.pos, { r0: 1, r1: 18, life: 0.7, color: 0xffc040 });
+    this.fx.rings.pillar(p.pos, { r: p.radius * 1.6, h: 30, life: 1, color: 0xffb020, opacity: 0.8 });
+    this.fx.sparks.burst(p.center, { count: 90, speed: 14, life: 0.9, size: 1.1, color: 0xffe070, color2: 0xff3000, up: 5 });
+    this.fx.lights?.flash(p.pos, 0xffb040, 90, 30, 0.8);
+  }
+
+  onRageEnd() {
+    const p = this.player;
+    this.audio.setMusicRate(1);
+    // 觉醒结束：全屏冲击波清场
+    const n = this.aoe(p.pos, 24, p.stats.atk * 3, { knock: 16, up: 10, stun: 1, source: 'skill' });
+    this.fx.rings.ring(p.pos, { r0: 2, r1: 26, life: 0.8, color: 0xffe0a0, opacity: 0.9 });
+    this.fx.rings.disc(p.pos, { r: 14, life: 0.35, color: 0xffd080, opacity: 0.6 });
+    this.fx.debris.burst(p.pos, { count: 30, speed: 14, up: 12, size: 0.45, color: this.rockColor ?? 0x7a6a5a });
+    this.fx.scorch.add(p.pos, 7, 6);
+    this.audio.play('quake', { volume: 1 });
+    this.audio.play('explosion', { volume: 0.8, pitch: 0.7 });
+    this.shake.add(0.5);
+    this.juice.flash(0xfff0c0, 0.5);
+    this.juice.radial(1.5);
+    this.juice.fovKick(-5);
+    this.hitstop(n > 0 ? 0.08 : 0.04);
+  }
+
+  /** 完美闪避：跳过怪物 / 首领攻击擦身而过 */
+  onPerfect(pos, big = true) {
+    if (this.perfectCd > 0 || !this.player.alive) return;
+    this.perfectCd = big ? 0.6 : 0.25;
+    if (!big) {
+      // 擦弹：小奖励
+      this.addFever(2.5);
+      this.fx.sparks.burst(pos, { count: 8, speed: 5, life: 0.25, size: 0.5, color: 0x9ff0ff, color2: 0xffffff });
+      return;
+    }
+    this.addFever(12);
+    this.slowmoT = Math.max(this.slowmoT, 0.18);
+    this.juice.flash(0x60e0ff, 0.18);
+    this.juice.aberr(0.6);
+    this.floatText(this.player.pos, t('float.perfect'), 'info', this.player.top + 2.5);
+    this.fx.rings.ring(this.player.pos, { r0: 0.5, r1: 5, life: 0.35, color: 0x60e0ff });
+    for (let i = 0; i < 3; i++) this.spawnPickup('coin', this.player.pos, 1);
+    this.audio.play('star', { volume: 0.6, pitch: 1.5 });
+  }
+
+  // ------------------------------------------------------------------
+  //  宝藏哥布林 / 炸弹 / 命运骰子
+  // ------------------------------------------------------------------
+  onGoblinCaught(e) {
+    for (let i = 0; i < 22; i++) this.spawnPickup('coin', e.pos, 2);
+    this.spawnPickup('crystal', e.pos);
+    e.getCenter(_v2);
+    this.fx.sparks.burst(_v2, { count: 80, speed: 12, life: 1, size: 1, color: 0xffe070, color2: 0xffa000, up: 8, gravity: 8 });
+    this.fx.rings.pillar(e.pos, { r: 1.2, h: 14, life: 0.8, color: 0xffd040 });
+    this.floatText(e.pos, t('float.goblinCaught'), 'crit', 3);
+    this.addFever(10);
+    this.juice.flash(0xffd040, 0.25);
+    this.hitstop(0.06);
+    this.audio.play('victory', { volume: 0.4, pitch: 1.4 });
+  }
+
+  onGoblinEscape(e) {
+    e.getCenter(_v2);
+    this.fx.sparks.burst(_v2, { count: 30, speed: 5, life: 0.6, size: 0.9, color: 0xffffff, color2: 0xffd040, up: 3 });
+    this.fx.dust.burst(_v2, { count: 14, speed: 3, life: 0.8, size: 1.4, sizeEnd: 3, color: 0xd0c8b0, alpha: 0.6, up: 2 });
+    this.floatText(e.pos, t('float.goblinEscaped'), 'info', 2.5);
+    e.alive = false;
+    e.removed = true;
+  }
+
+  bombBlast() {
+    const p = this.player;
+    const n = this.aoe(p.pos, 30, p.stats.atk * 4 + 60 * this.mulAt(p.pos.z).hp, { knock: 16, up: 10, stun: 1, source: 'skill' });
+    _v2.set(p.pos.x, p.pos.y, p.pos.z + 8);
+    this.fx.rings.ring(_v2, { r0: 2, r1: 30, life: 0.7, color: 0xffa040 });
+    this.fx.rings.disc(_v2, { r: 12, life: 0.25, color: 0xffa040, opacity: 0.35 });
+    this.fx.sparks.burst(_v2, { count: 60, speed: 22, life: 0.6, size: 0.8, color: 0xffd060, color2: 0xff3000, up: 6 });
+    this.fx.debris.burst(_v2, { count: 30, speed: 16, up: 14, size: 0.5, color: this.rockColor ?? 0x7a6a5a, color2: 0x2a2420 });
+    this.fx.scorch.add(_v2, 9, 6);
+    this.fx.lights?.flash(_v2, 0xff9040, 140, 40, 0.6);
+    this.juice.flash(0xfff0c0, 0.4);
+    this.juice.radial(1.6);
+    this.juice.bloom(0.6);
+    this.juice.fovKick(-5);
+    this.shake.add(0.5);
+    this.hitstop(n > 0 ? 0.08 : 0.04);
+    this.audio.play('explosion', { volume: 1, pitch: 0.6 });
+    this.floatText(p.pos, t('float.bomb'), 'crit', p.top + 3);
+  }
+
+  rollGamble() {
+    const p = this.player;
+    if (!p.alive) return;
+    const r = Math.random();
+    let key;
+    if (r < 0.2) {
+      key = 'wlv';
+      let need = 0;
+      for (let lv = p.weapon.level; lv < Math.min(WEAPON_MAX, p.weapon.level + 2); lv++) need += XP_NEED[lv];
+      p.addXp(Math.max(1, need - p.weapon.xp));
+    } else if (r < 0.38) { key = 'fever'; this.addFever(100); p.buffs.shield = 8; }
+    else if (r < 0.54) { key = 'egg'; this.hazards.hatch(2); }
+    else if (r < 0.7) { key = 'coins'; for (let i = 0; i < 24; i++) this.spawnPickup('coin', p.pos, 2); }
+    else if (r < 0.85) { key = 'slow'; p.slowMul = 0.6; p.slowT = 3; }
+    else { key = 'hurt'; p.takeDamage(p.stats.maxHp * 0.12, { kind: 'chip' }); }
+    const good = r < 0.7;
+    this.showBanner(t('gamble.' + key), '', !good, 1200);
+    this.audio.play(good ? 'star' : 'error', { volume: 0.7, pitch: good ? 1.2 : 0.8 });
+    if (good) { this.juice.flash(0xff60c0, 0.2); this.fx.sparks.burst(p.center, { count: 50, speed: 9, life: 0.8, size: 0.9, color: 0xff80e0, color2: 0xffffff, up: 4 }); }
+  }
+
+  /** 击杀演出：精英击破 / 多重击杀 */
+  onKillFx(e) {
+    const now = this.time;
+    this.killTimes.push(now);
+    while (this.killTimes.length && now - this.killTimes[0] > 0.45) this.killTimes.shift();
+    if (e.elite) {
+      e.getCenter(_v2);
+      const busy = this.killTimes.length > 6;
+      this.fx.rings.pillar(e.pos, { r: e.radius + 0.6, h: 16, life: 0.9, color: 0xffd040, opacity: busy ? 0.35 : 0.75 });
+      this.fx.rings.ring(e.pos, { r0: 1, r1: 10, life: 0.6, color: 0xffd040 });
+      this.fx.sparks.burst(_v2, { count: busy ? 20 : 70, speed: 12, life: 0.9, size: 1, color: 0xffe080, color2: 0xff8000, up: 6 });
+      for (let i = 0; i < 8; i++) this.spawnPickup('coin', e.pos, 2);
+      this.floatText(e.pos, t('float.eliteDown'), 'crit', e.halfHeight * 2 + 2);
+      this.juice.flash(0xffd040, 0.3);
+      this.juice.bloom(0.5);
+      this.hitstop(0.07);
+      this.audio.play('powerup', { volume: 0.6, pitch: 0.8 });
+    }
+    const n = this.killTimes.length;
+    if (n >= 5 && this.multiCd <= 0) {
+      this.multiCd = 1.2;
+      this.slowmoT = Math.max(this.slowmoT, 0.22);
+      this.juice.radial(1.1);
+      this.juice.aberr(0.6);
+      this.floatText(this.player.pos, t('float.multi', { n }), 'crit', this.player.top + 3);
+      this.audio.play('levelUp', { volume: 0.45, pitch: 1.4 });
+    }
   }
 
   killEnemy(e, silent = false) {
@@ -665,12 +970,16 @@ export class Game {
     e.kill();
     e.getCenter(_v);
     const col = e.def.color ?? 0xffffff;
-    this.fx.sparks.burst(_v, { count: e.isBoss ? 80 : 16, speed: e.isBoss ? 14 : 6, life: 0.6, size: 0.8, color: 0xfff0c0, color2: col });
-    this.fx.dust.burst(_v, { count: e.isBoss ? 40 : 8, speed: 3, life: 0.8, size: 1.2, sizeEnd: 2.5, color: col, alpha: 0.5, up: 1.5 });
+    // 同一瞬间死很多只时（炸弹 / 大招）减少每只的粒子，避免满屏发白
+    const crowd = e.isBoss ? 1 : this.killTimes.length > 6 ? 0.35 : 1;
+    this.fx.sparks.burst(_v, { count: e.isBoss ? 80 : Math.round(16 * crowd), speed: e.isBoss ? 14 : 6, life: 0.6, size: 0.8, color: 0xfff0c0, color2: col });
+    this.fx.dust.burst(_v, { count: e.isBoss ? 40 : Math.round(8 * crowd), speed: 3, life: 0.8, size: 1.2, sizeEnd: 2.5, color: col, alpha: 0.5, up: 1.5 });
     if (e.isBoss) { this.onBossDeath(e); return; }
     if (silent) return;
     if (!e.isProp) {
       this.stats.kills++;
+      this.onKillFx(e);
+      this.addFever(e.elite ? 10 : 2.2);
       this.stats.score += (e.def.score || 10) * (1 + Math.min(this.combo, 50) * 0.02);
       this.audio.play('enemyDie', { volume: 0.4, pitch: rand(0.85, 1.15) });
     } else {
@@ -683,10 +992,13 @@ export class Game {
     const n = Math.min(e.isProp ? 8 : 2, total);
     for (let i = 0; i < n; i++) this.spawnPickup('coin', e.pos, Math.max(1, Math.round(total / n)));
     const r = Math.random();
-    if (e.type === 'chest') { this.spawnPickup(Math.random() < 0.5 ? 'power' : 'meat', e.pos); return; }
+    if (e.type === 'chest') { this.spawnPickup(r < 0.35 ? 'power' : r < 0.6 ? 'meat' : r < 0.8 ? 'egg' : 'bomb', e.pos); return; }
+    if (e.treasure) { this.onGoblinCaught(e); return; }
     if (r < 0.06) this.spawnPickup('meat', e.pos);
     else if (r < 0.1) this.spawnPickup('crystal', e.pos);
     else if (r < 0.12) this.spawnPickup('power', e.pos);
+    else if (r < 0.132) this.spawnPickup('magnet', e.pos);
+    else if (r < 0.142) this.spawnPickup('bomb', e.pos);
   }
 
   aoe(center, radius, dmg, o = {}) {
@@ -780,12 +1092,15 @@ export class Game {
     const ground = this.heightAt(p.pos.x, p.pos.z);
     const air = p.pos.y - ground;
     for (const e of this.enemies) {
-      if (!e.targetable || e.isBoss || e.collideCd > 0) continue;
+      if (!e.targetable || e.isBoss || e.treasure || e.collideCd > 0) continue;
       const dz = e.pos.z - p.pos.z;
       if (dz > p.frontReach * 0.7 + e.radius || dz < -p.radius - e.radius) continue;
       if (Math.abs(e.pos.x - p.pos.x) > p.radius * 0.85 + e.radius * 0.8) continue;
       if (e.flying) { if (e.hoverY > p.top + 2.5) continue; }
-      else if (air > (e.height || 2) * 0.8) continue; // 跳过去了
+      else if (air > (e.height || 2) * 0.8) { // 跳过去了
+        if (!e.dodged && !e.isProp) { e.dodged = true; this.onPerfect(e.pos); }
+        continue;
+      }
       e.collideCd = 0.7;
       p.collide(e);
     }
@@ -794,14 +1109,20 @@ export class Game {
   // ------------------------------------------------------------------
   //  拾取物
   // ------------------------------------------------------------------
-  spawnPickup(kind, pos, value = 1, placed = false) {
+  spawnProp(kind, x, z) {
+    const e = new Prop(this, kind, x, z, this.mulAt(z).hp);
+    this.enemies.push(e);
+    return e;
+  }
+
+  spawnPickup(kind, pos, value = 1, placed = false, fixedY = null) {
     const mesh = kind === 'coin' ? null : PICKUP_MAKERS()[kind]();
     if (mesh) this.scene.add(mesh);
     const a = Math.random() * Math.PI * 2;
     const s = rand(2, 4);
     const pk = {
-      kind, mesh, value, t: 0, magnet: false, placed, phase: Math.random() * 6,
-      pos: new THREE.Vector3(pos.x, placed ? this.heightAt(pos.x, pos.z) + 1.1 : pos.y + 1.2, pos.z),
+      kind, mesh, value, t: 0, magnet: false, placed, phase: Math.random() * 6, fixedY,
+      pos: new THREE.Vector3(pos.x, fixedY ?? (placed ? this.heightAt(pos.x, pos.z) + 1.1 : pos.y + 1.2), pos.z),
       vel: placed ? new THREE.Vector3() : new THREE.Vector3(Math.cos(a) * s, rand(5, 8), Math.sin(a) * s + 4),
     };
     this.pickups.push(pk);
@@ -810,14 +1131,15 @@ export class Game {
 
   updatePickups(dt) {
     const p = this.player;
-    const mag = p.stats.magnet;
+    const magBuff = p.buffs.magnet > 0;
+    const mag = magBuff ? 60 : p.stats.magnet;
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const pk = this.pickups[i];
       pk.t += dt;
       const dx = p.pos.x - pk.pos.x, dz = p.pos.z - pk.pos.z;
       const dy = (p.pos.y + p.size.height * 0.6) - pk.pos.y;
       if (!pk.placed && pk.t > 0.35) pk.magnet = true; // 击杀掉落：弹出后自动飞向玩家
-      if (p.alive && (pk.magnet || Math.hypot(dx, dz) < mag)) {
+      if (p.alive && (pk.magnet || (Math.hypot(dx, dz) < mag && (magBuff || pk.fixedY === null || Math.abs(dy) < 3.5)))) {
         pk.magnet = true;
         const sp = 20 + pk.t * 10 + p.fwd;
         const l = Math.hypot(dx, dy, dz) || 1;
@@ -829,7 +1151,7 @@ export class Game {
         const gy = this.heightAt(pk.pos.x, pk.pos.z) + 0.5;
         if (pk.pos.y < gy) { pk.pos.y = gy; pk.vel.set(0, 0, 0); }
       } else {
-        pk.pos.y = this.heightAt(pk.pos.x, pk.pos.z) + 1.1 + Math.sin(pk.t * 3 + pk.phase) * 0.15;
+        pk.pos.y = (pk.fixedY ?? this.heightAt(pk.pos.x, pk.pos.z) + 1.1) + Math.sin(pk.t * 3 + pk.phase) * 0.15;
       }
       if (pk.mesh) { pk.mesh.position.copy(pk.pos); pk.mesh.rotation.y = pk.t * 4 + pk.phase; }
       if (pk.pos.z < p.pos.z - 12) { if (pk.mesh) this.scene.remove(pk.mesh); this.pickups.splice(i, 1); }
@@ -841,7 +1163,7 @@ export class Game {
     switch (pk.kind) {
       case 'coin': {
         // 无尽模式金币收益打折，避免刷金币让升级失去意义
-        this.coinFrac = (this.coinFrac || 0) + pk.value * p.stats.coinMul * (this.endless ? 0.35 : 1);
+        this.coinFrac = (this.coinFrac || 0) + pk.value * p.stats.coinMul * (this.endless ? 0.35 : 1) * (1 + Math.min(this.combo, 100) / 200);
         const v = Math.floor(this.coinFrac);
         this.coinFrac -= v;
         this.stats.coins += v;
@@ -856,13 +1178,24 @@ export class Game {
         const cd = p.def.skill.cd * p.stats.cdMul;
         p.skillCd = Math.max(0, p.skillCd - cd * 0.6);
         this.audio.play('powerup');
-        this.floatText(p.pos, '技能充能！', 'info', p.top + 2);
+        this.floatText(p.pos, t('float.skillCharge'), 'info', p.top + 2);
         break;
       }
       case 'power':
         p.buffs.power = 10;
         this.audio.play('powerup', { pitch: 0.8 });
-        this.floatText(p.pos, '力量 +50%！', 'crit', p.top + 2);
+        this.floatText(p.pos, t('float.power'), 'crit', p.top + 2);
+        break;
+      case 'egg':
+        this.hazards.hatch(1);
+        break;
+      case 'magnet':
+        p.buffs.magnet = 10;
+        this.audio.play('powerup', { pitch: 1.3 });
+        this.floatText(p.pos, t('float.magnet'), 'info', p.top + 2);
+        break;
+      case 'bomb':
+        this.bombBlast();
         break;
     }
   }
@@ -881,9 +1214,12 @@ export class Game {
     const ahead = 20 + cam.boss * 8;
     cam.x = damp(cam.x, p.pos.x * 0.55, 4, dt);
     cam.gy = damp(cam.gy, this.heightAt(0, p.pos.z), 3, dt);
+    // 上下坡：视线跟随前方路面高度（看向坡顶 / 坡底），镜头不会钻进身后的坡里
+    cam.gl = damp(cam.gl, this.heightAt(0, p.pos.z + ahead), 2.5, dt);
     const jumpY = Math.max(0, p.pos.y - this.heightAt(p.pos.x, p.pos.z)) * 0.3;
-    const pos = _v.set(cam.x, cam.gy + camH + jumpY, p.pos.z - camD);
-    const look = _v2.set(cam.x * 0.8 + p.pos.x * 0.2, cam.gy + 1.3 + cam.boss * 2, p.pos.z + ahead);
+    const camY = Math.max(cam.gy + camH, this.heightAt(0, p.pos.z - camD) + 2.5);
+    const pos = _v.set(cam.x, camY + jumpY, p.pos.z - camD);
+    const look = _v2.set(cam.x * 0.8 + p.pos.x * 0.2, lerp(cam.gy, cam.gl, 0.6) + 1.3 + cam.boss * 2, p.pos.z + ahead);
 
     let blend = 0;
     const t = this.stateT;
@@ -897,9 +1233,41 @@ export class Game {
       blend = easeInOut(clamp(t / 1.8, 0, 1));
     }
     if (blend > 0) { pos.lerp(_cinePos, blend); look.lerp(_cineLook, blend); }
+    // 弯道：镜头与视点按同一弯曲函数平移，并提前看向弯道内侧、轻微侧倾
+    bendVec(pos);
+    bendVec(look);
+    look.x += (bendX(p.pos.z + 55) - bendX(p.pos.z + ahead)) * 0.35 * (1 - blend);
+    cam.roll = damp(cam.roll, clamp(curvature() * 14, -0.07, 0.07) * (1 - blend), 2, dt);
     this.camera.position.copy(pos);
     this.camera.lookAt(look);
+    this.camera.rotateZ(cam.roll);
+    this.updateJuice();
     this.camFade.value = Math.max(0, pos.distanceTo(p.pos) - 3);
+  }
+
+  /** 持续画面状态：速度感（FOV / 速度线 / 径向模糊）、低血量去饱和 */
+  updateJuice() {
+    const pl = this.player, sk = pl.skill, J = this.juice.hold;
+    let spd = clamp((pl.fwd - RUN_SPEED * 1.2) / (RUN_SPEED * 0.7), 0, 1); // 下坡的小幅加速不算，冲刺 / 冲锋才出速度线
+    if (sk && (sk.type === 'pounce' || sk.type === 'dive') && !pl.onGround) spd = Math.max(spd, 0.75);
+    if (pl.rampAir) spd = Math.max(spd, 0.8);
+    if (this.state === 'win' || this.state === 'intro') spd = 0;
+    const rage = pl.buffs.rage > 0;
+    if (rage) spd = Math.max(spd, 0.5);
+    J.speed = spd;
+    J.fov = spd * 12 + (rage ? 4 : 0);
+    J.radial = spd * 0.4;
+    J.tint = rage ? 0.4 : 0;
+    const low = pl.alive ? clamp(1 - pl.hp / (pl.stats.maxHp * 0.3), 0, 1) : 1;
+    J.desat = pl.alive ? low * 0.35 : 0.75;
+    J.vig = low * 0.3;
+    const fov = 60 + this.juice.fov;
+    if (Math.abs(this.camera.fov - fov) > 0.02) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+      this.fx.sparks.setScale(this.viewH, fov);
+      this.fx.dust.setScale(this.viewH, fov);
+    }
   }
 
   // ------------------------------------------------------------------
@@ -919,6 +1287,7 @@ export class Game {
         bars.add(e.pos.x, e.pos.y + e.barTop + (e.lift || 0), e.pos.z, e.barW, e.hp / e.maxHp, e.isProp ? 0xffb020 : 0xff3a3a);
       }
     }
+    for (const b of this.hazards.babies) sh.add(b.pos.x, b.pos.y, b.pos.z, 1.8);
     sh.end();
     bars.end();
     let n = 0;
@@ -957,7 +1326,8 @@ export class Game {
     this.projectiles.warm(kinds);
     for (const k of Object.keys(GATES)) { const t = gateLabel(GATES[k]); try { renderer.initTexture(t); } catch { /* ignore */ } }
     const models = [...tmp.children];
-    for (const k of ['meat', 'crystal', 'power']) tmp.add(PICKUP_MAKERS()[k]()); // 共享材质，编译后保留
+    for (const k of ['meat', 'crystal', 'power', 'egg', 'magnet', 'bomb']) tmp.add(PICKUP_MAKERS()[k]()); // 共享材质，编译后保留
+    this.hazards.warm(tmp);
     this.scene.add(tmp);
     // 冲击波环 / 光柱 / 地面预警 / 护盾（平时隐藏的对象也要编译）
     _v.set(0, this.heightAt(0, 30), 30);
@@ -971,7 +1341,8 @@ export class Game {
     this.camera.getWorldDirection(_v2);
     const at = _v.copy(this.camera.position).addScaledVector(_v2, 14);
     _m.makeTranslation(at.x, at.y, at.z);
-    const inst = [this.shadows.mesh, this.bars.bg, this.bars.fg, this.coinMesh];
+    const inst = [this.shadows.mesh, this.bars.bg, this.bars.fg, this.coinMesh, this.fx.debris.mesh, this.fx.scorch.mesh, this.fx.streaks.mesh];
+    this.player.afterimages?.spawn(0xffffff, 0.01, 0.05);
     for (const b of this.projectiles.batches.values()) inst.push(...b.layers);
     for (const im of inst) { im.setMatrixAt(0, _m); im.count = 1; im.instanceMatrix.needsUpdate = true; }
     tmp.position.copy(at).addScaledVector(_v2, 6);
@@ -1038,9 +1409,17 @@ export class Game {
     this.fx.sparks.dispose();
     this.fx.dust.dispose();
     this.fx.rings.dispose();
+    this.fx.debris.dispose();
+    this.fx.scorch.dispose();
+    this.fx.lights?.dispose();
+    this.fx.streaks.dispose();
+    this.hazards.dispose();
+    this.juice.reset();
+    this.audio.setMusicRate(1);
     this.tele.clear();
     this.text.clear();
     this.hud.dispose();
     this.track.dispose();
+    resetBend();
   }
 }

@@ -1,5 +1,6 @@
 // 视觉特效：GPU 粒子、冲击波环、光柱、地面预警、护盾、伤害飘字
 import * as THREE from 'three';
+import { bendVec } from './bend.js';
 
 const _c = new THREE.Color();
 const _v = new THREE.Vector3();
@@ -14,10 +15,11 @@ const PARTICLE_VS = /* glsl */`
   varying vec3 vColor;
   varying float vAlpha;
   uniform float uScale;
+  #include <bend_pars_vertex>
   void main() {
     vColor = color;
     vAlpha = alpha;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vec4 mv = viewMatrix * bendWorld(modelMatrix * vec4(position, 1.0));
     gl_PointSize = max(1.0, size * uScale / -mv.z);
     gl_Position = projectionMatrix * mv;
   }`;
@@ -259,7 +261,8 @@ export class Rings {
 // ---------------------------------------------------------------------
 const TELE_VS = /* glsl */`
   varying vec2 vUv;
-  void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  #include <bend_pars_vertex>
+  void main() { vUv = uv; gl_Position = projectionMatrix * viewMatrix * bendWorld(modelMatrix * vec4(position, 1.0)); }`;
 const TELE_FS = /* glsl */`
   uniform vec3 uColor;
   uniform float uProgress;
@@ -381,8 +384,9 @@ export function createShield(color = 0xffd060) {
     uniforms: { uColor: { value: new THREE.Color(color) }, uTime: { value: 0 }, uAlpha: { value: 1 } },
     vertexShader: /* glsl */`
       varying vec3 vN; varying vec3 vV; varying vec3 vP;
+      #include <bend_pars_vertex>
       void main() {
-        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vec4 wp = bendWorld(modelMatrix * vec4(position, 1.0));
         vN = normalize(mat3(modelMatrix) * normal);
         vV = normalize(cameraPosition - wp.xyz);
         vP = position;
@@ -439,7 +443,7 @@ export class FloatingText {
       it.t += dt;
       const k = it.t / it.life;
       if (k >= 1) { this._kill(i); continue; }
-      _v.set(it.x, it.y, it.z).project(camera);
+      bendVec(_v.set(it.x, it.y, it.z)).project(camera);
       if (_v.z > 1) { it.el.style.opacity = 0; continue; }
       const sx = (_v.x * 0.5 + 0.5) * w + it.vx * k;
       const sy = (-_v.y * 0.5 + 0.5) * h - it.rise * (1 - (1 - k) * (1 - k));
@@ -455,10 +459,16 @@ export class FloatingText {
 //  镜头震动（trauma 模型）
 // ---------------------------------------------------------------------
 export class Shake {
-  constructor() { this.trauma = 0; this.t = 0; this.enabled = true; }
+  constructor() { this.trauma = 0; this.t = 0; this.enabled = true; this.kickV = new THREE.Vector3(); }
   add(a) { if (this.enabled) this.trauma = Math.min(1, this.trauma + a); }
+  /** 定向冲击：镜头沿 dir 方向被“踢”一下再弹回（受击时传入攻击方向） */
+  kick(dir, a) { if (this.enabled) this.kickV.addScaledVector(dir, a); }
   apply(camera, dt) {
     this.t += dt;
+    if (this.kickV.lengthSq() > 1e-5) {
+      camera.position.add(this.kickV);
+      this.kickV.multiplyScalar(Math.exp(-dt * 10));
+    }
     if (this.trauma <= 0) return;
     const s = this.trauma * this.trauma;
     camera.position.x += (Math.sin(this.t * 47.3) + Math.sin(this.t * 31.1)) * 0.5 * s * 0.9;
@@ -604,5 +614,286 @@ export class Bars {
   }
   dispose() {
     for (const m of [this.bg, this.fg]) { m.parent && m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); }
+  }
+}
+
+// ---------------------------------------------------------------------
+//  碎石 / 碎片（实例化，带重力与弹跳，一次 draw call）
+// ---------------------------------------------------------------------
+const debrisGeo = new THREE.IcosahedronGeometry(0.5, 0);
+const _dm = new THREE.Matrix4();
+const _dq = new THREE.Quaternion();
+const _de = new THREE.Euler();
+const _ds = new THREE.Vector3();
+const _dp = new THREE.Vector3();
+export class Debris {
+  constructor(scene, heightAt, max = 220) {
+    this.max = max;
+    this.heightAt = heightAt;
+    this.mesh = new THREE.InstancedMesh(debrisGeo, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.85 }), max);
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * 3).fill(1), 3);
+    this.mesh.frustumCulled = false;
+    this.mesh.count = 0;
+    scene.add(this.mesh);
+    this.scene = scene;
+    this.items = [];
+  }
+  burst(pos, { count = 10, speed = 8, up = 7, size = 0.35, sizeVar = 0.5, color = 0x8a7a6a, color2, life = 1.8 } = {}) {
+    for (let i = 0; i < count; i++) {
+      if (this.items.length >= this.max) this.items.shift();
+      const a = Math.random() * Math.PI * 2, sp = speed * (0.35 + Math.random() * 0.65);
+      _c.set(color);
+      if (color2 !== undefined) _c.lerp(new THREE.Color(color2), Math.random());
+      _c.multiplyScalar(0.75 + Math.random() * 0.4);
+      this.items.push({
+        x: pos.x, y: pos.y + 0.3, z: pos.z,
+        vx: Math.cos(a) * sp, vy: up * (0.5 + Math.random() * 0.8), vz: Math.sin(a) * sp,
+        rx: Math.random() * 6, ry: Math.random() * 6, sx: (Math.random() - 0.5) * 16, sy: (Math.random() - 0.5) * 16,
+        s: size * (1 - sizeVar * 0.5 + Math.random() * sizeVar), t: 0, life: life * (0.7 + Math.random() * 0.6),
+        r: _c.r, g: _c.g, b: _c.b,
+      });
+    }
+  }
+  update(dt) {
+    const m = this.mesh;
+    let n = 0;
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const d = this.items[i];
+      d.t += dt;
+      if (d.t >= d.life) { this.items.splice(i, 1); continue; }
+      d.vy -= 24 * dt;
+      d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
+      const gy = this.heightAt(d.x, d.z) + d.s * 0.4;
+      if (d.y < gy) {
+        d.y = gy;
+        if (d.vy < -2) { d.vy *= -0.35; d.vx *= 0.6; d.vz *= 0.6; d.sx *= 0.5; d.sy *= 0.5; } else { d.vy = 0; d.vx *= 0.9; d.vz *= 0.9; d.sx *= 0.9; d.sy *= 0.9; }
+      }
+      d.rx += d.sx * dt; d.ry += d.sy * dt;
+      const k = d.life - d.t < 0.4 ? (d.life - d.t) / 0.4 : 1;
+      _dq.setFromEuler(_de.set(d.rx, d.ry, 0));
+      _dm.compose(_dp.set(d.x, d.y, d.z), _dq, _ds.setScalar(d.s * k));
+      m.setMatrixAt(n, _dm);
+      m.instanceColor.setXYZ(n, d.r, d.g, d.b);
+      n++;
+    }
+    m.count = n;
+    m.instanceMatrix.needsUpdate = true;
+    m.instanceColor.needsUpdate = true;
+  }
+  clear() { this.items.length = 0; this.mesh.count = 0; }
+  dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.mesh.dispose(); }
+}
+
+// ---------------------------------------------------------------------
+//  地面焦痕（爆炸后留下，数秒后淡出）
+// ---------------------------------------------------------------------
+export class Scorch {
+  constructor(scene, heightAt, max = 40) {
+    this.max = max;
+    this.heightAt = heightAt;
+    const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+    this.fade = new THREE.InstancedBufferAttribute(new Float32Array(max), 1);
+    geo.setAttribute('aFade', this.fade);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(0x140c08) } },
+      vertexShader: /* glsl */`
+        attribute float aFade;
+        varying vec2 vUv; varying float vFade;
+        #include <bend_pars_vertex>
+        void main() {
+          vUv = uv; vFade = aFade;
+          gl_Position = projectionMatrix * viewMatrix * bendWorld(modelMatrix * instanceMatrix * vec4(position, 1.0));
+        }`,
+      fragmentShader: /* glsl */`
+        uniform vec3 uColor;
+        varying vec2 vUv; varying float vFade;
+        void main() {
+          vec2 q = vUv - 0.5;
+          float d = length(q) * 2.0;
+          float ang = atan(q.y, q.x);
+          float edge = 0.72 + 0.16 * sin(ang * 7.0) + 0.08 * sin(ang * 13.0 + 1.7);
+          float a = (1.0 - smoothstep(edge * 0.55, edge, d)) * vFade;
+          float n = fract(sin(dot(floor(vUv * 22.0), vec2(12.9898, 78.233))) * 43758.5453);
+          a *= 0.7 + 0.3 * n;
+          gl_FragColor = vec4(uColor, a * 0.72);
+        }`,
+      transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+    });
+    this.mesh = new THREE.InstancedMesh(geo, mat, max);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 1;
+    this.mesh.count = 0;
+    scene.add(this.mesh);
+    this.scene = scene;
+    this.items = [];
+    this.enabled = true;
+  }
+  add(pos, r = 3, life = 5) {
+    if (!this.enabled) return;
+    if (this.items.length >= this.max) this.items.shift();
+    const h0 = this.heightAt(pos.x, pos.z - r * 0.5), h1 = this.heightAt(pos.x, pos.z + r * 0.5);
+    this.items.push({ x: pos.x, z: pos.z, y: this.heightAt(pos.x, pos.z) + 0.08, r, t: 0, life, tilt: -Math.atan2(h1 - h0, r), rot: Math.random() * 6 });
+  }
+  update(dt) {
+    let n = 0;
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const it = this.items[i];
+      it.t += dt;
+      if (it.t >= it.life) { this.items.splice(i, 1); continue; }
+      _dq.setFromEuler(_de.set(it.tilt, it.rot, 0, 'XYZ'));
+      _dm.compose(_dp.set(it.x, it.y, it.z), _dq, _ds.set(it.r * 2, 1, it.r * 2));
+      this.mesh.setMatrixAt(n, _dm);
+      const k = it.t / it.life;
+      this.fade.setX(n, Math.min(1, it.t * 12) * (k > 0.6 ? (1 - k) / 0.4 : 1));
+      n++;
+    }
+    this.mesh.count = n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.fade.needsUpdate = true;
+  }
+  clear() { this.items.length = 0; this.mesh.count = 0; }
+  dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.mesh.geometry.dispose(); this.mesh.dispose(); }
+}
+
+// ---------------------------------------------------------------------
+//  爆炸闪光：地面加法发光圆盘（不用点光源——光源会让场景里所有材质的每个像素都多算一次光照）
+// ---------------------------------------------------------------------
+export class LightFlashes {
+  constructor(rings) { this.rings = rings; }
+  flash(pos, color = 0xffa040, intensity = 60, dist = 18, life = 0.35) {
+    this.rings.disc(pos, { r: dist * 0.5, life: Math.max(0.2, life * 0.8), color, opacity: Math.min(0.55, 0.15 + intensity / 250), y: 0.3 });
+  }
+  update() {}
+  dispose() {}
+}
+
+// ---------------------------------------------------------------------
+//  弹体拖光（沿速度方向拉长、始终朝向镜头的加法面片，一次 draw call）
+// ---------------------------------------------------------------------
+function streakTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 16;
+  const ctx = c.getContext('2d');
+  const gx = ctx.createLinearGradient(0, 0, 128, 0);
+  gx.addColorStop(0, 'rgba(255,255,255,0)');
+  gx.addColorStop(0.75, 'rgba(255,255,255,0.8)');
+  gx.addColorStop(1, 'rgba(255,255,255,1)');
+  ctx.fillStyle = gx;
+  ctx.fillRect(0, 0, 128, 16);
+  ctx.globalCompositeOperation = 'destination-in';
+  const gy = ctx.createLinearGradient(0, 0, 0, 16);
+  gy.addColorStop(0, 'rgba(0,0,0,0)');
+  gy.addColorStop(0.5, 'rgba(0,0,0,1)');
+  gy.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gy;
+  ctx.fillRect(0, 0, 128, 16);
+  return new THREE.CanvasTexture(c);
+}
+const _sx = new THREE.Vector3();
+const _sy = new THREE.Vector3();
+const _sz = new THREE.Vector3();
+const _toCam = new THREE.Vector3();
+export class Streaks {
+  constructor(scene, max = 260) {
+    this.max = max;
+    this.tex = streakTexture();
+    const mat = new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+    this.mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).translate(-0.5, 0, 0), mat, max);
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 12;
+    this.mesh.count = 0;
+    scene.add(this.mesh);
+    this.scene = scene;
+    this.n = 0;
+  }
+  begin(camera) { this.n = 0; this.cam = camera.position; }
+  /** 头部在 pos，沿 -dir 拖出 len 长的光尾 */
+  add(pos, dir, len, width, color, boost = 1.6) {
+    if (this.n >= this.max) return;
+    _sx.copy(dir).normalize();
+    _toCam.subVectors(this.cam, pos);
+    _sy.crossVectors(_sx, _toCam);
+    if (_sy.lengthSq() < 1e-6) return;
+    _sy.normalize();
+    _sz.crossVectors(_sx, _sy);
+    _dm.makeBasis(_sx.multiplyScalar(len), _sy.multiplyScalar(width), _sz);
+    _dm.setPosition(pos);
+    this.mesh.setMatrixAt(this.n, _dm);
+    this.mesh.setColorAt(this.n, _c.set(color).multiplyScalar(boost));
+    this.n++;
+  }
+  end() {
+    this.mesh.count = this.n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+  }
+  dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.tex.dispose(); this.mesh.dispose(); }
+}
+
+// ---------------------------------------------------------------------
+//  残影：把恐龙 + 骑手当前姿态“拍”下来，用半透明加法材质淡出
+// ---------------------------------------------------------------------
+const MAX_GHOST_PARTS = 12;
+const GHOST_INTERVAL = 0.08;
+export class Afterimages {
+  constructor(scene, root, slots = 6) {
+    this.scene = scene;
+    this.src = [];
+    root.updateMatrixWorld(true);
+    root.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
+      const m = Array.isArray(o.material) ? o.material[0] : o.material;
+      if (!m || m.isShaderMaterial || m.transparent) return;
+      this.src.push(o);
+    });
+    // 只拍体积最大的几个零件（轮廓足够辨认，绘制调用少很多）
+    this.src.sort((a, b) => (b.geometry.attributes.position?.count || 0) - (a.geometry.attributes.position?.count || 0));
+    this.src.length = Math.min(this.src.length, MAX_GHOST_PARTS);
+    this.slots = [];
+    this.clock = 0;
+    this.lastSpawn = -1;
+    for (let i = 0; i < slots; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0x70e0ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+      const meshes = this.src.map((o) => {
+        const g = new THREE.Mesh(o.geometry, mat);
+        g.matrixAutoUpdate = false;
+        g.visible = false;
+        g.renderOrder = 8;
+        g.frustumCulled = false;
+        scene.add(g);
+        return g;
+      });
+      this.slots.push({ mat, meshes, t: 1, life: 1, a: 0 });
+    }
+    this.next = 0;
+  }
+  spawn(color, alpha = 0.45, life = 0.32) {
+    if (this.clock - this.lastSpawn < GHOST_INTERVAL) return;
+    this.lastSpawn = this.clock;
+    const s = this.slots[this.next];
+    this.next = (this.next + 1) % this.slots.length;
+    s.mat.color.set(color);
+    s.t = 0; s.life = life; s.a = alpha;
+    for (let i = 0; i < this.src.length; i++) {
+      const o = this.src[i], g = s.meshes[i];
+      g.visible = o.visible && o.parent?.visible !== false;
+      g.matrix.copy(o.matrixWorld);
+      g.matrixWorldNeedsUpdate = true;
+    }
+  }
+  update(dt) {
+    this.clock += dt;
+    for (const s of this.slots) {
+      if (s.t >= s.life) continue;
+      s.t += dt;
+      const k = Math.min(1, s.t / s.life);
+      s.mat.opacity = s.a * (1 - k);
+      if (k >= 1) for (const g of s.meshes) g.visible = false;
+    }
+  }
+  dispose() {
+    for (const s of this.slots) { for (const g of s.meshes) this.scene.remove(g); s.mat.dispose(); }
+    this.slots.length = 0;
   }
 }

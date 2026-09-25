@@ -4,7 +4,10 @@ import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
 import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED } from './data.js';
 import { clamp, damp, prepareModel, mergeStaticMeshes } from './util.js';
-import { createShield } from './effects.js';
+import { createShield, Afterimages } from './effects.js';
+import { t } from './i18n.js';
+import { curvature } from './bend.js';
+import { LAUNCH_VY, RAMP_GRAV } from './hazards.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -13,6 +16,10 @@ const _inherit = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const FWD = new THREE.Vector3(0, 0, 1);
 const GRAVITY = 32;
+const smoothstep01 = (x) => x * x * (3 - 2 * x);
+export const RAGE_TIME = 7;
+const RAGE_COL = new THREE.Color(0xffb020);
+const _rc = new THREE.Color();
 
 export function computeStats(dino, rider, up) {
   const s = dino.stats;
@@ -69,6 +76,7 @@ export class Player {
     });
     game.scene.add(this.root);
     this.flash = prepareModel(this.root, { cast: true });
+    this.afterimages = new Afterimages(game.scene, this.root, 4);
 
     this.size = this.model.size;
     this.top = this.size.top || this.size.height;
@@ -93,7 +101,13 @@ export class Player {
     this.skillCd = 2;
     this.skill = null;
     this.skillAnim = -1;
-    this.buffs = { frenzy: 0, fortress: 0, sprint: 0, power: 0, shield: 0 };
+    this.buffs = { frenzy: 0, fortress: 0, sprint: 0, power: 0, shield: 0, rage: 0, magnet: 0 };
+    this.rampAir = false;
+    this.flipT = 0;
+    this.baseScale = this.root.scale.x;
+    this.rageScale = 1;
+    this.rageWaveT = 0;
+    this.rageWas = false;
     this.slowT = 0; this.slowMul = 1;
     this.poisonT = 0; this.poisonDps = 0; this.poisonTick = 0;
     this.invuln = 0;
@@ -103,6 +117,7 @@ export class Player {
     this.alive = true;
     this.deadT = 0;
     this.lean = 0;
+    this.slope = 0;
     this.cheer = false;
     this.stepAcc = 0;
     this.auraAcc = 0;
@@ -119,7 +134,7 @@ export class Player {
 
   get center() { return _v.set(this.pos.x, this.pos.y + this.size.height * 0.75, this.pos.z); }
   getCenter(out) { return out.set(this.pos.x, this.pos.y + this.size.height * 0.75, this.pos.z); }
-  get invulnerable() { return this.buffs.sprint > 0 || !!(this.skill && this.skill.invuln); }
+  get invulnerable() { return this.buffs.sprint > 0 || this.buffs.rage > 0 || !!(this.skill && this.skill.invuln); }
 
   // ------------------------------------------------------------------
   //  武器
@@ -128,13 +143,14 @@ export class Player {
     const w = this.riderDef.weapon;
     const L = WEAPON_LEVELS[this.weapon.level];
     const W = this.weapon;
-    const count = Math.min(9, (w.count || 1) + L.count + W.count);
-    const rate = L.rate * W.rate * (this.buffs.frenzy > 0 ? 1.8 : 1) * (this.buffs.sprint > 0 ? 1.4 : 1);
+    const rage = this.buffs.rage > 0;
+    const count = Math.min(rage ? 11 : 9, (w.count || 1) + L.count + W.count + (rage ? 2 : 0));
+    const rate = L.rate * W.rate * (this.buffs.frenzy > 0 ? 1.8 : 1) * (this.buffs.sprint > 0 ? 1.4 : 1) * (rage ? 1.3 : 1) * (1 + this.game.comboBonus());
     return {
       count,
-      dmg: w.dmg * this.stats.riderMul * L.dmg * W.dmg * (this.buffs.power > 0 ? 1.5 : 1),
+      dmg: w.dmg * this.stats.riderMul * L.dmg * W.dmg * (this.buffs.power > 0 ? 1.5 : 1) * (rage ? 1.25 : 1),
       cd: w.cd / rate,
-      pierce: (w.pierce || 0) + L.pierce + W.pierce,
+      pierce: (w.pierce || 0) + L.pierce + W.pierce + (rage ? 2 : 0),
       homing: w.homing || L.homing || 0,
       spread: count > 1 ? Math.min(w.spread || 9, 44 / (count - 1)) : 0,
     };
@@ -164,6 +180,8 @@ export class Player {
       case 'shield': this.buffs.shield = 8; break;
       case 'skill': this.skillCd = 0; break;
       case 'xp': this.addXp(25); break;
+      case 'magnet': this.buffs.magnet = 10; break;
+      // 'gamble' 由 game.rollGamble 结算
     }
   }
 
@@ -207,6 +225,10 @@ export class Player {
     const sk = this.skill;
     // --- 前进 ---
     let fwdT = ctl.run ? RUN_SPEED : 0;
+    // 上坡减速、下坡加速
+    const base = g.track.baseAt;
+    this.slope = damp(this.slope, (base(this.pos.z + 3) - base(this.pos.z - 3)) / 6, 6, dt);
+    fwdT *= clamp(1 - this.slope * 1.3, 0.86, 1.14);
     if (ctl.run && this.buffs.sprint > 0) fwdT *= 1.6;
     if (ctl.run && sk && sk.type === 'charge') fwdT *= 2;
     this.fwd = damp(this.fwd, fwdT * (ctl.run ? this.slowMul : 1), ctl.run ? 2.5 : 2, dt);
@@ -218,6 +240,9 @@ export class Player {
     this.vel.x = damp(this.vel.x, vxT, 12, dt);
     let dx = this.vel.x * dt;
     if (ctl.enabled && ctl.drag) dx -= ctl.drag * ctl.dragScale;
+    // 弯道离心力：把恐龙往弯道外侧推，需要主动往内侧打方向
+    const kap = curvature();
+    if (ctl.run && this.onGround) dx -= kap * this.fwd * this.fwd * 0.55 * dt;
     this.pos.x += dx;
     const lim = g.track.roadHalf - Math.min(1.2, this.radius * 0.5);
     this.pos.x = clamp(this.pos.x, -lim, lim);
@@ -231,7 +256,7 @@ export class Player {
       g.audio.play('jump', { pitch: 1.2 - this.size.height * 0.08 });
       g.fx.dust.burst(this.pos, { count: 10, speed: 3, life: 0.6, size: 0.8, sizeEnd: 2, color: g.dustColor, alpha: 0.5, flat: true, up: 1 });
     }
-    this.vy -= (sk && sk.air ? GRAVITY * 0.8 : GRAVITY) * dt;
+    this.vy -= (this.rampAir ? RAMP_GRAV : sk && sk.air ? GRAVITY * 0.8 : GRAVITY) * dt;
     this.pos.y += this.vy * dt;
     const gy = g.heightAt(this.pos.x, this.pos.z);
     if (this.pos.y <= gy) {
@@ -239,6 +264,9 @@ export class Player {
         g.audio.play('land', { volume: 0.5 });
         g.fx.dust.burst(this.pos, { count: 12, speed: 4, life: 0.6, size: 1, sizeEnd: 2.2, color: g.dustColor, alpha: 0.45, flat: true, up: 1 });
         if (sk && sk.air) this.landSkill();
+        else if (this.rampAir) this.landStomp(-this.vy, 1.6);
+        else if (!sk) this.landStomp(-this.vy);
+        this.rampAir = false;
       }
       this.pos.y = gy; this.vy = 0; this.onGround = true;
     } else if (this.pos.y > gy + 0.05) this.onGround = false;
@@ -246,7 +274,7 @@ export class Player {
     // 朝向：随左右移动微微转头
     const hT = clamp(Math.atan2(vxEff, Math.max(7, this.fwd)), -0.55, 0.55);
     this.heading = damp(this.heading, hT, 8, dt);
-    this.lean = damp(this.lean, clamp(-vxEff / Math.max(1, lat), -1, 1), 8, dt);
+    this.lean = damp(this.lean, clamp(-vxEff / Math.max(1, lat) + kap * this.fwd * this.fwd * 0.12, -1, 1), 8, dt);
 
     // 脚步
     if (this.onGround && this.fwd > 2) {
@@ -261,6 +289,10 @@ export class Player {
     if (ctl.enabled) {
       if (this.fireCd <= 0) this.fire();
       if (this.biteCd <= 0 && this.atkT < 0 && !(sk && sk.noBite)) this.tryBite();
+      if (ctl.ult && this.buffs.rage <= 0) {
+        if (g.fever >= 100) this.startRage();
+        else g.audio.play('error', { volume: 0.35 });
+      }
       if (ctl.skill) {
         if (this.skillCd <= 0 && !this.skill) this.startSkill(ctl.run);
         else if (this.skillCd > 0) g.audio.play('error', { volume: 0.35 });
@@ -278,6 +310,18 @@ export class Player {
     // --- 模型 ---
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.heading + this.spinAngle;
+    if (this.rampAir) {
+      // 跳台飞行：绕身体中心前空翻一圈
+      this.flipT += dt;
+      const th = Math.PI * 2 * smoothstep01(clamp((this.flipT - 0.15) / 1.35, 0, 1));
+      const hc = this.size.height * 0.5;
+      this.root.rotation.x = th;
+      this.root.position.y += hc * (1 - Math.cos(th));
+      this.root.position.z -= hc * Math.sin(th);
+    } else {
+      if (this.root.rotation.x > Math.PI) this.root.rotation.x -= Math.PI * 2;
+      this.root.rotation.x = this.onGround ? damp(this.root.rotation.x, -Math.atan(this.slope) * 0.9, 8, dt) : damp(this.root.rotation.x, 0, 3, dt);
+    }
     const runAmt = this.fwd > 1 ? clamp(this.fwd / RUN_SPEED, 0, 1.8) : clamp(Math.abs(vxEff) / lat, 0, 1) * 0.8;
     this.anim.move = runAmt;
     this.anim.air = !this.onGround;
@@ -293,6 +337,7 @@ export class Player {
     this.riderModel.update(dt, this.riderAnim);
 
     if (this.flashT > 0) this.flash.setFlash(this.flashT / 0.15);
+    else if (this.buffs.rage > 0) this.flash.setFlash(0.16 + 0.08 * Math.sin(this.anim.t * 14), RAGE_COL);
     else if (this.buffs.frenzy > 0) this.flash.setFlash(0.22 + 0.12 * Math.sin(this.anim.t * 12), FRENZY_COL);
     else if (this.buffs.sprint > 0 || (sk && sk.type === 'charge')) this.flash.setFlash(0.3, SPRINT_COL);
     else if (this.poisonT > 0) this.flash.setFlash(0.2 + 0.1 * Math.sin(this.anim.t * 8), POISON_COL);
@@ -356,7 +401,7 @@ export class Player {
         radius: (RADII[w.type] ?? 0.6) * (this.weapon.level >= 9 ? 1.25 : 1), life: w.type === 'missile' ? 3.5 : 2.4,
         pierce: ws.pierce, bounce: w.bounce || 0, homing: ws.homing, target: ws.homing ? target : null,
         aoe: w.aoe || 0, slow: w.slow || 0, slowTime: w.slowTime || 0, burn: w.burn || 0,
-        knock: w.knock ?? 2, gravity, color: w.color, explodeOnExpire: !!w.aoe,
+        knock: w.knock ?? 2, gravity, color: this.buffs.rage > 0 ? _rc.setHSL((this.anim.t * 0.9 + i / n) % 1, 1, 0.6).getHex() : w.color, explodeOnExpire: !!w.aoe,
         scale: this.weapon.level >= 9 ? 1.3 : 1,
       });
     }
@@ -415,7 +460,7 @@ export class Player {
   /** 与怪物相撞（由 game 检测） */
   collide(e) {
     const g = this.game;
-    const charging = (this.skill && this.skill.type === 'charge') || this.buffs.sprint > 0;
+    const charging = (this.skill && this.skill.type === 'charge') || this.buffs.sprint > 0 || this.buffs.rage > 0;
     const dxs = Math.sign(e.pos.x - this.pos.x) || (Math.random() < 0.5 ? -1 : 1);
     if (charging || (!e.isBoss && (!e.isProp || e.type === 'chest') && e.hp <= this.stats.ram * (this.buffs.power > 0 ? 1.5 : 1))) {
       // 撞飞！
@@ -442,6 +487,7 @@ export class Player {
     const g = this.game;
     const d = this.def.skill;
     const s = { type: d.type, t: 0, dur: 1, fired: false, hit: new Set(), count: 0, running };
+    this.skillJuice(d.type);
     switch (d.type) {
       case 'roar': s.dur = 1.2; break;
       case 'charge':
@@ -467,20 +513,20 @@ export class Player {
         this.buffs.frenzy = d.duration;
         g.audio.play('frenzy'); g.audio.roar(0.8 + this.size.height * 0.15);
         g.fx.sparks.burst(this.center, { count: 40, speed: 8, life: 0.6, size: 0.8, color: 0xff4020, color2: 0xff0000 });
-        g.floatText(this.pos, '狂暴！射速翻倍', 'crit', this.top + 2);
+        g.floatText(this.pos, t('float.frenzy'), 'crit', this.top + 2);
         break;
       case 'fortress':
         s.dur = 0.8;
         this.buffs.fortress = d.duration;
         g.audio.play('fortress');
-        g.floatText(this.pos, '铁甲堡垒！', 'info', this.top + 2);
+        g.floatText(this.pos, t('float.fortress'), 'info', this.top + 2);
         break;
       case 'sprint':
         s.dur = 0.6;
         this.buffs.sprint = d.duration;
         this.sprintTouched.clear();
         g.audio.play('sprint');
-        g.floatText(this.pos, '疾风！无敌冲刺', 'info', this.top + 2);
+        g.floatText(this.pos, t('float.sprint'), 'info', this.top + 2);
         break;
     }
     this.skill = s;
@@ -494,6 +540,86 @@ export class Player {
     _v.set(this.pos.x, this.pos.y + 1.2, this.pos.z + this.frontReach);
     g.projectiles.spawn({ kind: 'wave', owner: 'player', source: 'skill', pos: _v, dir: FWD, speed: 36, inherit: _inherit.set(0, 0, this.fwd), dmg, radius: width / 2 + 0.6, life: 1.5, pierce: 999, knock: 12, stun: 0.8, width, hover: 1.3, scale });
     g.audio.play('wave');
+  }
+
+  /** 跳台起跳 */
+  launch() {
+    const g = this.game;
+    this.vy = LAUNCH_VY;
+    this.onGround = false;
+    this.rampAir = true;
+    this.flipT = 0;
+    this.pos.y += 0.4;
+    g.audio.play('jump', { pitch: 0.8 });
+    g.audio.play('whoosh', { volume: 0.8 });
+    g.juice.fovKick(7);
+    g.juice.radial(0.8);
+    g.floatText(this.pos, t('float.ramp'), 'info', this.top + 2);
+    g.fx.dust.burst(this.pos, { count: 16, speed: 5, life: 0.6, size: 1, sizeEnd: 2.4, color: g.dustColor, alpha: 0.5, flat: true, up: 1 });
+  }
+
+  /** 普通跳跃落地：踩踏震地，伤害并击飞脚边的怪物（体型越大范围越大）；跳台落地 mul > 1 */
+  landStomp(fall, mul = 1) {
+    const g = this.game;
+    const k = clamp((fall - 8) / 6, 0, 1);
+    const R = (2.4 + this.radius * 0.9 + this.size.height * 0.35) * mul;
+    const dmg = this.stats.atk * (0.7 + 0.4 * k) * (this.buffs.power > 0 ? 1.5 : 1) * mul;
+    const hits = g.aoe(this.pos, R, dmg, { knock: 8, up: 6, stun: 0.35, source: 'melee' });
+    g.fx.rings.ring(this.pos, { r0: 0.8, r1: R * 1.25, life: 0.45, color: 0xfff0c8, opacity: 0.55 });
+    g.fx.dust.burst(this.pos, { count: 26, speed: 6 + R, life: 0.7, size: 1.1, sizeEnd: 2.8, color: g.dustColor, alpha: 0.5, flat: true, drag: 2.5, up: 1.5 });
+    g.audio.play('stomp', { volume: 0.55 + 0.25 * k, pitch: 1.2 - this.size.height * 0.08 });
+    g.shake.add(0.12 + 0.1 * k);
+    g.fx.debris.burst(this.pos, { count: 4 + Math.round(4 * k), speed: 5, up: 6, size: 0.25, color: g.rockColor ?? 0x7a6a5a });
+    g.juice.fovKick(-1.5 - 2 * k * mul);
+    if (mul > 1) { g.fx.scorch.add(this.pos, R * 0.5, 4); g.juice.flash(0xfff0c0, 0.12); g.juice.aberr(0.8); g.hitstop(0.05); }
+    if (hits > 0) {
+      g.hitstop(0.035);
+      if (hits >= 3) g.floatText(this.pos, t('float.stomp', { n: hits }), 'crit', this.top + 2);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  //  远古觉醒（狂热槽满后按 R）：变大、无敌、彩虹弹幕、周期冲击波，结束时全屏震荡
+  // ------------------------------------------------------------------
+  startRage() {
+    const g = this.game;
+    g.fever = 0;
+    this.buffs.rage = RAGE_TIME;
+    this.rageWaveT = 0.3;
+    this.rageWas = true;
+    g.onRageStart();
+  }
+
+  updateRage(dt) {
+    const g = this.game;
+    const on = this.buffs.rage > 0;
+    this.rageScale = damp(this.rageScale, on ? 1.35 : 1, on ? 6 : 3, dt);
+    this.root.scale.setScalar(this.baseScale * this.rageScale);
+    if (on) {
+      this.rageWaveT -= dt;
+      if (this.rageWaveT <= 0 && this.alive) {
+        this.rageWaveT = 0.75;
+        this.launchWave(this.stats.atk * 1.2, 8, 1.2);
+      }
+    } else if (this.rageWas) {
+      this.rageWas = false;
+      if (this.alive) g.onRageEnd();
+    }
+  }
+
+  /** 技能释放的画面冲击 */
+  skillJuice(type) {
+    const J = this.game.juice;
+    J.bloom(0.35);
+    switch (type) {
+      case 'roar': case 'sonic': J.radial(1.6); J.aberr(1); J.fovKick(-4); break;
+      case 'charge': case 'sprint': J.fovKick(7); J.radial(0.8); break;
+      case 'pounce': case 'dive': J.fovKick(5); break;
+      case 'stomp': case 'wave': J.aberr(0.8); J.fovKick(-3); break;
+      case 'frenzy': J.flash(0xff3020, 0.25); J.aberr(0.8); break;
+      case 'fortress': J.flash(0xffd060, 0.25); break;
+      default: J.aberr(0.5); J.fovKick(-2);
+    }
   }
 
   landSkill() {
@@ -512,6 +638,11 @@ export class Player {
     g.audio.play('quake', { volume: 0.8 });
     g.shake.add(0.35);
     g.hitstop(0.06);
+    g.fx.debris.burst(this.pos, { count: 16, speed: 9, up: 9, size: 0.35, color: g.rockColor ?? 0x7a6a5a });
+    g.fx.scorch.add(this.pos, R * 0.6, 5);
+    g.juice.fovKick(-5);
+    g.juice.flash(0xfff0c0, 0.14);
+    g.juice.aberr(1);
     this.launchWave(atk * d.power, 7);
   }
 
@@ -670,10 +801,24 @@ export class Player {
 
   updateBuffFx(dt) {
     const g = this.game;
+    this.afterimages.update(dt);
+    this.updateRage(dt);
     this.auraAcc += dt;
     if (this.auraAcc < 0.05) return;
     this.auraAcc = 0;
     const c = this.center;
+    // 残影：疾跑 / 冲锋 / 飞扑 / 俯冲时留下一串半透明的影子
+    const sk = this.skill;
+    if (this.buffs.rage > 0) {
+      // 金色火焰包裹全身 + 金色残影
+      g.fx.sparks.burst(c, { count: 4, speed: 1.2, life: 0.5, size: 0.85, sizeEnd: 0.1, color: 0xffd060, color2: 0xff3000, alpha: 0.8, radius: this.radius * 1.2, up: 4, gravity: -3 });
+      this.afterimages.spawn(0xd89020, 0.2, 0.25);
+    }
+    if (this.alive) {
+      if (this.buffs.sprint > 0) this.afterimages.spawn(0x3aa8d8, 0.22);
+      else if (sk && sk.type === 'charge') this.afterimages.spawn(0xd87a20, 0.22);
+      else if (sk && sk.air && !this.onGround) this.afterimages.spawn(sk.type === 'dive' ? 0xd86a20 : 0xc8b070, 0.2);
+    }
     if (this.buffs.frenzy > 0) g.fx.sparks.burst(c, { count: 2, speed: 1.5, life: 0.6, size: 0.8, color: 0xff3020, color2: 0x600000, radius: this.radius, up: 2 });
     if (this.buffs.power > 0) g.fx.sparks.burst(c, { count: 2, speed: 1, life: 0.6, size: 0.7, color: 0xffd040, color2: 0xff6000, radius: this.radius, up: 2 });
     if (this.buffs.sprint > 0) {
@@ -720,6 +865,11 @@ export class Player {
       g.audio.play(this.buffs.fortress > 0 || this.buffs.shield > 0 ? 'shieldHit' : 'playerHurt', { volume: 0.7 });
       g.shake.add(Math.min(0.3, 0.1 + dmg / this.stats.maxHp * 1.2));
       g.hud && g.hud.damageFlash();
+      const heavy = Math.min(1, dmg / this.stats.maxHp * 6);
+      g.juice.flash(0xff2020, 0.08 + heavy * 0.2);
+      g.juice.aberr(0.5 + heavy * 1.2);
+      if (o.dir) g.shake.kick(o.dir, 0.25 + heavy * 0.35);
+      else if (o.attacker) g.shake.kick(_dir.set(this.pos.x - o.attacker.pos.x, 0, this.pos.z - o.attacker.pos.z).normalize(), 0.25 + heavy * 0.35);
       if (this.buffs.fortress > 0 && o.attacker && o.attacker.targetable) {
         _dir.set(o.attacker.pos.x - this.pos.x, 0, o.attacker.pos.z - this.pos.z).normalize();
         g.damageEnemy(o.attacker, amount * (this.def.skill.thorns || 0.5) + this.stats.atk * 0.5, { dir: _dir, knock: 6, source: 'thorns' });
@@ -747,5 +897,6 @@ export class Player {
     this.game.scene.remove(this.shield);
     this.shield.geometry.dispose();
     this.shield.material.dispose();
+    this.afterimages.dispose();
   }
 }

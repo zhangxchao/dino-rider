@@ -12,6 +12,8 @@ import { Game } from './game.js';
 import { UI } from './ui.js';
 import { Showcase } from './showcase.js';
 import { renderThumbnails } from './thumbs.js';
+import { t } from './i18n.js';
+import { Juice } from './juice.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -32,6 +34,8 @@ class App {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.45, 0.85);
     this.composer.addPass(this.bloom);
+    this.juice = new Juice(this);
+    this.juice.install(this.composer, 2);
     this.composer.addPass(new OutputPass());
 
     this.audio = audio;
@@ -129,18 +133,22 @@ class App {
     this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.juice.setSize(w, h);
     if (this.game) this.game.resize(w, h);
   }
 
   async init() {
     const fill = document.getElementById('loading-fill');
     const text = document.getElementById('loading-text');
+    document.querySelector('#loading .logo-big').textContent = t('game.logo');
+    document.querySelector('#loading .logo-sub').textContent = t('game.sub');
+    text.textContent = t('loading.wake');
     await nextFrame();
     this.thumbs = await renderThumbnails((p, name) => {
       fill.style.width = (p * 85).toFixed(0) + '%';
-      text.textContent = `正在孵化恐龙蛋：${name}…`;
+      text.textContent = t('loading.hatch', { name });
     });
-    text.textContent = '正在生成远古大陆…';
+    text.textContent = t('loading.world');
     fill.style.width = '92%';
     await nextFrame();
     this.showcase = new Showcase(this, this.menuBiome());
@@ -185,6 +193,7 @@ class App {
 
   exitToMenu(screen = 'title') {
     if (this.game) { this.game.dispose(); this.game = null; }
+    this.juice.reset();
     input.gameActive = false;
     input.exitLock();
     input.releaseAll();
@@ -229,6 +238,7 @@ class App {
       } else if (this.showcase) {
         this.showcase.update(dt);
       }
+      this.juice.update(this.game && this.game.paused ? 0 : dt);
       if (this.useComposer) this.composer.render(dt);
       else this.renderer.render(this.scene, this.camera);
       this.lastCalls = this.renderer.info.render.calls;
@@ -245,7 +255,7 @@ class App {
     this.errorShown = true;
     const d = document.createElement('div');
     d.style.cssText = 'position:fixed;left:12px;bottom:12px;max-width:60vw;padding:10px 14px;background:rgba(120,0,0,.85);color:#fff;font:12px/1.5 monospace;border-radius:8px;z-index:99;white-space:pre-wrap;pointer-events:auto';
-    d.textContent = '⚠️ 运行出错（请截图反馈）：\n' + (e && e.stack ? e.stack.split('\n').slice(0, 4).join('\n') : String(e));
+    d.textContent = t('error.runtime') + '\n' + (e && e.stack ? e.stack.split('\n').slice(0, 4).join('\n') : String(e));
     d.onclick = () => d.remove();
     document.body.appendChild(d);
   }
@@ -255,6 +265,6 @@ const app = new App();
 window.__app = app;
 app.init().catch((e) => {
   app.showError(e);
-  const t = document.getElementById('loading-text');
-  if (t) t.textContent = '加载失败：' + e.message;
+  const el = document.getElementById('loading-text');
+  if (el) el.textContent = t('error.load', { msg: e.message });
 });

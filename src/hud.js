@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED } from './data.js';
 import { formatTime } from './util.js';
+import { t } from './i18n.js';
+import { bendVec } from './bend.js';
 
 export const SKILL_ICON = {
   roar: '🗯️', charge: '🐂', pounce: '🐾', spin: '🌀', stomp: '💥', frenzy: '🔥', fortress: '🛡️',
@@ -23,7 +25,7 @@ export class Hud {
       <div class="hud-player panel">
         <div class="portrait">${thumb ? `<img src="${thumb}">` : ''}</div>
         <div>
-          <div class="nm">${dino.name}<small>骑手 · ${rider.name}</small></div>
+          <div class="nm">${dino.name}<small>${t('common.rider', { name: rider.name })}</small></div>
           <div class="bar-outer"><div class="bar-fill ghost"></div><div class="bar-fill hp"></div><div class="bar-text"></div></div>
           <div class="weapon-row">
             <span class="wicon">${WEAPON_ICON[rider.weapon.type] || '🎯'}</span>
@@ -50,14 +52,14 @@ export class Hud {
           <div class="hud-stat">⏱ <span class="time">0:00</span></div>
         </div>
       </div>
-      <div class="combo"><div class="n">0</div><div class="l">连击</div></div>
+      <div class="combo"><div class="n">0</div><div class="l">${t('hud.combo')}</div><div class="tier"></div></div>
       <div class="lvlup"></div>
       <div class="hud-skills">
+        <div class="fever-gauge"><div class="lbl">${t('hud.fever')}</div><div class="tube"><div class="fill"></div></div><div class="key">R</div></div>
         <div class="skill-ico big skill"><div class="lbl">${dino.skill.name}</div>${SKILL_ICON[dino.skill.type] || '✨'}<div class="cd"></div><div class="cdt"></div><div class="key">Q</div></div>
       </div>
       <div class="hud-hints">
-        <kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> 左右移动（也可按住鼠标拖动）<br>
-        <kbd>空格</kbd> 跳跃 · <kbd>Q</kbd> 技能 · 骑手自动射击 · <kbd>Esc</kbd> 暂停
+        ${t('hud.hints')}
       </div>`;
     if (touch) root.querySelector('.hud-hints').classList.add('hidden');
     const $ = (s) => root.querySelector(s);
@@ -67,6 +69,7 @@ export class Hud {
       routeFill: $('.route-fill'), routeDino: $('.route-dino'), routeText: $('.route-text'), dist: $('.endless-dist'),
       bossWrap: $('.boss-wrap'), route: $('.route'),
       coins: $('.coins'), kills: $('.kills'), time: $('.time'), combo: $('.combo'), comboN: $('.combo .n'),
+      fever: $('.fever-gauge'), feverFill: $('.fever-gauge .fill'), comboTier: $('.combo .tier'),
       skillCd: $('.skill .cd'), skillCdt: $('.skill .cdt'), skill: $('.skill'), lvlup: $('.lvlup'),
     };
     this.reticle = document.createElement('div');
@@ -91,9 +94,18 @@ export class Hud {
     requestAnimationFrame(() => { f.style.transition = 'opacity .45s'; f.style.opacity = ''; });
   }
 
+  comboTier(tier, name) {
+    const el = this.el.comboTier;
+    this.el.combo.dataset.tier = tier;
+    el.textContent = name;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+  }
+
   levelUp(lv, name) {
     const el = this.el.lvlup;
-    el.innerHTML = `<div class="a">武器升级！</div><div class="b">Lv.${lv}${lv >= WEAPON_MAX ? ' MAX' : ''} · ${name}</div>`;
+    el.innerHTML = `<div class="a">${t('hud.levelUp')}</div><div class="b">Lv.${lv}${lv >= WEAPON_MAX ? ' MAX' : ''} · ${name}</div>`;
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');
@@ -149,13 +161,14 @@ export class Hud {
     });
 
     const buffs = [];
-    if (p.buffs.frenzy > 0) buffs.push(`🔥 狂暴 ${p.buffs.frenzy.toFixed(1)}`);
-    if (p.buffs.fortress > 0) buffs.push(`🛡️ 堡垒 ${p.buffs.fortress.toFixed(1)}`);
-    if (p.buffs.shield > 0) buffs.push(`🛡️ 护盾 ${p.buffs.shield.toFixed(1)}`);
-    if (p.buffs.sprint > 0) buffs.push(`⚡ 疾风 ${p.buffs.sprint.toFixed(1)}`);
-    if (p.buffs.power > 0) buffs.push(`💪 力量 ${p.buffs.power.toFixed(1)}`);
-    if (p.poisonT > 0) buffs.push('☠️ 中毒');
-    if (p.slowT > 0) buffs.push('🧊 减速');
+    if (p.buffs.frenzy > 0) buffs.push(t('buff.frenzy', { t: p.buffs.frenzy.toFixed(1) }));
+    if (p.buffs.fortress > 0) buffs.push(t('buff.fortress', { t: p.buffs.fortress.toFixed(1) }));
+    if (p.buffs.shield > 0) buffs.push(t('buff.shield', { t: p.buffs.shield.toFixed(1) }));
+    if (p.buffs.sprint > 0) buffs.push(t('buff.sprint', { t: p.buffs.sprint.toFixed(1) }));
+    if (p.buffs.power > 0) buffs.push(t('buff.power', { t: p.buffs.power.toFixed(1) }));
+    if (p.poisonT > 0) buffs.push(t('buff.poison'));
+    if (p.slowT > 0) buffs.push(t('buff.slow'));
+    if (p.buffs.magnet > 0) buffs.push(t('buff.magnet', { t: p.buffs.magnet.toFixed(1) }));
     this.set('buffs', buffs.join('|'), () => { this.el.buffs.innerHTML = buffs.map((b) => `<span class="buff">${b}</span>`).join(''); });
 
     // 技能
@@ -175,17 +188,26 @@ export class Hud {
         this.el.routeDino.style.left = (pr * 100).toFixed(1) + '%';
       });
       this.set('routeT', Math.max(0, Math.ceil((game.length - p.pos.z) / 10) * 10), (v) => {
-        this.el.routeText.textContent = v > 0 ? `距离首领 ${v} 米` : '首领战！';
+        this.el.routeText.textContent = v > 0 ? t('hud.toBoss', { n: v }) : t('hud.bossFight');
       });
     } else {
-      this.set('dist', Math.floor(p.pos.z), (v) => { this.el.dist.innerHTML = `🏃 <b>${v}</b> 米`; });
+      this.set('dist', Math.floor(p.pos.z), (v) => { this.el.dist.innerHTML = t('hud.dist', { n: v }); });
     }
 
     this.set('coins', game.stats.coins, (v) => { this.el.coins.textContent = v; });
     this.set('kills', game.stats.kills, (v) => { this.el.kills.textContent = v; });
     this.set('time', Math.floor(game.time), () => { this.el.time.textContent = formatTime(game.time); });
 
+    const rage = game.player.buffs.rage;
+    const fv = rage > 0 ? rage / 7 * 100 : game.fever;
+    this.set('fever', Math.round(fv * 2) + (rage > 0 ? 'r' : game.fever >= 100 ? 'f' : ''), () => {
+      this.el.feverFill.style.height = fv.toFixed(1) + '%';
+      this.el.fever.classList.toggle('ready', rage <= 0 && game.fever >= 100);
+      this.el.fever.classList.toggle('active', rage > 0);
+    });
+
     const c = game.combo;
+    if (c < 10 && this.el.combo.dataset.tier !== '0') { this.el.combo.dataset.tier = '0'; this.el.comboTier.textContent = ''; }
     this.set('combo', c, (v) => {
       this.el.combo.classList.toggle('show', v >= 5);
       this.el.comboN.textContent = v;
@@ -201,13 +223,13 @@ export class Hud {
         this.bossEl.ghost.style.width = (r * 100).toFixed(1) + '%';
         this.bossEl.text.textContent = `${Math.ceil(b.hp)} / ${b.maxHp}`;
       });
-      this.set('bph', b.phase, (v) => { this.bossEl.phase.textContent = b.phases > 1 ? `阶段 ${v} / ${b.phases}` : ''; });
+      this.set('bph', b.phase, (v) => { this.bossEl.phase.textContent = b.phases > 1 ? t('hud.phase', { n: v, max: b.phases }) : ''; });
     }
 
     // 自动瞄准标记
-    const t = game.aimTarget;
-    if (t && game.state !== 'win') {
-      t.getCenter(_v).project(game.camera);
+    const aim = game.aimTarget;
+    if (aim && game.state !== 'win') {
+      bendVec(aim.getCenter(_v)).project(game.camera);
       if (_v.z < 1) {
         this.reticle.style.display = 'block';
         this.reticle.style.left = ((_v.x * 0.5 + 0.5) * game.viewW).toFixed(0) + 'px';

@@ -3,8 +3,8 @@ import { DINOS, RIDERS, LEVELS, BOSSES, UPGRADES, upgradeCost } from './data.js'
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
+import { t, LANGS, getLang, setLang } from './i18n.js';
 
-const ATTACK_NAME = { bite: '撕咬', horn: '角顶', claw: '爪击', tail: '尾击', stomp: '踩踏', peck: '啄击', headbutt: '头槌' };
 const BIOME_EMOJI = { jungle: '🌴', desert: '🏜️', frost: '❄️', swamp: '🍄', volcano: '🌋', shadow: '🏰' };
 const BIOME_BG = {
   jungle: 'linear-gradient(160deg,#2f7a3a 0%,#1b4a2a 55%,#0d2416 100%)',
@@ -15,17 +15,17 @@ const BIOME_BG = {
   shadow: 'linear-gradient(160deg,#8a4ad0 0%,#3a1a6a 55%,#0e0620 100%)',
 };
 const WEAPON_TRAITS = (w) => {
-  const t = [];
-  if (w.count > 1) t.push(`${w.count} 连发`);
-  if (w.pierce) t.push(`穿透 ${w.pierce}`);
-  if (w.aoe) t.push(`爆炸范围 ${w.aoe}m`);
-  if (w.homing) t.push('自动追踪');
-  if (w.bounce) t.push(`弹射 ${w.bounce} 次`);
-  if (w.slow) t.push(`减速 ${Math.round(w.slow * 100)}%`);
-  if (w.burn) t.push('灼烧');
-  if (w.arc) t.push('抛物线');
-  if (w.knock) t.push('强力击退');
-  return t;
+  const r = [];
+  if (w.count > 1) r.push(t('trait.count', { n: w.count }));
+  if (w.pierce) r.push(t('trait.pierce', { n: w.pierce }));
+  if (w.aoe) r.push(t('trait.aoe', { n: w.aoe }));
+  if (w.homing) r.push(t('trait.homing'));
+  if (w.bounce) r.push(t('trait.bounce', { n: w.bounce }));
+  if (w.slow) r.push(t('trait.slow', { n: Math.round(w.slow * 100) }));
+  if (w.burn) r.push(t('trait.burn'));
+  if (w.arc) r.push(t('trait.arc'));
+  if (w.knock) r.push(t('trait.knock'));
+  return r;
 };
 
 function el(html) {
@@ -75,30 +75,36 @@ export class UI {
     const n = el(`
       <div>
         <div class="title-wrap">
-          <div class="logo-big">恐龙骑士</div>
-          <div class="logo-sub">DINO RIDERS · 远古征途</div>
-          <div class="tagline">骑上恐龙沿着远古大道一路狂奔！骑手自动开火，<br>左右走位撞飞怪物、穿过强化门升级武器，击败终点的恐怖首领！</div>
+          <div class="logo-big">${t('game.logo')}</div>
+          <div class="logo-sub">${t('game.sub')}</div>
+          <div class="tagline">${t('title.tagline')}</div>
         </div>
         <div class="menu">
-          <button class="btn" data-act="levels"><span class="ico">⚔️</span>开始冒险</button>
-          <button class="btn ghost" data-act="select"><span class="ico">🦖</span>选择坐骑 · 骑手</button>
-          <button class="btn ghost" data-act="shop"><span class="ico">🛠️</span>升级工坊</button>
-          <button class="btn ghost" data-act="settings"><span class="ico">⚙️</span>设置</button>
-          <button class="btn ghost" data-act="help"><span class="ico">📖</span>操作说明</button>
+          <button class="btn" data-act="levels"><span class="ico">⚔️</span>${t('title.start')}</button>
+          <button class="btn ghost" data-act="select"><span class="ico">🦖</span>${t('title.select')}</button>
+          <button class="btn ghost" data-act="shop"><span class="ico">🛠️</span>${t('title.shop')}</button>
+          <button class="btn ghost" data-act="settings"><span class="ico">⚙️</span>${t('title.settings')}</button>
+          <button class="btn ghost" data-act="help"><span class="ico">📖</span>${t('title.help')}</button>
         </div>
         <div class="current">
-          <div class="lbl">当前坐骑</div>
+          <div class="lbl">${t('title.current')}</div>
           <div class="nm">${d.name}</div>
-          <div class="rd">骑手 · ${r.name}</div>
-          <div class="rd" style="margin-top:8px;font-size:14px;color:#fffa">⭐ ${totalStars} / ${LEVELS.length * 3}　🏆 已通关 ${save.stars.filter((s) => s > 0).length} / ${LEVELS.length}</div>
+          <div class="rd">${t('common.rider', { name: r.name })}</div>
+          <div class="rd" style="margin-top:8px;font-size:14px;color:#fffa">${t('title.progress', { stars: totalStars, maxStars: LEVELS.length * 3, cleared: save.stars.filter((s) => s > 0).length, total: LEVELS.length })}</div>
         </div>
         <div style="position:absolute;right:4vw;top:22px">${this.coinPill()}</div>
+        <button class="btn ghost small lang-btn" data-lang>🌐 ${LANGS.find((l) => l.id === getLang()).label}</button>
       </div>`);
     n.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
       const a = b.dataset.act;
       if (a === 'settings') this.show('settings', { from: 'title' });
       else this.show(a);
     }));
+    n.querySelector('[data-lang]').addEventListener('click', () => {
+      const i = LANGS.findIndex((l) => l.id === getLang());
+      setLang(LANGS[(i + 1) % LANGS.length].id);
+      this.show('title');
+    });
     return n;
   }
 
@@ -107,21 +113,21 @@ export class UI {
     const n = el(`
       <div>
         <div class="topbar">
-          <button class="btn ghost small" data-back>← 返回</button>
-          <h2>选择坐骑</h2>
+          <button class="btn ghost small" data-back>${t('common.back')}</button>
+          <h2>${t('select.title')}</h2>
           <div class="tabs">
-            <div class="tab ${this.tab === 'dino' ? 'active' : ''}" data-tab="dino">🦖 恐龙 · ${DINOS.length}</div>
-            <div class="tab ${this.tab === 'rider' ? 'active' : ''}" data-tab="rider">🧑 骑手 · ${RIDERS.length}</div>
+            <div class="tab ${this.tab === 'dino' ? 'active' : ''}" data-tab="dino">${t('select.tabDino', { n: DINOS.length })}</div>
+            <div class="tab ${this.tab === 'rider' ? 'active' : ''}" data-tab="rider">${t('select.tabRider', { n: RIDERS.length })}</div>
           </div>
           <div class="spacer"></div>
           ${this.coinPill()}
         </div>
         <div class="grid-panel panel"><div class="card-grid"></div></div>
         <div class="info-panel panel"></div>
-        <div class="hint-drag">拖动画面可旋转查看</div>
+        <div class="hint-drag">${t('select.dragHint')}</div>
         <div class="preview-name"><div class="a"></div><div class="b"></div></div>
         <div class="bottom">
-          <button class="btn" data-go>确认出发 →</button>
+          <button class="btn" data-go>${t('select.go')}</button>
         </div>
       </div>`);
     const grid = n.querySelector('.card-grid');
@@ -134,27 +140,27 @@ export class UI {
       const d = DINOS.find((x) => x.id === save.dino) || DINOS[0];
       const r = RIDERS.find((x) => x.id === save.rider) || RIDERS[0];
       pa.textContent = d.name;
-      pb.textContent = `骑手 · ${r.name}`;
+      pb.textContent = t('common.rider', { name: r.name });
       if (this.tab === 'dino') {
         const s = d.stats;
         const bar = (k, v, max, txt) => `<div class="stat-row"><span class="k">${k}</span><span class="bar"><i style="width:${Math.min(100, v / max * 100)}%"></i></span><span class="v">${txt}</span></div>`;
         const wins = save.dinoWins[d.id] || 0;
         info.innerHTML = `
           <h3>${d.name}</h3>
-          <div class="en">${d.en}</div>
-          <span class="era">${d.era}</span> <span class="era" style="background:rgba(79,201,255,.15);color:#8fdcff">攻击方式：${ATTACK_NAME[d.attack]}</span>
-          ${wins ? `<span class="era" style="background:rgba(98,227,127,.15);color:#8ff0a0">胜场 ${wins}</span>` : ''}
+          ${d.en !== d.name ? `<div class="en">${d.en}</div>` : ''}
+          <span class="era">${d.era}</span> <span class="era" style="background:rgba(79,201,255,.15);color:#8fdcff">${t('select.attack', { name: t('attack.' + d.attack) })}</span>
+          ${wins ? `<span class="era" style="background:rgba(98,227,127,.15);color:#8ff0a0">${t('select.wins', { n: wins })}</span>` : ''}
           <p>${d.desc}</p>
           <div style="margin-top:12px">
-            ${bar('生命', s.hp, 330, s.hp)}
-            ${bar('攻击', s.atk, 34, s.atk)}
-            ${bar('防御', s.def, 0.45, Math.round(s.def * 100) + '%')}
-            ${bar('速度', s.speed, 16, s.speed)}
-            ${bar('攻速', s.atkRate, 1.8, s.atkRate.toFixed(1))}
-            ${bar('范围', s.reach, 3.2, s.reach.toFixed(1))}
+            ${bar(t('stat.hp'), s.hp, 330, s.hp)}
+            ${bar(t('stat.atk'), s.atk, 38, s.atk)}
+            ${bar(t('stat.def'), s.def, 0.45, Math.round(s.def * 100) + '%')}
+            ${bar(t('stat.speed'), s.speed, 16, s.speed)}
+            ${bar(t('stat.atkRate'), s.atkRate, 1.8, s.atkRate.toFixed(1))}
+            ${bar(t('stat.reach'), s.reach, 3.2, s.reach.toFixed(1))}
           </div>
           <div class="skill-box">
-            <div class="t">${SKILL_ICON[d.skill.type]} 技能：${d.skill.name}<small>冷却 ${d.skill.cd}s</small></div>
+            <div class="t">${SKILL_ICON[d.skill.type]} ${t('select.skill', { name: d.skill.name })}<small>${t('select.cd', { n: d.skill.cd })}</small></div>
             <div class="d">${d.skill.desc}</div>
           </div>`;
       } else {
@@ -162,17 +168,17 @@ export class UI {
         const dps = (w.dmg * (w.count || 1) / w.cd).toFixed(0);
         info.innerHTML = `
           <h3>${r.name}</h3>
-          <div class="en">${r.en}</div>
+          ${getLang() !== 'en' ? `<div class="en">${r.en}</div>` : ''}
           <p style="margin-top:8px">${r.desc}</p>
           <div class="skill-box">
-            <div class="t">${WEAPON_ICON[w.type]} 武器：${w.name}</div>
-            <div class="d">伤害 ${w.dmg}${w.count > 1 ? ' × ' + w.count : ''} · 间隔 ${w.cd}s · 理论秒伤 ${dps}<br>${WEAPON_TRAITS(w).join(' · ') || '稳定可靠'}</div>
+            <div class="t">${WEAPON_ICON[w.type]} ${t('select.weapon', { name: w.name })}</div>
+            <div class="d">${t('select.weaponStats', { dmg: w.dmg + (w.count > 1 ? ' × ' + w.count : ''), cd: w.cd, dps })}<br>${WEAPON_TRAITS(w).join(' · ') || t('trait.none')}</div>
           </div>
           <div class="skill-box" style="background:rgba(98,227,127,.08);border-color:rgba(98,227,127,.3)">
-            <div class="t" style="color:#8ff0a0">✨ 被动加成</div>
+            <div class="t" style="color:#8ff0a0">${t('select.passive')}</div>
             <div class="d">${r.bonusText}</div>
           </div>
-          <p style="margin-top:12px;color:var(--muted);font-size:12.5px">骑手会自动瞄准前方的怪物持续射击。击败怪物获得经验，武器最高可升到 Lv.10（多重弹道、射速、穿透、追踪）。</p>`;
+          <p style="margin-top:12px;color:var(--muted);font-size:12.5px">${t('select.riderNote')}</p>`;
       }
     };
 
@@ -182,13 +188,13 @@ export class UI {
           <div class="card ${d.id === save.dino ? 'active' : ''}" data-id="${d.id}">
             ${save.dinoWins[d.id] ? `<span class="badge">🏆${save.dinoWins[d.id]}</span>` : ''}
             <img src="${thumbs.dino[d.id] || ''}" alt="">
-            <div class="nm">${d.name}</div>
+            <div class="nm" title="${d.name}">${d.name}</div>
           </div>`).join('');
       } else {
         grid.innerHTML = RIDERS.map((r) => `
           <div class="card ${r.id === save.rider ? 'active' : ''}" data-id="${r.id}">
             <img src="${thumbs.rider[r.id] || ''}" alt="">
-            <div class="nm">${r.name}</div>
+            <div class="nm" title="${r.name}">${r.name}</div>
           </div>`).join('');
       }
       grid.querySelectorAll('.card').forEach((c) => c.addEventListener('click', () => {
@@ -235,10 +241,10 @@ export class UI {
           <div class="num">${String(i + 1).padStart(2, '0')}</div>
           <div class="emoji">${BIOME_EMOJI[lv.biome]}</div>
           <h4>${lv.name}</h4>
-          <div class="boss">全程 ${lv.length} 米 · 首领：${BOSSES[lv.boss].name}</div>
+          <div class="boss">${t('levels.route', { len: lv.length, boss: BOSSES[lv.boss].name })}</div>
           <div class="desc">${lv.desc}</div>
           <div class="stars">${[0, 1, 2].map((k) => `<span class="${k < stars ? 'on' : 'off'}">★</span>`).join('')}
-            ${save.bestTime[i] ? `<span style="font-size:12px;color:#fffa;letter-spacing:0;margin-left:8px">最快 ${formatTime(save.bestTime[i])}</span>` : ''}</div>
+            ${save.bestTime[i] ? `<span style="font-size:12px;color:#fffa;letter-spacing:0;margin-left:8px">${t('levels.best', { time: formatTime(save.bestTime[i]) })}</span>` : ''}</div>
           ${locked ? '<div class="lock">🔒</div>' : ''}
         </div>`;
     }).join('');
@@ -246,10 +252,10 @@ export class UI {
     const n = el(`
       <div>
         <div class="topbar">
-          <button class="btn ghost small" data-back>← 返回</button>
-          <h2>选择关卡</h2>
-          <span style="color:var(--muted);font-weight:700">出战：${d.name} · ${r.name}</span>
-          <button class="btn ghost small" data-sel>更换</button>
+          <button class="btn ghost small" data-back>${t('common.back')}</button>
+          <h2>${t('levels.title')}</h2>
+          <span style="color:var(--muted);font-weight:700">${t('levels.team', { dino: d.name, rider: r.name })}</span>
+          <button class="btn ghost small" data-sel>${t('levels.change')}</button>
           <div class="spacer"></div>
           ${this.coinPill()}
         </div>
@@ -258,8 +264,8 @@ export class UI {
           <div class="level-card endless ${endlessLocked ? 'locked' : ''}" data-endless style="animation-delay:.4s">
             <div class="bg" style="background:linear-gradient(120deg,#3a1a0a,#7a2a1a 40%,#2a1a4a)"></div>
             <div class="emoji">♾️</div>
-            <h4>无尽模式</h4>
-            <div class="desc">随机地形，道路永无尽头，每 1400 米出现一只首领。${save.endlessBest ? `最佳纪录：${save.endlessBest} 米` : endlessLocked ? '通过第 1 关后解锁' : '尚无纪录，快来挑战！'}</div>
+            <h4>${t('endless.name')}</h4>
+            <div class="desc">${t('endless.desc')}${save.endlessBest ? t('endless.best', { n: save.endlessBest }) : endlessLocked ? t('endless.locked') : t('endless.none')}</div>
             ${endlessLocked ? '<div class="lock">🔒</div>' : ''}
           </div>
         </div>
@@ -285,9 +291,9 @@ export class UI {
     const n = el(`
       <div>
         <div class="topbar">
-          <button class="btn ghost small" data-back>← 返回</button>
-          <h2>升级工坊</h2>
-          <span style="color:var(--muted)">永久强化，对所有恐龙与骑手生效</span>
+          <button class="btn ghost small" data-back>${t('common.back')}</button>
+          <h2>${t('shop.title')}</h2>
+          <span style="color:var(--muted)">${t('shop.sub')}</span>
           <div class="spacer"></div>
           ${this.coinPill()}
         </div>
@@ -305,10 +311,10 @@ export class UI {
             <div class="ico">${u.icon}</div>
             <div class="main">
               <div class="t">${u.name} <span style="color:var(--muted);font-size:13px">Lv.${lv}/${u.max}</span></div>
-              <div class="d">${u.desc}（当前：${this.upgradeNow(u, lv)}）</div>
+              <div class="d">${u.desc}${t('shop.now', { v: this.upgradeNow(u, lv) })}</div>
               <div class="pips">${Array.from({ length: u.max }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('')}</div>
             </div>
-            <button class="btn small" data-id="${u.id}" ${maxed || save.coins < cost ? 'disabled' : ''}>${maxed ? '已满级' : `<i class="coin-ico"></i> ${cost}`}</button>
+            <button class="btn small" data-id="${u.id}" ${maxed || save.coins < cost ? 'disabled' : ''}>${maxed ? t('shop.maxed') : `<i class="coin-ico"></i> ${cost}`}</button>
           </div>`;
       }).join('');
       list.querySelectorAll('button[data-id]').forEach((b) => b.addEventListener('click', () => {
@@ -348,15 +354,16 @@ export class UI {
       <div>
         ${from === 'pause' ? '<div class="overlay-dim"></div>' : ''}
         <div class="center-panel panel">
-          <h2>⚙️ 设置</h2>
-          <div class="set-row"><label>🎵 音乐音量</label><input type="range" min="0" max="1" step="0.05" value="${s.music}" data-k="music"></div>
-          <div class="set-row"><label>🔊 音效音量</label><input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-k="sfx"></div>
-          <div class="set-row"><label>🎨 画质</label><div class="seg" data-k="quality"><button data-v="high" class="${s.quality === 'high' ? 'on' : ''}">高（泛光+阴影）</button><button data-v="low" class="${s.quality === 'low' ? 'on' : ''}">流畅</button></div></div>
-          <div class="set-row"><label>⚡ 自动调节分辨率（保持流畅）</label><div class="seg" data-k="autoRes"><button data-v="1" class="${s.autoRes !== false ? 'on' : ''}">开</button><button data-v="0" class="${s.autoRes === false ? 'on' : ''}">关</button></div></div>
-          <div class="set-row"><label>📊 显示帧率</label><div class="seg" data-k="showFps"><button data-v="1" class="${s.showFps ? 'on' : ''}">开</button><button data-v="0" class="${!s.showFps ? 'on' : ''}">关</button></div></div>
-          <div class="set-row"><label>📳 镜头震动（容易晕可关闭）</label><div class="seg" data-k="shake"><button data-v="1" class="${s.shake ? 'on' : ''}">开</button><button data-v="0" class="${!s.shake ? 'on' : ''}">关</button></div></div>
-          ${from === 'title' ? `<div class="set-row"><label>🗑️ 重置进度</label><button class="btn danger small" data-reset>清空存档</button></div>` : ''}
-          <div class="row-btns"><button class="btn" data-back>完成</button></div>
+          <h2>${t('settings.title')}</h2>
+          <div class="set-row"><label>${t('settings.lang')}</label><div class="seg" data-lang>${LANGS.map((l) => `<button data-v="${l.id}" class="${l.id === getLang() ? 'on' : ''}">${l.label}</button>`).join('')}</div></div>
+          <div class="set-row"><label>${t('settings.music')}</label><input type="range" min="0" max="1" step="0.05" value="${s.music}" data-k="music"></div>
+          <div class="set-row"><label>${t('settings.sfx')}</label><input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-k="sfx"></div>
+          <div class="set-row"><label>${t('settings.quality')}</label><div class="seg" data-k="quality"><button data-v="high" class="${s.quality === 'high' ? 'on' : ''}">${t('settings.qualityHigh')}</button><button data-v="low" class="${s.quality === 'low' ? 'on' : ''}">${t('settings.qualityLow')}</button></div></div>
+          <div class="set-row"><label>${t('settings.autoRes')}</label><div class="seg" data-k="autoRes"><button data-v="1" class="${s.autoRes !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.autoRes === false ? 'on' : ''}">${t('common.off')}</button></div></div>
+          <div class="set-row"><label>${t('settings.fps')}</label><div class="seg" data-k="showFps"><button data-v="1" class="${s.showFps ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.showFps ? 'on' : ''}">${t('common.off')}</button></div></div>
+          <div class="set-row"><label>${t('settings.shake')}</label><div class="seg" data-k="shake"><button data-v="1" class="${s.shake ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.shake ? 'on' : ''}">${t('common.off')}</button></div></div>
+          ${from === 'title' ? `<div class="set-row"><label>${t('settings.reset')}</label><button class="btn danger small" data-reset>${t('settings.resetBtn')}</button></div>` : ''}
+          <div class="row-btns"><button class="btn" data-back>${t('settings.done')}</button></div>
         </div>
       </div>`);
     n.querySelectorAll('input[type=range]').forEach((inp) => inp.addEventListener('input', () => {
@@ -364,7 +371,12 @@ export class UI {
       this.app.applySettings();
       persist();
     }));
-    n.querySelectorAll('.seg').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    n.querySelectorAll('.seg[data-lang] button').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.v === getLang()) return;
+      setLang(b.dataset.v);
+      this.show('settings', { from });
+    }));
+    n.querySelectorAll('.seg[data-k]').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       const k = seg.dataset.k;
       const v = b.dataset.v;
       s[k] = k === 'quality' ? v : v === '1';
@@ -376,7 +388,7 @@ export class UI {
     if (reset) {
       let armed = false;
       reset.addEventListener('click', () => {
-        if (!armed) { armed = true; reset.textContent = '再点一次确认清空'; return; }
+        if (!armed) { armed = true; reset.textContent = t('settings.resetConfirm'); return; }
         resetSave();
         this.app.showcase?.setSelection(save.dino, save.rider);
         this.show('title');
@@ -395,22 +407,21 @@ export class UI {
       <div>
         ${from === 'pause' ? '<div class="overlay-dim"></div>' : ''}
         <div class="center-panel panel">
-          <h2>📖 操作说明</h2>
+          <h2>${t('help.title')}</h2>
           <div class="keys">
-            <div><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd></div><div>左右移动（恐龙会自动向前跑）</div>
-            <div><kbd>按住鼠标</kbd></div><div>左右拖动也能移动；触屏上直接用手指左右滑动</div>
-            <div><kbd>空格</kbd> / <kbd>W</kbd></div><div>跳跃：跳过怪物、落石和地面冲击</div>
-            <div><kbd>Q</kbd> / <kbd>E</kbd> / <kbd>Shift</kbd></div><div>释放恐龙专属技能</div>
-            <div><kbd>Esc</kbd> / <kbd>P</kbd></div><div>暂停</div>
+            <div><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd></div><div>${t('help.move')}</div>
+            <div><kbd>${t('help.mouse')}</kbd></div><div>${t('help.drag')}</div>
+            <div><kbd>${t('help.space')}</kbd> / <kbd>W</kbd></div><div>${t('help.jump')}</div>
+            <div><kbd>Q</kbd> / <kbd>E</kbd> / <kbd>Shift</kbd></div><div>${t('help.skill')}</div>
+            <div><kbd>R</kbd></div><div>${t('help.ult')}</div>
+            <div><kbd>Esc</kbd> / <kbd>P</kbd></div><div>${t('help.pause')}</div>
           </div>
           <div class="help-tip">
-            🎯 骑手会<b>自动射击</b>前方的怪物，恐龙会<b>自动撕咬</b>贴身的敌人。<br>
-            💥 血量低的小怪可以直接<b>撞飞</b>；又硬又大的怪物和落石要先打掉，或者绕开。<br>
-            ⭐ 击败怪物获得经验，<b>武器自动升级</b>到 Lv.10；路上的<b>强化门</b>二选一，从哪边跑过就获得哪边的强化。<br>
-            💀 跑到终点迎战首领：地面出现<b style="color:#ff6a6a">红色预警</b>时及时左右躲开。<br>
-            ⭐ 星级：通关 1 星 · 剩余生命 ≥50% 再得 1 星 · 消灭 70% 以上的怪物再得 1 星。
+            ${t('help.tips')}<br>
+            ${t('help.tips2')}<br>
+            ${t('help.tips3')}
           </div>
-          <div class="row-btns"><button class="btn" data-back>明白了！</button></div>
+          <div class="row-btns"><button class="btn" data-back>${t('help.ok')}</button></div>
         </div>
       </div>`);
     n.querySelector('[data-back]').addEventListener('click', () => this.show(from === 'pause' ? 'pause' : 'title'));
@@ -423,13 +434,13 @@ export class UI {
       <div>
         <div class="overlay-dim"></div>
         <div class="center-panel panel" style="width:min(420px,92vw)">
-          <h2>⏸ 暂停</h2>
+          <h2>${t('pause.title')}</h2>
           <div style="display:flex;flex-direction:column;gap:12px">
-            <button class="btn" data-a="resume">▶ 继续战斗</button>
-            <button class="btn ghost" data-a="restart">↻ 重新开始</button>
-            <button class="btn ghost" data-a="settings">⚙️ 设置</button>
-            <button class="btn ghost" data-a="help">📖 操作说明</button>
-            <button class="btn danger" data-a="quit">⌂ 返回主菜单</button>
+            <button class="btn" data-a="resume">${t('pause.resume')}</button>
+            <button class="btn ghost" data-a="restart">${t('pause.restart')}</button>
+            <button class="btn ghost" data-a="settings">${t('pause.settings')}</button>
+            <button class="btn ghost" data-a="help">${t('pause.help')}</button>
+            <button class="btn danger" data-a="quit">${t('pause.quit')}</button>
           </div>
         </div>
       </div>`);
@@ -450,30 +461,30 @@ export class UI {
     let body;
     if (r.win) {
       body = `
-        <h2 style="color:#ffe27a">🏆 胜利！</h2>
+        <h2 style="color:#ffe27a">${t('result.win')}</h2>
         <div class="big-stars">${[0, 1, 2].map((k) => `<span class="${k < r.stars ? 'on' : ''}" style="animation-delay:${0.2 + k * 0.25}s">★</span>`).join('')}</div>
         <div class="result-grid">
-          <div class="cell"><div class="k">用时</div><div class="v">${formatTime(r.time)}</div></div>
-          <div class="cell"><div class="k">击杀</div><div class="v">${r.kills}</div></div>
-          <div class="cell"><div class="k">最高连击</div><div class="v">${r.maxCombo}</div></div>
-          <div class="cell"><div class="k">武器等级</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
-          <div class="cell"><div class="k">拾取金币</div><div class="v gold">+${r.coins}</div></div>
-          <div class="cell"><div class="k">关卡奖励</div><div class="v gold">+${r.reward}</div></div>
+          <div class="cell"><div class="k">${t('result.time')}</div><div class="v">${formatTime(r.time)}</div></div>
+          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${r.kills}</div></div>
+          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${r.maxCombo}</div></div>
+          <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
+          <div class="cell"><div class="k">${t('result.coinsPicked')}</div><div class="v gold">+${r.coins}</div></div>
+          <div class="cell"><div class="k">${t('result.reward')}</div><div class="v gold">+${r.reward}</div></div>
         </div>
         <div class="star-reqs">
-          <div class="ok">★ 击败首领通关</div>
-          <div class="${r.hpR >= 0.5 ? 'ok' : ''}">★ 剩余生命 ≥ 50%（${Math.round(r.hpR * 100)}%）</div>
-          <div class="${r.killRate >= 0.7 ? 'ok' : ''}">★ 消灭 70% 以上的怪物（${Math.round(r.killRate * 100)}%）</div>
+          <div class="ok">${t('result.starClear')}</div>
+          <div class="${r.hpR >= 0.5 ? 'ok' : ''}">${t('result.starHp', { n: Math.round(r.hpR * 100) })}</div>
+          <div class="${r.killRate >= 0.7 ? 'ok' : ''}">${t('result.starKill', { n: Math.round(r.killRate * 100) })}</div>
         </div>`;
     } else {
       body = `
-        <h2 style="color:#ff8080">${r.endless ? '♾️ 冒险结束' : '💀 战败'}</h2>
-        ${r.endless ? `<div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:12px">一共跑了 ${r.dist} 米${r.newBest ? ' <span style="color:var(--gold)">· 新纪录！</span>' : ''}</div>` : `<p style="text-align:center;color:var(--muted);margin-bottom:12px">${r.bossReached ? '已经打到首领了，差一点点！' : `跑完了 ${Math.round(r.progress * 100)}% 的路程。`}去升级工坊强化一下，或者换一只恐龙试试？</p>`}
+        <h2 style="color:#ff8080">${r.endless ? t('result.endlessOver') : t('result.lose')}</h2>
+        ${r.endless ? `<div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:12px">${t('result.dist', { n: r.dist })}${r.newBest ? ` <span style="color:var(--gold)">${t('result.newBest')}</span>` : ''}</div>` : `<p style="text-align:center;color:var(--muted);margin-bottom:12px">${r.bossReached ? t('result.bossReached') : t('result.progress', { n: Math.round(r.progress * 100) })}${t('result.tryUpgrade')}</p>`}
         <div class="result-grid">
-          <div class="cell"><div class="k">武器等级</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
-          <div class="cell"><div class="k">击杀</div><div class="v">${r.kills}</div></div>
-          <div class="cell"><div class="k">最高连击</div><div class="v">${r.maxCombo}</div></div>
-          <div class="cell"><div class="k">获得金币</div><div class="v gold">+${r.coins}</div></div>
+          <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
+          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${r.kills}</div></div>
+          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${r.maxCombo}</div></div>
+          <div class="cell"><div class="k">${t('result.coinsGot')}</div><div class="v gold">+${r.coins}</div></div>
         </div>`;
     }
     const n = el(`
@@ -482,11 +493,11 @@ export class UI {
         <div class="center-panel panel result">
           ${body}
           <div class="row-btns">
-            ${r.final && r.win ? '<button class="btn" data-a="ending">🎉 观看结局</button>' : ''}
-            ${hasNext ? '<button class="btn" data-a="next">下一关 →</button>' : ''}
-            <button class="btn ${hasNext || (r.final && r.win) ? 'ghost' : ''}" data-a="retry">↻ ${r.win ? '再玩一次' : '再试一次'}</button>
-            ${!r.win ? '<button class="btn ghost" data-a="shop">🛠️ 升级工坊</button>' : ''}
-            <button class="btn ghost" data-a="menu">⌂ 主菜单</button>
+            ${r.final && r.win ? `<button class="btn" data-a="ending">${t('result.ending')}</button>` : ''}
+            ${hasNext ? `<button class="btn" data-a="next">${t('result.next')}</button>` : ''}
+            <button class="btn ${hasNext || (r.final && r.win) ? 'ghost' : ''}" data-a="retry">↻ ${r.win ? t('result.replay') : t('result.retry')}</button>
+            ${!r.win ? `<button class="btn ghost" data-a="shop">${t('result.shop')}</button>` : ''}
+            <button class="btn ghost" data-a="menu">${t('result.menu')}</button>
           </div>
         </div>
       </div>`);
@@ -509,17 +520,16 @@ export class UI {
       <div>
         <canvas class="fireworks" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
         <div class="end-wrap">
-          <div class="logo-big" style="font-size:clamp(44px,7vw,96px)">恭喜通关！</div>
-          <p>你和你的恐龙伙伴穿越了丛林、沙海、雪原、沼泽与火山，<br>最终在暗影要塞击败了暗影魔王。<br>远古大陆重新迎来了和平与阳光！🌅</p>
+          <div class="logo-big" style="font-size:clamp(44px,7vw,96px)">${t('ending.title')}</div>
+          <p>${t('ending.story')}</p>
           <div class="result-grid" style="max-width:520px;margin:0 auto">
-            <div class="cell"><div class="k">累计击杀</div><div class="v">${save.stats.kills}</div></div>
-            <div class="cell"><div class="k">击败首领</div><div class="v">${save.stats.bosses}</div></div>
-            <div class="cell"><div class="k">收集星星</div><div class="v" style="color:var(--gold)">★ ${stars} / ${LEVELS.length * 3}</div></div>
-            <div class="cell"><div class="k">无尽模式</div><div class="v" style="color:var(--good)">已解锁</div></div>
+            <div class="cell"><div class="k">${t('ending.kills')}</div><div class="v">${save.stats.kills}</div></div>
+            <div class="cell"><div class="k">${t('ending.bosses')}</div><div class="v">${save.stats.bosses}</div></div>
+            <div class="cell"><div class="k">${t('ending.stars')}</div><div class="v" style="color:var(--gold)">★ ${stars} / ${LEVELS.length * 3}</div></div>
+            <div class="cell"><div class="k">${t('ending.endless')}</div><div class="v" style="color:var(--good)">${t('ending.unlocked')}</div></div>
           </div>
-          <p class="credits">试试用全部 20 种恐龙通关，收集所有星星，或挑战无尽模式的最高纪录！<br>
-          本游戏中的所有 3D 模型、地形、音效与音乐均为程序实时生成 · Three.js + Web Audio</p>
-          <div class="row-btns"><button class="btn" data-a="menu">返回主菜单</button><button class="btn ghost" data-a="endless">♾️ 挑战无尽模式</button></div>
+          <p class="credits">${t('ending.credits')}</p>
+          <div class="row-btns"><button class="btn" data-a="menu">${t('ending.menu')}</button><button class="btn ghost" data-a="endless">${t('ending.playEndless')}</button></div>
         </div>
       </div>`);
     n.querySelector('[data-a=menu]').addEventListener('click', () => { this.stopFireworks?.(); this.show('title'); });

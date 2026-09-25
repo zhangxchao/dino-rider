@@ -153,7 +153,7 @@ export class UI {
           <p>${d.desc}</p>
           <div style="margin-top:12px">
             ${bar(t('stat.hp'), s.hp, 330, s.hp)}
-            ${bar(t('stat.atk'), s.atk, 34, s.atk)}
+            ${bar(t('stat.atk'), s.atk, 38, s.atk)}
             ${bar(t('stat.def'), s.def, 0.45, Math.round(s.def * 100) + '%')}
             ${bar(t('stat.speed'), s.speed, 16, s.speed)}
             ${bar(t('stat.atkRate'), s.atkRate, 1.8, s.atkRate.toFixed(1))}

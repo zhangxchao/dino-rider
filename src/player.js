@@ -76,7 +76,7 @@ export class Player {
     });
     game.scene.add(this.root);
     this.flash = prepareModel(this.root, { cast: true });
-    this.afterimages = new Afterimages(game.scene, this.root, 6);
+    this.afterimages = new Afterimages(game.scene, this.root, 4);
 
     this.size = this.model.size;
     this.top = this.size.top || this.size.height;

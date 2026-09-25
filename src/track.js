@@ -28,6 +28,7 @@ const XS = [...HALF_XS.slice(1).reverse().map((v) => -v), ...HALF_XS];
 const NX = XS.length;
 const XMAX = HALF_XS[HALF_XS.length - 1];
 const LANDMARK_STEP = 150;
+const BEND_PAD = 80;              // 弯道偏移的包围球余量（米）
 const PROP_STEP = 24;
 
 const _c = new THREE.Color();
@@ -987,14 +988,12 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
     const glow = new THREE.Mesh(new THREE.BufferGeometry(), roadGlowMat);
     glow.name = 'roadGlow' + i;
     const extra = { terrain, road, glow, water: null, chunk: null };
-    // 弯道在顶点着色器里平移，包围球与实际位置不符，块网格不做视锥剔除
-    for (const m of [terrain, road, glow]) { m.visible = false; m.frustumCulled = false; root.add(m); }
+    for (const m of [terrain, road, glow]) { m.visible = false; root.add(m); }
     if (surfaceMat) {
       extra.water = new THREE.Mesh(new THREE.BufferGeometry(), surfaceMat);
       extra.water.name = (tb.water ? 'water' : 'lava') + i;
       extra.water.receiveShadow = !!tb.water;
       extra.water.visible = false;
-      extra.water.frustumCulled = false;
       root.add(extra.water);
     }
     slotMeshes.push(extra);
@@ -1107,6 +1106,11 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
     }
     sm.terrain.visible = true;
     sm.road.visible = true;
+    // 弯道在顶点着色器里横向平移，包围球加大一圈留出余量（身后 / 视野外的块仍能正常剔除）
+    for (const m of [sm.terrain, sm.road, sm.glow, sm.water]) {
+      const bs = m && m.geometry.boundingSphere;
+      if (bs && !m.geometry.userData.bendPad) { bs.radius += BEND_PAD; m.geometry.userData.bendPad = true; }
+    }
 
     const P = makePlacer(ctx, rand, z0, z1);
     P.landmarks = landmarksIn(z0, z1);

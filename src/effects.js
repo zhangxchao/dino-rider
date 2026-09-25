@@ -726,8 +726,10 @@ export class Scorch {
     scene.add(this.mesh);
     this.scene = scene;
     this.items = [];
+    this.enabled = true;
   }
   add(pos, r = 3, life = 5) {
+    if (!this.enabled) return;
     if (this.items.length >= this.max) this.items.shift();
     const h0 = this.heightAt(pos.x, pos.z - r * 0.5), h1 = this.heightAt(pos.x, pos.z + r * 0.5);
     this.items.push({ x: pos.x, z: pos.z, y: this.heightAt(pos.x, pos.z) + 0.08, r, t: 0, life, tilt: -Math.atan2(h1 - h0, r), rot: Math.random() * 6 });
@@ -754,41 +756,15 @@ export class Scorch {
 }
 
 // ---------------------------------------------------------------------
-//  爆炸闪光灯（固定数量的点光源轮流使用，避免光源数量变化导致着色器重编译）
+//  爆炸闪光：地面加法发光圆盘（不用点光源——光源会让场景里所有材质的每个像素都多算一次光照）
 // ---------------------------------------------------------------------
 export class LightFlashes {
-  constructor(scene, n = 2) {
-    this.scene = scene;
-    this.lights = [];
-    for (let i = 0; i < n; i++) {
-      const l = new THREE.PointLight(0xffa040, 0, 18, 2);
-      l.userData = { t: 1, life: 1, peak: 0 };
-      scene.add(l);
-      this.lights.push(l);
-    }
-    this.i = 0;
-  }
+  constructor(rings) { this.rings = rings; }
   flash(pos, color = 0xffa040, intensity = 60, dist = 18, life = 0.35) {
-    if (!this.lights.length) return;
-    // 优先复用最暗的那盏
-    let l = this.lights[0];
-    for (const x of this.lights) if (x.intensity < l.intensity) l = x;
-    l.position.set(pos.x, pos.y + 1.2, pos.z);
-    l.color.set(color);
-    l.distance = dist;
-    l.userData = { t: 0, life, peak: intensity };
-    l.intensity = intensity;
+    this.rings.disc(pos, { r: dist * 0.5, life: Math.max(0.2, life * 0.8), color, opacity: Math.min(0.55, 0.15 + intensity / 250), y: 0.3 });
   }
-  update(dt) {
-    for (const l of this.lights) {
-      const u = l.userData;
-      if (u.t >= u.life) { l.intensity = 0; continue; }
-      u.t += dt;
-      const k = Math.min(1, u.t / u.life);
-      l.intensity = u.peak * (1 - k) * (1 - k);
-    }
-  }
-  dispose() { for (const l of this.lights) this.scene.remove(l); this.lights.length = 0; }
+  update() {}
+  dispose() {}
 }
 
 // ---------------------------------------------------------------------
@@ -858,6 +834,8 @@ export class Streaks {
 // ---------------------------------------------------------------------
 //  残影：把恐龙 + 骑手当前姿态“拍”下来，用半透明加法材质淡出
 // ---------------------------------------------------------------------
+const MAX_GHOST_PARTS = 12;
+const GHOST_INTERVAL = 0.08;
 export class Afterimages {
   constructor(scene, root, slots = 6) {
     this.scene = scene;
@@ -869,7 +847,12 @@ export class Afterimages {
       if (!m || m.isShaderMaterial || m.transparent) return;
       this.src.push(o);
     });
+    // 只拍体积最大的几个零件（轮廓足够辨认，绘制调用少很多）
+    this.src.sort((a, b) => (b.geometry.attributes.position?.count || 0) - (a.geometry.attributes.position?.count || 0));
+    this.src.length = Math.min(this.src.length, MAX_GHOST_PARTS);
     this.slots = [];
+    this.clock = 0;
+    this.lastSpawn = -1;
     for (let i = 0; i < slots; i++) {
       const mat = new THREE.MeshBasicMaterial({ color: 0x70e0ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
       const meshes = this.src.map((o) => {
@@ -886,6 +869,8 @@ export class Afterimages {
     this.next = 0;
   }
   spawn(color, alpha = 0.45, life = 0.32) {
+    if (this.clock - this.lastSpawn < GHOST_INTERVAL) return;
+    this.lastSpawn = this.clock;
     const s = this.slots[this.next];
     this.next = (this.next + 1) % this.slots.length;
     s.mat.color.set(color);
@@ -898,6 +883,7 @@ export class Afterimages {
     }
   }
   update(dt) {
+    this.clock += dt;
     for (const s of this.slots) {
       if (s.t >= s.life) continue;
       s.t += dt;

@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { DINOS, RUN_SPEED } from './data.js';
 import { createDinoModel } from './models/dinos.js';
-import { clamp, damp, rand, pick } from './util.js';
+import { clamp, damp, rand, pick, mergeStaticMeshes } from './util.js';
 import { t } from './i18n.js';
 
 const _v = new THREE.Vector3();
@@ -253,7 +253,13 @@ export class Hazards {
       const def = pick(DINOS.filter((d) => d.id !== p.def.id && d.body !== 'pterosaur'));
       const model = createDinoModel(def);
       model.root.scale.multiplyScalar(BABY_SCALE);
-      model.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      // 合并不会动的零件（同一种恐龙缓存复用），不投射实时阴影，改用圆形投影
+      mergeStaticMeshes(model.root, () => {
+        let tt = 0;
+        for (const a of [-1, 0.5]) for (const mv of [0, 1, 1.7]) { tt += 0.23; model.update(0.1, { t: tt, move: mv, air: false, attack: a, skill: -1, hurt: 0, dead: 0 }); }
+        model.update(0.1, { t: tt + 1, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0 });
+      }, 'baby:' + def.id);
+      model.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
       g.scene.add(model.root);
       const b = {
         def, model, side, life: BABY_LIFE, t: 0, atkT: -1, atkCd: 0.6, hit: false, target: null,

@@ -236,11 +236,13 @@ export class Game {
       sparks: new Particles(this.scene, 3500, true),
       dust: new Particles(this.scene, 2200, false),
       rings: new Rings(this.scene),
-      debris: new Debris(this.scene, this.heightAt, this.quality === 'high' ? 220 : 90),
+      debris: new Debris(this.scene, this.heightAt, this.quality === 'high' ? 220 : 60),
       scorch: new Scorch(this.scene, this.heightAt),
-      lights: this.quality === 'high' ? new LightFlashes(this.scene, 2) : null,
+      lights: null,
       streaks: new Streaks(this.scene),
     };
+    this.fx.lights = this.quality === 'high' ? new LightFlashes(this.fx.rings) : null;
+    this.fx.scorch.enabled = this.quality === 'high';
     this.juice = app.juice;
     this.juice.reset();
     this.killTimes = [];
@@ -1246,7 +1248,7 @@ export class Game {
   /** 持续画面状态：速度感（FOV / 速度线 / 径向模糊）、低血量去饱和 */
   updateJuice() {
     const pl = this.player, sk = pl.skill, J = this.juice.hold;
-    let spd = clamp((pl.fwd - RUN_SPEED * 1.08) / (RUN_SPEED * 0.8), 0, 1);
+    let spd = clamp((pl.fwd - RUN_SPEED * 1.2) / (RUN_SPEED * 0.7), 0, 1); // 下坡的小幅加速不算，冲刺 / 冲锋才出速度线
     if (sk && (sk.type === 'pounce' || sk.type === 'dive') && !pl.onGround) spd = Math.max(spd, 0.75);
     if (pl.rampAir) spd = Math.max(spd, 0.8);
     if (this.state === 'win' || this.state === 'intro') spd = 0;
@@ -1285,6 +1287,7 @@ export class Game {
         bars.add(e.pos.x, e.pos.y + e.barTop + (e.lift || 0), e.pos.z, e.barW, e.hp / e.maxHp, e.isProp ? 0xffb020 : 0xff3a3a);
       }
     }
+    for (const b of this.hazards.babies) sh.add(b.pos.x, b.pos.y, b.pos.z, 1.8);
     sh.end();
     bars.end();
     let n = 0;

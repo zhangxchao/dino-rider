@@ -20,7 +20,7 @@ const JuiceShader = {
     uTint: { value: new THREE.Color(1, 0.8, 0.4) },
     uTintA: { value: 0 },
     uDesat: { value: 0 },
-    uVig: { value: 0.28 },
+    uVig: { value: 0 },
     uVigCol: { value: new THREE.Color(0, 0, 0) },
   },
   vertexShader: /* glsl */`
@@ -42,8 +42,8 @@ const JuiceShader = {
         // 径向模糊：越靠边拉得越长，中心保持清晰
         float k = uRadial * 0.075 * smoothstep(0.08, 0.75, r);
         vec3 acc = vec3(0.0);
-        for (int i = 0; i < 8; i++) acc += texture2D(tDiffuse, 0.5 + c * (1.0 - k * float(i) / 7.0)).rgb;
-        col = acc / 8.0;
+        for (int i = 0; i < 6; i++) acc += texture2D(tDiffuse, 0.5 + c * (1.0 - k * float(i) / 5.0)).rgb;
+        col = acc / 6.0;
       } else col = texture2D(tDiffuse, vUv).rgb;
       if (uAberr > 0.002) {
         vec2 off = c * uAberr * 0.018 * (0.3 + r);
@@ -135,23 +135,28 @@ export class Juice {
 
   apply() {
     const u = this.u, c = this.cur, K = this.k;
-    u.uTime.value = this.t;
-    u.uFlash.value.copy(this.flashCol);
-    u.uFlashA.value = Math.min(1, K.flash);
-    u.uAberr.value = K.aberr + c.aberr;
-    u.uRadial.value = K.radial + c.radial;
-    u.uSpeed.value = c.speed;
-    u.uTintA.value = c.tint;
-    u.uDesat.value = c.desat;
-    u.uVig.value = 0.28 + c.vig;
+    const flash = Math.min(1, K.flash), aberr = K.aberr + c.aberr, radial = K.radial + c.radial;
+    // 没有任何效果时整个 Pass 关掉，省下一次整屏绘制；常驻暗角由 CSS 负责
+    const on = flash > 0.01 || aberr > 0.01 || radial > 0.01 || c.speed > 0.01 || c.tint > 0.01 || c.desat > 0.01 || c.vig > 0.01;
+    this.pass.enabled = on;
+    if (on) {
+      u.uTime.value = this.t;
+      u.uFlash.value.copy(this.flashCol);
+      u.uFlashA.value = flash;
+      u.uAberr.value = aberr;
+      u.uRadial.value = radial;
+      u.uSpeed.value = c.speed;
+      u.uTintA.value = c.tint;
+      u.uDesat.value = c.desat;
+      u.uVig.value = c.vig;
+    }
     if (this.app.bloom) this.app.bloom.strength = 0.5 + K.bloom;
     this._css();
   }
 
-  /** 流畅画质（没有后期）时的 CSS 替代：只做闪光和暗角 */
+  /** CSS 层：常驻暗角（两种画质）；流畅画质下再加闪光与色调（没有后期时的替代） */
   _css() {
     const low = !this.app.useComposer;
-    if (!low) { if (this.css) this.css.style.display = 'none'; return; }
     if (!this.css) {
       this.css = document.createElement('div');
       this.css.className = 'juice-css';
@@ -159,14 +164,16 @@ export class Juice {
       document.getElementById('fx-layer').appendChild(this.css);
       this.cssF = this.css.firstChild;
       this.cssV = this.css.lastChild;
+      this.cssCache = {};
     }
-    this.css.style.display = '';
-    const f = Math.min(1, this.k.flash);
-    this.cssF.style.opacity = f.toFixed(3);
-    if (f > 0.01) this.cssF.style.background = '#' + _c.copy(this.flashCol).getHexString();
-    const tint = this.cur.tint;
-    this.cssV.style.opacity = Math.min(1, 0.35 + this.cur.vig * 1.5 + tint * 0.6).toFixed(3);
-    this.cssV.style.setProperty('--jt', tint > 0.02 ? `rgba(255,170,40,${(tint * 0.5).toFixed(3)})` : 'transparent');
+    const C = this.cssCache;
+    const set = (el, key, prop, val) => { if (C[key] !== val) { C[key] = val; if (prop.startsWith('--')) el.style.setProperty(prop, val); else el.style[prop] = val; } };
+    const f = low ? Math.min(1, this.k.flash) : 0;
+    set(this.cssF, 'fo', 'opacity', f.toFixed(2));
+    if (f > 0.01) set(this.cssF, 'fb', 'background', '#' + _c.copy(this.flashCol).getHexString());
+    const tint = low ? this.cur.tint : 0;
+    set(this.cssV, 'vo', 'opacity', Math.min(1, 0.35 + (low ? this.cur.vig * 1.5 : 0) + tint * 0.6).toFixed(2));
+    set(this.cssV, 'vt', '--jt', tint > 0.02 ? `rgba(255,170,40,${(tint * 0.5).toFixed(2)})` : 'transparent');
   }
 
   /** 当前 FOV 偏移（度），由游戏镜头叠加到基础 FOV 上 */

@@ -4,6 +4,12 @@
 
 游戏有 **20 种恐龙** 和 **10 位骑手** 可选，共 6 个地形关卡，外加一个无尽模式。所有 3D 模型、地形、特效、音效和音乐都是代码实时生成的，项目里没有任何图片或音频素材文件。
 
+## 🌐 在线游玩
+
+**https://zhangxchao.github.io/dino-rider/**
+
+打开网页就能玩，不用安装。推荐用电脑上的 Chrome 或 Edge，手机和平板也能玩。每次推送到 `main` 分支，GitHub Actions 都会自动重新构建并发布（见 `.github/workflows/pages.yml`）。
+
 ## 🚀 本地运行
 
 需要 Node.js 18 或更高版本。

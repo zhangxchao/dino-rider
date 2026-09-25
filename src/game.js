@@ -758,7 +758,7 @@ export class Game {
         if (this.combo > this.stats.maxCombo) this.stats.maxCombo = this.combo;
         this.checkComboTier();
       }
-      if (e.isBoss) this.addFever(d / e.maxHp * 160);
+      if (e.isBoss) this.addFever(d / e.maxHp * 70);
       e.applyStatus({ ...o, dotBase: d });
     }
     if (o.source !== 'ram' || e.hp > 0) {
@@ -805,7 +805,7 @@ export class Game {
     if (tier <= this.comboTier) return;
     this.comboTier = tier;
     this.hud.comboTier(tier, t('combo.tier' + tier));
-    this.addFever(4 + tier * 3);
+    this.addFever(2 + tier * 2);
     this.audio.play('star', { volume: 0.55, pitch: 0.9 + tier * 0.12 });
     this.juice.aberr(0.4 + tier * 0.2);
     if (tier >= 3) this.juice.bloom(0.3);
@@ -835,8 +835,8 @@ export class Game {
     const p = this.player;
     this.audio.setMusicRate(1);
     // 觉醒结束：全屏冲击波清场
-    const n = this.aoe(p.pos, 24, p.stats.atk * 3, { knock: 16, up: 10, stun: 1, source: 'skill' });
-    this.fx.rings.ring(p.pos, { r0: 2, r1: 26, life: 0.8, color: 0xffe0a0, opacity: 0.9 });
+    const n = this.aoe(p.pos, 16, p.stats.atk * 2, { knock: 16, up: 10, stun: 1, source: 'skill' });
+    this.fx.rings.ring(p.pos, { r0: 2, r1: 18, life: 0.8, color: 0xffe0a0, opacity: 0.9 });
     this.fx.rings.disc(p.pos, { r: 14, life: 0.35, color: 0xffd080, opacity: 0.6 });
     this.fx.debris.burst(p.pos, { count: 30, speed: 14, up: 12, size: 0.45, color: this.rockColor ?? 0x7a6a5a });
     this.fx.scorch.add(p.pos, 7, 6);
@@ -855,11 +855,11 @@ export class Game {
     this.perfectCd = big ? 0.6 : 0.25;
     if (!big) {
       // 擦弹：小奖励
-      this.addFever(2.5);
+      this.addFever(1.5);
       this.fx.sparks.burst(pos, { count: 8, speed: 5, life: 0.25, size: 0.5, color: 0x9ff0ff, color2: 0xffffff });
       return;
     }
-    this.addFever(12);
+    this.addFever(7);
     this.slowmoT = Math.max(this.slowmoT, 0.18);
     this.juice.flash(0x60e0ff, 0.18);
     this.juice.aberr(0.6);
@@ -879,7 +879,7 @@ export class Game {
     this.fx.sparks.burst(_v2, { count: 80, speed: 12, life: 1, size: 1, color: 0xffe070, color2: 0xffa000, up: 8, gravity: 8 });
     this.fx.rings.pillar(e.pos, { r: 1.2, h: 14, life: 0.8, color: 0xffd040 });
     this.floatText(e.pos, t('float.goblinCaught'), 'crit', 3);
-    this.addFever(10);
+    this.addFever(6);
     this.juice.flash(0xffd040, 0.25);
     this.hitstop(0.06);
     this.audio.play('victory', { volume: 0.4, pitch: 1.4 });
@@ -979,7 +979,7 @@ export class Game {
     if (!e.isProp) {
       this.stats.kills++;
       this.onKillFx(e);
-      this.addFever(e.elite ? 10 : 2.2);
+      this.addFever(e.elite ? 5 : 0.7);
       this.stats.score += (e.def.score || 10) * (1 + Math.min(this.combo, 50) * 0.02);
       this.audio.play('enemyDie', { volume: 0.4, pitch: rand(0.85, 1.15) });
     } else {

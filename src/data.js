@@ -28,7 +28,7 @@ export const DINOS = [
     colors: { main: 0x6d7f8f, belly: 0xc9c2a8, accent: 0xc0533a, extra: 0xf1e3c0, eye: 0xffd24a },
     stats: { hp: 250, atk: 24, def: 0.3, speed: 9, reach: 2.2, atkRate: 0.9 },
     attack: 'horn',
-    skill: { type: 'charge', name: '三角冲锋', desc: '低头无敌冲锋 1.5 秒，撞飞沿途所有怪物；首领战时射出冲击波。', cd: 8, power: 1.8, dist: 24, speedMul: 2.6 },
+    skill: { type: 'charge', name: '三角冲锋', desc: '低头无敌冲锋 1.5 秒，撞飞沿途所有怪物；首领战时射出冲击波。', cd: 8, power: 2.5, dist: 24, speedMul: 2.6 },
   },
   {
     id: 'raptor', name: '迅猛龙', en: 'Velociraptor', era: '白垩纪晚期',
@@ -38,7 +38,7 @@ export const DINOS = [
     colors: { main: 0xb5763a, belly: 0xead2a8, accent: 0x5b2e14, extra: 0x2f6f8f, eye: 0xffe14a },
     stats: { hp: 140, atk: 16, def: 0.05, speed: 14, reach: 1.8, atkRate: 1.8 },
     attack: 'claw',
-    skill: { type: 'pounce', name: '迅猛飞扑', desc: '高高跃起（空中无敌），落地造成范围伤害并释放冲击波。', cd: 6, power: 2.2, radius: 6, dist: 20 },
+    skill: { type: 'pounce', name: '迅猛飞扑', desc: '高高跃起（空中无敌），落地造成范围伤害并释放冲击波。', cd: 6, power: 1.85, radius: 6, dist: 20 },
   },
   {
     id: 'stegosaurus', name: '剑龙', en: 'Stegosaurus', era: '侏罗纪晚期',
@@ -48,7 +48,7 @@ export const DINOS = [
     colors: { main: 0x7a8a4a, belly: 0xd6cfa0, accent: 0xc4553a, extra: 0xe8b04a, eye: 0xffd24a },
     stats: { hp: 240, atk: 22, def: 0.3, speed: 8.5, reach: 2.8, atkRate: 0.85 },
     attack: 'tail',
-    skill: { type: 'spin', name: '骨刺旋风', desc: '原地旋转甩尾，三连击周围敌人，还能打散飞来的子弹。', cd: 9, power: 1.3, radius: 8, hits: 3 },
+    skill: { type: 'spin', name: '骨刺旋风', desc: '原地旋转甩尾，三连击周围敌人，还能打散飞来的子弹。', cd: 9, power: 1.7, radius: 8, hits: 3 },
   },
   {
     id: 'brachiosaurus', name: '腕龙', en: 'Brachiosaurus', era: '侏罗纪晚期',
@@ -58,7 +58,7 @@ export const DINOS = [
     colors: { main: 0x7d8f9a, belly: 0xd8d2bf, accent: 0x55636e, extra: 0xa3b86a, eye: 0x222222 },
     stats: { hp: 330, atk: 26, def: 0.25, speed: 7.5, reach: 2.6, atkRate: 0.6 },
     attack: 'stomp',
-    skill: { type: 'stomp', name: '大地震踏', desc: '人立而起重重踏地，冲击波沿道路向前连续推进。', cd: 12, power: 1.8, radius: 18, waves: 3 },
+    skill: { type: 'stomp', name: '大地震踏', desc: '人立而起重重踏地，冲击波沿道路向前连续推进。', cd: 12, power: 1.4, radius: 18, waves: 3 },
   },
   {
     id: 'spinosaurus', name: '棘龙', en: 'Spinosaurus', era: '白垩纪中期',
@@ -88,7 +88,7 @@ export const DINOS = [
     colors: { main: 0x9aa6b8, belly: 0xe8e2d4, accent: 0xd9532b, extra: 0x5a6a84, eye: 0xffd24a },
     stats: { hp: 150, atk: 18, def: 0.05, speed: 13, reach: 2.0, atkRate: 1.3 },
     attack: 'peck',
-    skill: { type: 'dive', name: '俯冲轰炸', desc: '冲上高空（无敌）向前方敌人投下炸弹，落地再造成爆炸。', cd: 9, power: 2.4, radius: 9, dist: 24 },
+    skill: { type: 'dive', name: '俯冲轰炸', desc: '冲上高空（无敌）向前方敌人投下炸弹，落地再造成爆炸。', cd: 9, power: 1.5, radius: 9, dist: 24 },
   },
   {
     id: 'parasaurolophus', name: '副栉龙', en: 'Parasaurolophus', era: '白垩纪晚期',
@@ -98,7 +98,7 @@ export const DINOS = [
     colors: { main: 0x5d8a5a, belly: 0xe0d8b0, accent: 0xd9772b, extra: 0x2f5a3a, eye: 0xffd24a },
     stats: { hp: 200, atk: 18, def: 0.15, speed: 11, reach: 2.2, atkRate: 1.1 },
     attack: 'tail',
-    skill: { type: 'sonic', name: '共鸣号角', desc: '向前方释放音波伤害敌人，并回复 30% 生命。', cd: 11, power: 1.4, range: 18, angle: 70, heal: 0.3 },
+    skill: { type: 'sonic', name: '共鸣号角', desc: '向前方释放音波伤害敌人，并回复 30% 生命。', cd: 11, power: 2.3, range: 18, angle: 70, heal: 0.3 },
   },
   {
     id: 'allosaurus', name: '异特龙', en: 'Allosaurus', era: '侏罗纪晚期',
@@ -108,7 +108,7 @@ export const DINOS = [
     colors: { main: 0xa0663a, belly: 0xe6c9a0, accent: 0x5a2e1a, extra: 0xd24a2a, eye: 0xffc400 },
     stats: { hp: 240, atk: 26, def: 0.12, speed: 11, reach: 2.3, atkRate: 1.1 },
     attack: 'bite',
-    skill: { type: 'pounce', name: '猎杀突袭', desc: '猛然跃起扑杀，落地撕裂一片区域并释放冲击波。', cd: 7, power: 2.0, radius: 7, dist: 22 },
+    skill: { type: 'pounce', name: '猎杀突袭', desc: '猛然跃起扑杀，落地撕裂一片区域并释放冲击波。', cd: 7, power: 1.25, radius: 7, dist: 22 },
   },
   {
     id: 'carnotaurus', name: '食肉牛龙', en: 'Carnotaurus', era: '白垩纪晚期',
@@ -118,7 +118,7 @@ export const DINOS = [
     colors: { main: 0xa3432f, belly: 0xe0b98a, accent: 0x5a1e14, extra: 0xf0d080, eye: 0xffe14a },
     stats: { hp: 190, atk: 25, def: 0.12, speed: 12.5, reach: 2.2, atkRate: 1.1 },
     attack: 'headbutt',
-    skill: { type: 'charge', name: '公牛冲撞', desc: '超高速无敌冲撞，撞飞一路上的怪物。', cd: 7, power: 1.7, dist: 28, speedMul: 3 },
+    skill: { type: 'charge', name: '公牛冲撞', desc: '超高速无敌冲撞，撞飞一路上的怪物。', cd: 7, power: 2.5, dist: 28, speedMul: 3 },
   },
   {
     id: 'dilophosaurus', name: '双冠龙', en: 'Dilophosaurus', era: '侏罗纪早期',
@@ -128,7 +128,7 @@ export const DINOS = [
     colors: { main: 0x6aa04a, belly: 0xefe2a0, accent: 0xe6c43a, extra: 0x8a3ab0, eye: 0xff4a4a },
     stats: { hp: 160, atk: 18, def: 0.08, speed: 12, reach: 2.0, atkRate: 1.3 },
     attack: 'bite',
-    skill: { type: 'venom', name: '毒液喷射', desc: '扇形喷出 7 团毒液，命中敌人持续中毒。', cd: 7, power: 1.1, count: 7, spread: 50, poison: 3 },
+    skill: { type: 'venom', name: '毒液喷射', desc: '扇形喷出 7 团毒液，命中敌人持续中毒。', cd: 7, power: 1.4, count: 7, spread: 50, poison: 3 },
   },
   {
     id: 'pachycephalosaurus', name: '肿头龙', en: 'Pachycephalosaurus', era: '白垩纪晚期',
@@ -138,7 +138,7 @@ export const DINOS = [
     colors: { main: 0x7c8a5a, belly: 0xe2d6b0, accent: 0xd9c8a0, extra: 0x4a5a3a, eye: 0xffd24a },
     stats: { hp: 170, atk: 22, def: 0.22, speed: 11, reach: 1.9, atkRate: 1.2 },
     attack: 'headbutt',
-    skill: { type: 'charge', name: '铁头猛撞', desc: '低头无敌猛撞，撞飞并眩晕沿途的怪物。', cd: 7, power: 2.2, dist: 20, speedMul: 2.8, stun: 1.5 },
+    skill: { type: 'charge', name: '铁头猛撞', desc: '低头无敌猛撞，撞飞并眩晕沿途的怪物。', cd: 7, power: 3.0, dist: 20, speedMul: 2.8, stun: 1.5 },
   },
   {
     id: 'iguanodon', name: '禽龙', en: 'Iguanodon', era: '白垩纪早期',
@@ -158,7 +158,7 @@ export const DINOS = [
     colors: { main: 0x7a5a4a, belly: 0xd8c0a0, accent: 0x3a2a2a, extra: 0xa04a3a, eye: 0xff9a00 },
     stats: { hp: 265, atk: 36, def: 0.18, speed: 9.5, reach: 2.8, atkRate: 0.8 },
     attack: 'bite',
-    skill: { type: 'roar', name: '巨兽怒吼', desc: '毁天灭地的怒吼，伤害前方所有敌人并眩晕。', cd: 12, power: 1.7, radius: 16, stun: 2 },
+    skill: { type: 'roar', name: '巨兽怒吼', desc: '毁天灭地的怒吼，伤害前方所有敌人并眩晕。', cd: 12, power: 1.45, radius: 16, stun: 2 },
   },
   {
     id: 'therizinosaurus', name: '镰刀龙', en: 'Therizinosaurus', era: '白垩纪晚期',
@@ -178,7 +178,7 @@ export const DINOS = [
     colors: { main: 0x5a7a6a, belly: 0xd8d0b0, accent: 0x2a4a5a, extra: 0xb0c080, eye: 0xffc400 },
     stats: { hp: 200, atk: 26, def: 0.14, speed: 10.5, reach: 2.3, atkRate: 1.1 },
     attack: 'claw',
-    skill: { type: 'spin', name: '利爪旋风', desc: '挥舞巨爪原地旋转，四连击周围敌人并打散子弹。', cd: 9, power: 1.2, radius: 7, hits: 4 },
+    skill: { type: 'spin', name: '利爪旋风', desc: '挥舞巨爪原地旋转，四连击周围敌人并打散子弹。', cd: 9, power: 1.8, radius: 7, hits: 4 },
   },
   {
     id: 'diplodocus', name: '梁龙', en: 'Diplodocus', era: '侏罗纪晚期',
@@ -188,7 +188,7 @@ export const DINOS = [
     colors: { main: 0x8a7a6a, belly: 0xe0d6c0, accent: 0x5a4a44, extra: 0x6a8a5a, eye: 0x222222 },
     stats: { hp: 310, atk: 24, def: 0.22, speed: 8, reach: 3.2, atkRate: 0.7 },
     attack: 'tail',
-    skill: { type: 'wave', name: '音爆长鞭', desc: '甩尾产生音爆冲击波，贯穿前方所有敌人。', cd: 9, power: 2.0, range: 40, width: 5 },
+    skill: { type: 'wave', name: '音爆长鞭', desc: '甩尾产生音爆冲击波，贯穿前方所有敌人。', cd: 9, power: 3.4, range: 40, width: 7 },
   },
   {
     id: 'styracosaurus', name: '戟龙', en: 'Styracosaurus', era: '白垩纪晚期',
@@ -198,7 +198,7 @@ export const DINOS = [
     colors: { main: 0x9a7a4a, belly: 0xe0d0a8, accent: 0x3a6ab0, extra: 0xf0e0c0, eye: 0xffd24a },
     stats: { hp: 235, atk: 23, def: 0.3, speed: 9.5, reach: 2.2, atkRate: 0.95 },
     attack: 'horn',
-    skill: { type: 'spikes', name: '尖刺爆发', desc: '向前方扇形射出 16 根骨刺，贯穿敌人。', cd: 9, power: 1.3, count: 16 },
+    skill: { type: 'spikes', name: '尖刺爆发', desc: '向前方扇形射出 16 根骨刺，贯穿敌人。', cd: 9, power: 0.95, count: 16 },
   },
   {
     id: 'gallimimus', name: '似鸡龙', en: 'Gallimimus', era: '白垩纪晚期',

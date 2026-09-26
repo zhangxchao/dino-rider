@@ -6,6 +6,7 @@
 // =====================================================================
 import * as THREE from 'three';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FX } from './effects.js';
 
 const JuiceShader = {
   uniforms: {
@@ -97,14 +98,15 @@ export class Juice {
 
   // —— 触发 ——
   flash(color = 0xffffff, a = 0.5) {
+    a *= FX.screen;
     if (a >= this.k.flash) this.flashCol.set(color);
     this.k.flash = Math.min(0.8, Math.max(this.k.flash, a));
   }
-  aberr(a) { this.k.aberr = Math.min(2, this.k.aberr + a); }
-  radial(a) { this.k.radial = Math.min(2, this.k.radial + a); }
+  aberr(a) { a *= FX.screen; this.k.aberr = Math.min(2, this.k.aberr + a); }
+  radial(a) { a *= FX.screen; this.k.radial = Math.min(2, this.k.radial + a); }
   /** 正值拉远（视野变宽，速度感），负值推近（冲击） */
-  fovKick(deg) { this.fovVel = Math.max(-60, Math.min(60, this.fovVel + deg * 9)); }
-  bloom(a) { this.k.bloom = Math.min(0.9, this.k.bloom + a); }
+  fovKick(deg) { deg *= 0.4 + 0.6 * FX.screen; this.fovVel = Math.max(-60, Math.min(60, this.fovVel + deg * 9)); }
+  bloom(a) { a *= FX.screen; this.k.bloom = Math.min(0.9, this.k.bloom + a); }
   setTint(color) { this.u.uTint.value.set(color); }
 
   reset() {
@@ -137,7 +139,7 @@ export class Juice {
     const u = this.u, c = this.cur, K = this.k;
     const flash = Math.min(1, K.flash), aberr = K.aberr + c.aberr, radial = K.radial + c.radial;
     // 没有任何效果时整个 Pass 关掉，省下一次整屏绘制；常驻暗角由 CSS 负责
-    const on = flash > 0.01 || aberr > 0.01 || radial > 0.01 || c.speed > 0.01 || c.tint > 0.01 || c.desat > 0.01 || c.vig > 0.01;
+    const on = flash > 0.01 || aberr > 0.01 || radial > 0.01 || c.speed * FX.screen > 0.01 || c.tint > 0.01 || c.desat > 0.01 || c.vig > 0.01;
     this.pass.enabled = on;
     if (on) {
       u.uTime.value = this.t;
@@ -145,7 +147,7 @@ export class Juice {
       u.uFlashA.value = flash;
       u.uAberr.value = aberr;
       u.uRadial.value = radial;
-      u.uSpeed.value = c.speed;
+      u.uSpeed.value = c.speed * (0.3 + 0.7 * FX.screen);
       u.uTintA.value = c.tint;
       u.uDesat.value = c.desat;
       u.uVig.value = c.vig;

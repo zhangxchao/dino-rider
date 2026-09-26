@@ -1292,6 +1292,186 @@ function buildOverlord(def) {
 }
 
 // ---------------------------------------------------------------------
+//  7. 螳螂王：三角大头 + 发光复眼、细长前胸、两把巨镰、四条步足、可展开的翅膀
+// ---------------------------------------------------------------------
+function buildMantis(def) {
+  const main = def.color ?? 0x3a6a2a;
+  const glow = def.projColor ?? 0x9cff3a;
+  const mBody = mat(main, { rough: 0.45, metal: 0.15 });
+  const mDark = mat(shade(main, -0.12), { rough: 0.6 });
+  const mBand = mat(mix(main, 0xd8c060, 0.35), { rough: 0.55 });
+  const mBlade = mat(0xe8f0d0, { rough: 0.25, metal: 0.6, emissive: glow, ei: 0.25 });
+  const mGlow = mat(glow, { emissive: glow, ei: 1.8, rough: 0.35 });
+  const mEye = mat(0x80ff40, { emissive: 0x60ff20, ei: 2.4, rough: 0.2 });
+  const mWing = mat(mix(main, glow, 0.4), { emissive: glow, ei: 0.3, rough: 0.4, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+
+  const root = new THREE.Group();
+  const rig = grp(root);
+  rig.scale.setScalar(1.6);
+  const BODY_Y = 3.0;
+  const body = grp(rig, 0, BODY_Y, 0);
+
+  // 中后胸 + 腹部（分节）
+  add(body, G.sphere(12, 9), mBody, 0, 0, 0, 0.95, 0.8, 1.2);
+  const abd = grp(body, 0, 0.1, -0.9);
+  for (let i = 0; i < 6; i++) {
+    const r = 1.05 - i * 0.1;
+    add(abd, G.sphere(10, 7), i % 2 ? mBand : mBody, 0, 0.12 * i, -0.75 * i - 0.4, r, r * 0.78, 0.62);
+  }
+  add(abd, G.cone(6), mDark, 0, 0.7, -4.5, 0.18, 0.7, 0.18, -1.2, 0, 0);
+
+  // 翅膀（两对，平时收在背上，第 3 阶段展开）
+  const wings = [];
+  for (const sd of [-1, 1]) {
+    for (let k = 0; k < 2; k++) {
+      const w = grp(body, sd * 0.35, 0.75 - k * 0.1, -0.3 - k * 0.3);
+      const blade = add(w, G.sphere(10, 4), mWing, 0, 0, -1.9, 0.55 - k * 0.1, 0.05, 2.1 - k * 0.2);
+      add(w, G.limb(0.4, 5), mGlow, 0, 0.02, 0, 0.03, 3.4, 0.03, -PI / 2, 0, 0);
+      wings.push({ g: w, sd, k, blade });
+    }
+  }
+
+  // 前胸（长脖子）+ 头
+  const neck = grp(body, 0, 0.35, 0.9);
+  neck.rotation.x = -0.75;
+  add(neck, G.limb(0.75, 8), mBody, 0, 0, 0, 0.42, 2.6, 0.42);
+  add(neck, G.limb(0.7, 8), mBand, 0, 1.2, 0, 0.36, 0.25, 0.36);
+  const head = grp(neck, 0, 2.7, 0.1);
+  head.rotation.x = 0.75;
+  add(head, G.sphere(10, 8), mBody, 0, 0, 0, 1.0, 0.7, 0.62);
+  add(head, G.cone(6), mBody, 0, -0.35, 0.25, 0.42, 0.9, 0.36, PI * 0.82, 0, 0);
+  for (const sd of [-1, 1]) {
+    add(head, G.sphere(10, 8), mEye, sd * 0.78, 0.22, 0.18, 0.42, 0.5, 0.42);
+    const ant = grp(head, sd * 0.2, 0.5, 0.3);
+    ant.rotation.set(-0.6, 0, sd * 0.35);
+    add(ant, G.limb(0.3, 5), mDark, 0, 0, 0, 0.04, 2.2, 0.04);
+    add(head, G.cone(5), mDark, sd * 0.16, -1.1, 0.4, 0.08, 0.3, 0.08, PI, 0, -sd * 0.4);
+  }
+  const muzzle = grp(head, 0, -0.9, 0.6);
+
+  // 两把巨镰（基节 → 股节带刺 → 镰刃胫节）
+  const arms = [];
+  for (const sd of [-1, 1]) {
+    const sh = grp(neck, sd * 0.42, 1.9, 0.15);
+    add(sh, G.sphere(8, 6), mBand, 0, 0, 0, 0.32);
+    const coxa = grp(sh);
+    add(coxa, G.limb(0.8, 7), mBody, 0, 0, 0, 0.26, 1.3, 0.26, PI, 0, 0);
+    const femur = grp(coxa, 0, -1.3, 0);
+    add(femur, G.limb(0.7, 7), mBody, 0, 0, 0, 0.3, 2.6, 0.24);
+    for (let i = 0; i < 4; i++) add(femur, G.cone(5), mBlade, 0, 0.5 + i * 0.5, 0.2, 0.06, 0.35, 0.06, 0.6, 0, 0);
+    const tibia = grp(femur, 0, 2.6, 0);
+    add(tibia, G.sphere(8, 6), mDark, 0, 0, 0, 0.26);
+    add(tibia, G.cone(6), mBlade, 0, 0, 0, 0.26, 3.0, 0.08, PI, 0, 0);
+    add(tibia, G.cone(5), mGlow, 0, -2.2, 0.08, 0.05, 0.8, 0.03, PI, 0, 0);
+    arms.push({ sh, coxa, femur, tibia, sd });
+  }
+
+  // 四条步足
+  const legs = [];
+  const LEG = [[0.35, 0.6], [-0.25, -0.45]];
+  for (let i = 0; i < 2; i++) {
+    for (const sd of [1, -1]) {
+      const hip = grp(body, sd * 0.6, -0.15, LEG[i][0]);
+      const baseYaw = sd > 0 ? -LEG[i][1] : PI + LEG[i][1];
+      hip.rotation.y = baseYaw;
+      const femur = grp(hip);
+      add(femur, G.limb(0.7, 6), mBody, 0, 0, 0, 0.13, 2.4, 0.13, 0, 0, -PI / 2);
+      const knee = grp(femur, 2.4, 0, 0);
+      add(knee, G.sphere(6, 5), mBand, 0, 0, 0, 0.15);
+      add(knee, G.limb(0.35, 6), mDark, 0, 0, 0, 0.1, 3.2, 0.1, 0, 0, -PI / 2);
+      legs.push({ hip, femur, knee, baseYaw, sd, gait: (i + (sd > 0 ? 0 : 1)) & 1 });
+    }
+  }
+
+  const P = { raise: 0, fold: 1, cross: 0, yaw: 0, by: 0, rear: 0, wing: 0, glow: 0, buzz: 0 };
+  let phase = 0;
+
+  function update(dt, s) {
+    dt = fin(dt, 0);
+    const t = fin(s.t, 0), mv = clamp(fin(s.move, 0), 0, 2);
+    const a = fin(s.attack, -1), hurt = clamp(fin(s.hurt, 0), 0, 1), dead = clamp(fin(s.dead, 0), 0, 1);
+    const ph3 = fin(s.phase, 1) >= 3;
+    const w = windup(a), k = strike(a);
+    // raise: 巨镰抬起（弧度）；fold: 镰刃折叠（1 = 祈祷式收拢）；cross: 两镰向内交叉；yaw: 身体扭转
+    let raise = 0.25 + Math.sin(t * 1.4) * 0.05, fold = 1, cross = 0, yaw = 0, by = 0, rear = 0, glowB = 0, buzz = 0;
+    switch (a >= 0 ? s.pattern : null) {
+      case 'scythe':
+        raise = 0.25 + 2.3 * w - 2.0 * k; fold = 1 - 0.8 * w + 0.3 * k; cross = 0.6 * k; rear = 0.35 * w - 0.3 * k; glowB = w + 2 * k;
+        break;
+      case 'sweep':
+        raise = 0.25 + 1.1 * w; fold = 1 - 0.9 * Math.max(w, k); yaw = 0.9 * w - 1.6 * k; by = -0.3 * k; glowB = 0.5 * w + 1.5 * k;
+        break;
+      case 'blink':
+        by = -1.3 * w + 0.4 * k; raise = 0.25 + 1.8 * k; fold = 1 - 0.7 * k; buzz = w + k; glowB = 1.5 * w + k;
+        break;
+      case 'slam':
+        rear = 0.6 * w - 0.4 * k; raise = 0.25 + 2.0 * w - 1.6 * k; fold = 1 - 0.6 * w; by = 0.4 * w - 0.6 * k; glowB = k;
+        break;
+      case 'volley':
+        glowB = 1.5 * w + 2 * k; raise = 0.6 * w; fold = 1 - 0.3 * w; rear = 0.15 * w;
+        break;
+      case 'summon':
+        buzz = 1; by = -0.4 * w; glowB = 1.5 * w + k; raise = 0.8 * w;
+        break;
+      case null: case undefined:
+        break;
+      default:
+        raise = 0.25 + 1.2 * w - 0.8 * k; fold = 1 - 0.5 * w; glowB = w + k;
+    }
+    rear += hurt * 0.25;
+    P.raise = damp(P.raise, raise, 14, dt);
+    P.fold = damp(P.fold, fold, 14, dt);
+    P.cross = damp(P.cross, cross, 14, dt);
+    P.yaw = damp(P.yaw, yaw, 12, dt);
+    P.by = damp(P.by, by, 12, dt);
+    P.rear = damp(P.rear, rear, 12, dt);
+    P.glow = damp(P.glow, glowB, 10, dt);
+    P.buzz = damp(P.buzz, buzz, 8, dt);
+    P.wing = damp(P.wing, ph3 || buzz > 0 ? 1 : 0, 3, dt);
+
+    phase += dt * (1.2 + 6 * Math.min(mv, 1.5)) * (1 - dead);
+    const g = Math.min(mv, 1) * (1 - dead);
+    body.position.y = BODY_Y + P.by + Math.sin(phase * 2) * 0.05 * g + Math.sin(t * 1.6) * 0.04 - dead * 2.2;
+    body.rotation.x = -P.rear + dead * 0.1;
+    body.rotation.y = P.yaw;
+    rig.rotation.z = dead * 1.25 + hurt * Math.sin(t * 50) * 0.04;
+    head.rotation.z = Math.sin(t * 0.9) * 0.12 * (1 - dead);
+    abd.rotation.x = 0.12 + Math.sin(t * 1.3) * 0.04 + P.buzz * 0.1;
+
+    for (let i = 0; i < arms.length; i++) {
+      const A = arms[i];
+      A.coxa.rotation.x = -P.raise;
+      A.coxa.rotation.z = A.sd * (0.12 + P.cross * 0.5);
+      A.femur.rotation.x = -0.5 - P.raise * 0.35;
+      A.tibia.rotation.x = -(0.4 + 2.2 * P.fold);
+    }
+    for (let i = 0; i < legs.length; i++) {
+      const L = legs[i];
+      const lp = phase + L.gait * PI;
+      const lift = Math.max(0, Math.sin(lp)) * 0.3 * g;
+      L.hip.rotation.y = L.baseYaw - L.sd * Math.cos(lp) * 0.2 * g;
+      L.femur.rotation.z = 0.55 + lift + dead * 0.6;
+      L.knee.rotation.z = -(1.9 + lift * 0.4) + dead * 0.8;
+    }
+    for (let i = 0; i < wings.length; i++) {
+      const W = wings[i];
+      const open = P.wing * (1 - dead);
+      const flap = P.buzz * Math.sin(t * 60 + W.k) * 0.25;
+      W.g.rotation.y = W.sd * (0.08 + open * (0.9 + W.k * 0.35)) + flap * W.sd;
+      W.g.rotation.x = 0.12 + open * 0.35;
+      W.g.rotation.z = -W.sd * open * 0.25;
+    }
+    const fade = 1 - dead * 0.85;
+    mGlow.emissiveIntensity = (1.4 + 0.4 * Math.sin(t * 3) + P.glow * 1.8) * fade;
+    mEye.emissiveIntensity = (2.2 + P.glow * 0.8 + 0.3 * Math.sin(t * 4)) * fade;
+    mWing.emissiveIntensity = (0.3 + P.wing * 0.9 + P.glow * 0.4) * fade;
+    mBlade.emissiveIntensity = 0.2 + P.glow * 0.6;
+  }
+
+  return { root, rig, muzzle, update };
+}
+
+// ---------------------------------------------------------------------
 //  导出
 // ---------------------------------------------------------------------
 const BUILDERS = {
@@ -1301,6 +1481,7 @@ const BUILDERS = {
   hydra: buildHydra,
   magmaGolem: buildMagmaGolem,
   overlord: buildOverlord,
+  mantis: buildMantis,
 };
 
 export const BOSS_MODEL_TYPES = Object.keys(BUILDERS);

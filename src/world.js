@@ -1789,6 +1789,18 @@ function buildRuneCircle(ctx) {
 // ---------------------------------------------------------------------
 //  入口
 // ---------------------------------------------------------------------
+// ======================= 虫巢（克隆丛林，换成暗红色调） =======================
+BIOMES.hive = {
+  ...BIOMES.jungle,
+  sky: { top: 0x1a0610, horizon: 0x6a2a24, bottom: 0x3a1418, sunColor: 0xffb070, sunDir: [0.4, 0.3, 0.6], sunSize: 0.09, sunI: 5, glow: 1.3, clouds: 0.5, cloudColor: 0x4a1a1a },
+  fog: { near: 30, far: 190 },
+  light: { hemiSky: 0xd07a5a, hemiGround: 0x2a1010, hemi: 1.0, sun: 0xffa070, sunI: 2.4, amb: 0x5a2a2a, ambI: 0.35 },
+  weather(ctx) {
+    W.pollen(ctx, 360, [1.0, 0.45, 0.25]);
+    W.pollen(ctx, 120, [0.55, 1.0, 0.35]);
+  },
+};
+
 export const BIOME_IDS = Object.keys(BIOMES);
 
 export function createWorld(biome = 'jungle', scene, opts = {}) {

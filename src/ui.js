@@ -5,7 +5,7 @@ import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
 import { t, LANGS, getLang, setLang } from './i18n.js';
 
-const BIOME_EMOJI = { jungle: '🌴', desert: '🏜️', frost: '❄️', swamp: '🍄', volcano: '🌋', shadow: '🏰' };
+const BIOME_EMOJI = { jungle: '🌴', desert: '🏜️', frost: '❄️', swamp: '🍄', volcano: '🌋', shadow: '🏰', hive: '🦗' };
 const BIOME_BG = {
   jungle: 'linear-gradient(160deg,#2f7a3a 0%,#1b4a2a 55%,#0d2416 100%)',
   desert: 'linear-gradient(160deg,#e0a64a 0%,#a8622a 55%,#4a2a14 100%)',
@@ -13,6 +13,7 @@ const BIOME_BG = {
   swamp: 'linear-gradient(160deg,#5a7a4a 0%,#2e4a3a 55%,#101c18 100%)',
   volcano: 'linear-gradient(160deg,#ff7a2a 0%,#8a1a14 55%,#240808 100%)',
   shadow: 'linear-gradient(160deg,#8a4ad0 0%,#3a1a6a 55%,#0e0620 100%)',
+  hive: 'linear-gradient(160deg,#c0304a 0%,#5a1424 55%,#14040a 100%)',
 };
 const WEAPON_TRAITS = (w) => {
   const r = [];

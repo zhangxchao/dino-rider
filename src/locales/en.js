@@ -133,7 +133,7 @@ export default {
     'result.menu': '⌂ Main Menu',
 
     'ending.title': 'You Won!',
-    'ending.story': 'You and your dinosaur companions crossed jungle, desert, snowfield, swamp and volcano,<br>and finally defeated the Shadow Overlord in the Shadow Citadel.<br>Peace and sunlight return to the primeval land! 🌅',
+    'ending.story': 'You and your dinosaur companions crossed jungle, desert, snowfield, swamp and volcano and defeated the Shadow Overlord,<br>then plunged into the hive below and cut down the Mantis King who pulled the strings.<br>Peace and sunlight return to the primeval land! 🌅',
     'ending.kills': 'Total kills',
     'ending.bosses': 'Bosses defeated',
     'ending.stars': 'Stars',
@@ -192,6 +192,7 @@ export default {
     'hazard.swamp': '⚠ Toxic bubbles!',
     'hazard.volcano': '⚠ Lava bombs!',
     'hazard.shadow': '⚠ Shadow storm!',
+    'hazard.hive': '⚠ Acid egg sacs!',
     'hazard.sub': 'Watch the red circles and dodge!',
     'banner.ambush': '⚠ Elite ambush!',
     'banner.ambushSub': 'Drive them off to earn a chest',
@@ -305,6 +306,7 @@ export default {
       hydra: { name: 'Swamp Hydra', title: 'Nightmare of the Mist' },
       magmaGolem: { name: 'Magma Titan', title: 'Heart of the Volcano' },
       overlord: { name: 'Shadow Overlord', title: 'The Primeval End' },
+      mantis: { name: 'Mantis King', title: 'Lord of the Hive' },
     },
     levels: {
       0: { name: 'Emerald Jungle', desc: 'Dash down the jungle trail, break through the monster horde and defeat the Venom Queen!' },
@@ -312,7 +314,8 @@ export default {
       2: { name: 'Frozen Tundra', desc: 'Wolf packs charge through the blizzard, and the Frost Giant waits at the end of the snowy road.' },
       3: { name: 'Misty Swamp', desc: 'Cross the swamp boardwalks where toxic shrooms and wisps lurk in the mist.' },
       4: { name: 'Magma Volcano', desc: 'A volcanic highway of surging lava, with fire imps swarming the sky.' },
-      5: { name: 'Shadow Citadel', desc: 'The last stretch to the citadel — defeat the Shadow Overlord and save the primeval land!' },
+      5: { name: 'Shadow Citadel', desc: 'Storm the rune road of the citadel and defeat the Shadow Overlord — but a greater threat lurks deeper…' },
+      6: { name: 'Mantis Hive', desc: 'With the Overlord fallen, the scrape of blades echoes from below — break into the hive and cut down the Mantis King!' },
     },
     weaponLevels: {
       1: { name: 'Starter Weapon' }, 2: { name: 'Damage Up' }, 3: { name: 'Double Shot' }, 4: { name: 'Fire Rate Up' },
@@ -323,7 +326,7 @@ export default {
       count: { name: 'Shots +1' }, rate: { name: 'Rate +25%' }, dmg: { name: 'DMG +30%' }, pierce: { name: 'Pierce +1' },
       heal: { name: 'Heal 40%' }, shield: { name: 'Shield 8s' }, skill: { name: 'Skill Charge' }, xp: { name: 'Weapon XP +25' }, magnet: { name: 'Magnet 10s' }, gamble: { name: 'Lucky Dice' },
     },
-    biomes: { jungle: 'Jungle', desert: 'Desert', frost: 'Tundra', swamp: 'Swamp', volcano: 'Volcano', shadow: 'Shadow' },
+    biomes: { jungle: 'Jungle', desert: 'Desert', frost: 'Tundra', swamp: 'Swamp', volcano: 'Volcano', shadow: 'Shadow', hive: 'Hive' },
     upgrades: {
       hp: { name: 'Vitality', desc: 'Max HP +10%' },
       atk: { name: 'Sharpened Fangs', desc: 'Melee damage +10%' },

@@ -129,6 +129,7 @@ class GeoBuf {
 // ---------------------------------------------------------------------
 class Deco {
   constructor(ctx, name, geo, mat, capNear, capFar, { split = 30, receive = true } = {}) {
+    this.name = name;
     this.cap = [capNear | 0, capFar | 0];
     this.split = split;
     this.meshes = this.cap.map((cap, k) => {
@@ -845,6 +846,48 @@ const TB = {
     far: (ctx) => buildCitadel(ctx),
   },
 };
+
+// ============================== 虫巢（克隆丛林：暗红甲壳地面 + 染色植被） ==============================
+{
+  const J = TB.jungle;
+  const HIVE = col(0x4a1420), CARA = col(0x2a1418), VEIN = col(0x7a2a1a);
+  const tintOf = (b) => new THREE.Color().setRGB(0.55 + b * 0.25, 0.25 + b * 0.12, 0.28 + b * 0.12);
+  TB.hive = {
+    ...J,
+    amp: [2.1, 0.55, 2.0],
+    hill: [3.8, 3.6, 4.4, 1.0],
+    ground: (n) => {
+      const g0 = J.ground(n);
+      return (c, x, yr, z, ny, rnd, ax) => {
+        g0(c, x, yr, z, ny, rnd, ax);
+        c.lerp(HIVE, ax <= FLAT + 0.01 ? 0.7 : 0.55);
+      };
+    },
+    road(ctx, gb, gl, z0, z1) {
+      // 深色甲壳路面：丛林泥路的纹理 + 暗红叠色 + 发光血管纹
+      const n = ctx.noise;
+      const fn = (x, z) => {
+        const v = fbm(n, x * 0.14, z * 0.1, 2) * 0.5 + 0.5;
+        _c2.copy(CARA).lerp(HIVE, v);
+        const vein = Math.exp(-(((fbm(n, x * 0.25 + 7, z * 0.08, 2)) / 0.06) ** 2));
+        _c2.lerp(VEIN, vein * 0.6);
+        _c2.multiplyScalar(1 - 0.18 * Math.exp(-(((Math.abs(x) - 3.6) / 0.7) ** 2)));
+      };
+      const XS_R = [-9, -8.2, -7.2, -6, -4.6, -3.6, -2.6, -1.3, 0, 1.3, 2.6, 3.6, 4.6, 6, 7.2, 8.2, 9];
+      for (let z = z0; z < z1 - 1e-6; z += 1.5) {
+        const zb = Math.min(z1, z + 1.5), ya = ctx.base(z) + 0.03, yb = ctx.base(zb) + 0.03;
+        for (let i = 0; i < XS_R.length - 1; i++) gb.quadFn(XS_R[i], XS_R[i + 1], z, zb, ya, yb, fn);
+      }
+    },
+    decos(ctx) {
+      return J.decos(ctx).map((e) => {
+        const glow = e.d.name === 'flames';
+        return { d: e.d, place: (P) => e.place(P).map((it) => ({ ...it, tint: glow ? new THREE.Color(1.0, 0.35, 0.6) : tintOf(it.b ?? 1) })) };
+      });
+    },
+    landmarkMat: (ctx) => { const m = decoMaterial({ emissive: 0x3a0a14 }); m.color.setRGB(0.6, 0.3, 0.32); ctx.extraMats.push(m); return m; },
+  };
+}
 
 // ---------------------------------------------------------------------
 //  入口

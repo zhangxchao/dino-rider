@@ -120,7 +120,7 @@ html:not([data-lang="zh-CN"]) #s-title .menu { width: 300px; }
 .hint-drag { position: absolute; left: 50%; top: 80px; transform: translateX(-50%); color: rgba(255,255,255,.55); font-size: 12px; pointer-events: none; text-shadow: 0 1px 4px #000; }
 
 /* ---------------- 关卡 ---------------- */
-#s-levels .map { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); width: min(1100px, 94vw); display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+#s-levels .map { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); width: min(1240px, 96vw); display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-height: calc(100vh - 110px); overflow-y: auto; }
 .level-card { position: relative; cursor: pointer; border-radius: 18px; overflow: hidden; min-height: 200px; padding: 18px; display: flex; flex-direction: column; justify-content: flex-end; border: 2px solid rgba(255,255,255,.12); transition: transform .15s, border-color .15s, box-shadow .15s; animation: popIn .45s ease both; }
 .level-card:hover { transform: translateY(-4px) scale(1.015); border-color: var(--accent); box-shadow: 0 16px 40px rgba(0,0,0,.5), 0 0 24px rgba(255,185,56,.3); }
 .level-card .bg { position: absolute; inset: 0; z-index: -1; }
@@ -135,7 +135,7 @@ html:not([data-lang="zh-CN"]) #s-title .menu { width: 300px; }
 .level-card.locked { cursor: not-allowed; filter: grayscale(.9) brightness(.55); }
 .level-card.locked:hover { transform: none; border-color: rgba(255,255,255,.12); box-shadow: none; }
 .level-card .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 54px; }
-.level-card.endless { grid-column: 1 / -1; min-height: 110px; }
+.level-card.endless { min-height: 200px; }
 
 /* ---------------- 商店 ---------------- */
 #s-shop .list { position: absolute; left: 50%; top: 54%; transform: translate(-50%, -50%); width: min(760px, 94vw); padding: 18px; display: grid; gap: 10px; max-height: 76vh; overflow-y: auto; }
@@ -313,7 +313,7 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
   #s-select .grid-panel { width: 46vw; top: 70px; }
   #s-select .info-panel { width: 46vw; }
   .card-grid { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
-  #s-levels .map { grid-template-columns: repeat(2, 1fr); }
+  #s-levels .map { grid-template-columns: repeat(2, 1fr); top: 84px; transform: translateX(-50%); max-height: calc(100vh - 100px); }
   .bar-outer { width: 180px; }
   #minimap { width: 120px; height: 120px; }
   .hud-hints { display: none; }

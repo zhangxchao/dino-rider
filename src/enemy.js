@@ -27,7 +27,7 @@ const ENEMY_STATES = [
 const BOSS_STATES = (() => {
   const out = [];
   let t = 0;
-  for (const p of ['slam', 'volley', 'barrage', 'summon', 'charge', 'burrow', 'breath', 'meteor', null]) {
+  for (const p of ['slam', 'volley', 'barrage', 'summon', 'charge', 'burrow', 'breath', 'meteor', 'scythe', 'sweep', 'blink', null]) {
     for (const ph of [1, 2, 3]) for (const a of [0.2, 0.7]) out.push({ t: (t += 0.37), move: a, attack: a, pattern: p, hurt: a > 0.5 ? 1 : 0, dead: 0, phase: ph, burrow: p === 'burrow' ? a : 0 });
   }
   out.push({ t: t + 1, move: 0, attack: -1, pattern: null, hurt: 0, dead: 0.7, phase: 1, burrow: 0 });
@@ -584,7 +584,8 @@ export class Boss {
   choosePattern() {
     const g = this.game;
     const opts = this.def.patterns.filter((p) => p !== this.lastPattern);
-    const w = opts.map((p) => (p === 'summon' ? (g.enemies.length > 8 ? 0 : 0.8) : p === 'charge' ? 1.3 : 1));
+    const w = opts.map((p) => (p === 'summon' ? (g.enemies.length > 8 ? 0 : 0.8) : p === 'charge' ? 1.3
+      : (p === 'sweep' || p === 'blink') && this.phase >= 3 ? 1.6 : p === 'scythe' ? 1.3 : 1));
     let r = Math.random() * w.reduce((a, b) => a + b, 0);
     let name = opts[0];
     for (let i = 0; i < opts.length; i++) { r -= w[i]; if (r <= 0) { name = opts[i]; break; } }
@@ -650,6 +651,35 @@ export class Boss {
         g.audio.play('warning', { volume: 0.6 });
         break;
       }
+      // —— 螳螂王 ——
+      case 'scythe': {
+        // 十字斩：以玩家为中心的 X 形两道（第 3 阶段再加一道横斩）
+        P.windup = 0.95 * fast;
+        P.dur = P.windup + 0.6;
+        P.cx = pl.pos.x; P.cz = pl.pos.z;
+        P.len = 17; P.w = 2.8;
+        P.angles = ph >= 3 ? [Math.PI / 4, -Math.PI / 4, Math.PI / 2] : [Math.PI / 4, -Math.PI / 4];
+        for (const a of P.angles) {
+          const dx = Math.sin(a), dz = Math.cos(a);
+          P.teles.push(g.tele.add({ shape: 'rect', x: P.cx - dx * P.len / 2, z: P.cz - dz * P.len / 2, angle: a, length: P.len, width: P.w, duration: P.windup, color: 0xff3030 }));
+        }
+        g.audio.play('warning', { volume: 0.55 });
+        break;
+      }
+      case 'sweep':
+        // 镰刃波：横扫整条路，必须跳过去（第 3 阶段连发两道）
+        P.windup = 0.75 * fast;
+        P.waves = ph >= 3 ? 2 : 1;
+        P.dur = P.windup + 0.5 * P.waves + 0.6;
+        g.audio.play('warning', { volume: 0.5 });
+        break;
+      case 'blink':
+        // 瞬移突袭：隐身 → 出现在玩家身侧 → 下劈
+        P.vanish = 0.35; P.windup = P.vanish + 0.75 * fast;
+        P.dur = P.windup + 0.9;
+        g.audio.play('portal', { volume: 0.6, pitch: 1.4 });
+        g.fx.sparks.burst(this.getCenter(_v), { count: 40, speed: 8, life: 0.5, size: 1, color: 0xc8ff80, color2: 0x206010 });
+        break;
       default: P.dur = 0.5;
     }
     this.pattern = P;
@@ -657,6 +687,7 @@ export class Boss {
 
   endPattern() {
     if (!this.pattern) return;
+    this.root.visible = true;
     for (const t of this.pattern.teles || []) this.game.tele.remove(t);
     this.pattern = null;
   }
@@ -788,6 +819,96 @@ export class Boss {
           if (this.pos.z >= tz - 0.5) P.t = P.dur;
         }
         break;
+
+      case 'scythe':
+        out = { tx: this.pos.x };
+        if (!P.fired && P.t >= P.windup) {
+          P.fired = true;
+          const hitW = P.w / 2 + pl.radius * 0.4;
+          let hit = false, near = false;
+          for (const a of P.angles) {
+            const dx = Math.sin(a), dz = Math.cos(a);
+            const rx = pl.pos.x - P.cx, rz = pl.pos.z - P.cz;
+            const along = rx * dx + rz * dz, perp = Math.abs(rx * dz - rz * dx);
+            if (Math.abs(along) < P.len / 2 + 0.5) { if (perp < hitW) hit = true; else if (perp < hitW + 2) near = true; }
+            // 沿斩线喷出刀光
+            for (let k = -3; k <= 3; k++) {
+              _v.set(P.cx + dx * k * P.len / 7, 0, P.cz + dz * k * P.len / 7);
+              _v.y = g.heightAt(_v.x, _v.z);
+              g.fx.sparks.burst(_v, { count: 6, speed: 6, life: 0.35, size: 0.8, color: 0xf0ffd0, color2: color, up: 2 });
+              if (k % 2 === 0) g.fx.scorch.add(_v, 1.3, 3);
+            }
+          }
+          if (hit && pl.pos.y - g.heightAt(pl.pos.x, pl.pos.z) < 3) {
+            _dir.set(Math.sign(pl.pos.x - P.cx) || 1, 0, -0.4).normalize();
+            pl.takeDamage(this.dmg * 1.3, { dir: _dir, knock: 12, attacker: this, kind: 'melee' });
+          } else if (near) g.onPerfect(pl.pos);
+          _v.set(P.cx, g.heightAt(P.cx, P.cz), P.cz);
+          g.fx.rings.ring(_v, { r0: 1, r1: 9, life: 0.4, color: 0xd8ff80 });
+          g.fx.debris.burst(_v, { count: 8, speed: 8, up: 7, size: 0.35, color: g.rockColor ?? 0x4a2a2a });
+          g.audio.play('claw', { volume: 1, pitch: 0.6 });
+          g.audio.play('hitHeavy', { volume: 0.8, pitch: 0.7 });
+          g.shakeAt(_v, 0.35);
+          g.juice.aberr(0.8);
+          g.juice.fovKick(-2.5);
+        }
+        break;
+
+      case 'sweep': {
+        out = { tx: this.pos.x };
+        const rh = g.track.roadHalf;
+        while (P.count < P.waves && P.t >= P.windup + P.count * 0.5) {
+          P.count++;
+          _v.set(0, g.heightAt(0, this.pos.z - 3) + 0.9, this.pos.z - 3);
+          _dir.set(0, 0, -1);
+          g.projectiles.spawn({ kind: 'scythewave', owner: 'enemy', pos: _v, dir: _dir, speed: 24, dmg: this.dmg * 1.1, radius: 1, life: 3, knock: 10, width: rh * 2 + 2, sweepW: rh * 2 + 2, hover: 0.9, color });
+          g.audio.play('whoosh', { volume: 1, pitch: 0.6 });
+          g.audio.play('wave', { volume: 0.6, pitch: 0.8 });
+          g.juice.aberr(0.5);
+        }
+        break;
+      }
+
+      case 'blink': {
+        const k = P.t;
+        if (k < P.vanish) {
+          this.root.visible = Math.sin(k * 60) > 0;
+          out = { tx: this.pos.x };
+        } else if (!P.appeared) {
+          // 出现在玩家侧前方，地面圆形预警
+          P.appeared = true;
+          this.root.visible = true;
+          const side = pl.pos.x > 0 ? -1 : 1;
+          const rh = g.track.roadHalf;
+          P.bx = clamp(pl.pos.x + side * 5, -rh + 2, rh - 2);
+          P.bz = pl.pos.z + 7;
+          P.sx = pl.pos.x; P.sz = pl.pos.z + 1.5;
+          this.pos.x = P.bx; this.pos.z = P.bz;
+          P.teles.push(g.tele.add({ shape: 'circle', x: P.sx, z: P.sz, radius: 4.2, duration: P.windup - P.vanish, color: 0xff3030 }));
+          g.fx.sparks.burst(this.getCenter(_v), { count: 50, speed: 10, life: 0.5, size: 1, color: 0xe0ff90, color2: 0x206010 });
+          g.audio.play('portal', { volume: 0.7, pitch: 0.8 });
+          out = { drive: true };
+        } else if (!P.fired && k >= P.windup) {
+          P.fired = true;
+          const d = Math.hypot(pl.pos.x - P.sx, pl.pos.z - P.sz);
+          if (d < 4.2 + pl.radius * 0.4 && pl.pos.y - g.heightAt(pl.pos.x, pl.pos.z) < 2.5) {
+            _dir.set(pl.pos.x - P.sx, 0, pl.pos.z - P.sz).normalize();
+            pl.takeDamage(this.dmg * 1.4, { dir: _dir, knock: 14, attacker: this, kind: 'melee' });
+          } else if (d < 6.6) g.onPerfect(pl.pos);
+          _v.set(P.sx, g.heightAt(P.sx, P.sz), P.sz);
+          g.fx.rings.ring(_v, { r0: 1, r1: 6, life: 0.4, color: 0xd8ff80 });
+          g.fx.debris.burst(_v, { count: 10, speed: 8, up: 9, size: 0.4, color: g.rockColor ?? 0x4a2a2a });
+          g.fx.scorch.add(_v, 3.4, 4);
+          g.audio.play('stomp', { volume: 1, pitch: 0.7 });
+          g.shakeAt(_v, 0.4);
+          g.juice.fovKick(-3);
+          out = { drive: true };
+        } else {
+          // 劈完后退回原本的跟随位置
+          out = k > P.windup + 0.25 ? { tx: this.pos.x } : { drive: true };
+        }
+        break;
+      }
 
       case 'burrow': {
         const t = P.t;

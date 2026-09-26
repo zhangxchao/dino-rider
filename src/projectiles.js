@@ -76,6 +76,10 @@ const MAKERS = {
   wave: (c, w = 5) => new THREE.Mesh(
     G('wave' + w, () => new THREE.TorusGeometry(w / 2, 0.22, 6, 36, Math.PI).rotateX(Math.PI / 2).scale(1, 3, 0.55)),
     glow(0xcff4ff, 2.2, { additive: true, opacity: 0.85, side: THREE.DoubleSide })),
+  // 螳螂王的镰刃波：横跨整条路的绿色新月
+  scythewave: (c, w = 20) => new THREE.Mesh(
+    G('sw' + w, () => new THREE.TorusGeometry(w / 2, 0.45, 6, 40, Math.PI).rotateX(Math.PI / 2).scale(1, 2.6, 0.22)),
+    glow(0xc0ff60, 3.6, { additive: true, opacity: 0.9, side: THREE.DoubleSide })),
   spore: () => new THREE.Mesh(G('spore', () => new THREE.IcosahedronGeometry(0.36, 0)), glow(0xb070ff, 2.6)),
   orb: (c = 0x7affd0) => new THREE.Mesh(G('orb', () => new THREE.SphereGeometry(0.42, 12, 10)), glow(c, 3)),
   efire: () => new THREE.Mesh(G('efire', () => new THREE.IcosahedronGeometry(0.42, 1)), glow(0xff6a1a, 3.2)),
@@ -96,6 +100,7 @@ const TRAILS = {
   cannon: { color: 0xffa040, size: 0.3, life: 0.25, rate: 35 },
   venom: { color: 0x9cff3a, size: 0.45, life: 0.3, rate: 55, drop: 6 },
   wave: { color: 0xcff4ff, size: 1.4, life: 0.35, rate: 70, spread: 2 },
+  scythewave: { color: 0xb8ff60, color2: 0x40a010, size: 1.3, life: 0.35, rate: 90, spread: 7 },
   spore: { color: 0xb070ff, size: 0.4, life: 0.4, rate: 30 },
   orb: { size: 0.5, life: 0.3, rate: 40 },
   efire: { color: 0xffa040, color2: 0xff2000, size: 0.7, life: 0.3, rate: 60 },
@@ -225,10 +230,10 @@ export class Projectiles {
       burn: o.burn ?? 0, poison: o.poison ?? 0, knock: o.knock ?? 2, stun: o.stun ?? 0, gravity: o.gravity ?? 0,
       crit: !!o.crit, color: o.color, hit: new Set(), trailAcc: 0, spinT: 0, dead: false,
       trail: TRAILS[o.kind], explodeOnExpire: !!o.explodeOnExpire, groundHit: o.groundHit !== false,
-      hover: o.hover ?? null,
+      hover: o.hover ?? null, sweepW: o.sweepW ?? 0,
     };
     if (o.inherit) p.vel.add(o.inherit);
-    p.batch = this._batch(o.kind, o.kind === 'orb' || o.kind === 'borb' ? o.color : undefined, o.kind === 'wave' ? (o.width || 5) : undefined);
+    p.batch = this._batch(o.kind, o.kind === 'orb' || o.kind === 'borb' ? o.color : undefined, o.kind === 'wave' || o.kind === 'scythewave' ? (o.width || 5) : undefined);
     p.scale = o.scale || 1;
     this.list.push(p);
     return p;
@@ -314,6 +319,18 @@ export class Projectiles {
           const rr = pl.radius * 0.8 + p.radius;
           const top = pl.pos.y + pl.size.height * 1.35 + 0.6;
           const d2 = dx * dx + dz * dz;
+          if (p.sweepW) {
+            // 横扫整条路的镰刃：按线段判定，贴地飞行，跳起来就能躲过
+            const inLine = Math.abs(dz) < 0.9 + pl.radius * 0.4 && Math.abs(dx) < p.sweepW / 2;
+            const lowEnough = p.pos.y > pl.pos.y - 0.6 && p.pos.y < pl.pos.y + pl.size.height * 1.35 + 0.6;
+            if (inLine && lowEnough) {
+              _dir.set(0, 0, -1);
+              pl.takeDamage(p.dmg, { dir: _dir, knock: p.knock, kind: 'proj' });
+              fx.sparks.burst(pl.pos, { count: 18, speed: 7, life: 0.4, size: 0.7, color: 0xd8ff80, color2: 0x40a010, up: 2 });
+              this._kill(i);
+            } else if (!p.grazed && dz < -0.5 && Math.abs(dx) < p.sweepW / 2) { p.grazed = true; game.onPerfect(pl.pos); }
+            continue;
+          }
           // 擦弹：敌方弹体从身边 1.2 米内飞过
           if (!p.grazed && d2 < (rr + 1.2) * (rr + 1.2) && d2 >= rr * rr && dz < 0) { p.grazed = true; game.onPerfect(p.pos, false); }
           if (d2 < rr * rr && p.pos.y > pl.pos.y - 0.6 && p.pos.y < top) {

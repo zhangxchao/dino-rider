@@ -14,6 +14,7 @@ import { Showcase } from './showcase.js';
 import { renderThumbnails } from './thumbs.js';
 import { t } from './i18n.js';
 import { Juice } from './juice.js';
+import { setFxLevel } from './effects.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -90,6 +91,7 @@ class App {
     this.dyn.good = 0;
     this.setPixelRatio(this.dyn.pr);
     this.useComposer = s.quality === 'high';
+    setFxLevel(s.fx || 'medium');
     if (this.game) this.game.shake.enabled = s.shake;
     this.fpsEl.style.display = s.showFps ? 'block' : 'none';
   }

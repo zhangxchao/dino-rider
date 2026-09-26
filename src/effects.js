@@ -6,6 +6,24 @@ const _c = new THREE.Color();
 const _v = new THREE.Vector3();
 
 // ---------------------------------------------------------------------
+//  特效强度（设置：完整 / 适中 / 精简）
+//  count 粒子数量  size 粒子大小  maxPx 单个粒子最大屏幕尺寸（占画面高度比例）
+//  screen 全屏闪光 / 色差 / 径向模糊 / 泛光脉冲  ring 光环光柱透明度  text 普通伤害飘字上限
+// ---------------------------------------------------------------------
+const FX_LEVELS = {
+  full:   { count: 1, size: 1, maxPx: 0.16, screen: 1, ring: 1, text: 28 },
+  medium: { count: 0.6, size: 0.8, maxPx: 0.07, screen: 0.5, ring: 0.65, text: 14 },
+  low:    { count: 0.35, size: 0.65, maxPx: 0.045, screen: 0.2, ring: 0.4, text: 6 },
+};
+export const FX = { ...FX_LEVELS.medium, level: 'medium' };
+const _particleSystems = new Set();
+export function setFxLevel(level) {
+  const L = FX_LEVELS[level] || FX_LEVELS.medium;
+  Object.assign(FX, L, { level: FX_LEVELS[level] ? level : 'medium' });
+  for (const ps of _particleSystems) ps._applyMax();
+}
+
+// ---------------------------------------------------------------------
 //  粒子系统（Points + 自定义着色器，单次 draw call）
 // ---------------------------------------------------------------------
 const PARTICLE_VS = /* glsl */`
@@ -15,12 +33,14 @@ const PARTICLE_VS = /* glsl */`
   varying vec3 vColor;
   varying float vAlpha;
   uniform float uScale;
+  uniform float uMaxPx;
   #include <bend_pars_vertex>
   void main() {
     vColor = color;
-    vAlpha = alpha;
     vec4 mv = viewMatrix * bendWorld(modelMatrix * vec4(position, 1.0));
-    gl_PointSize = max(1.0, size * uScale / -mv.z);
+    // 贴近镜头的粒子淡出，避免一团糊住画面
+    vAlpha = alpha * smoothstep(2.0, 7.0, -mv.z);
+    gl_PointSize = clamp(size * uScale / -mv.z, 1.0, uMaxPx);
     gl_Position = projectionMatrix * mv;
   }`;
 const PARTICLE_FS = /* glsl */`
@@ -55,7 +75,7 @@ export class Particles {
     this.geo = g;
     this.mat = new THREE.ShaderMaterial({
       vertexShader: PARTICLE_VS, fragmentShader: PARTICLE_FS,
-      uniforms: { uScale: { value: 600 }, uSoft: { value: additive ? 1 : 0.25 }, uBoost: { value: additive ? 2.2 : 1 } },
+      uniforms: { uScale: { value: 600 }, uMaxPx: { value: 80 }, uSoft: { value: additive ? 1 : 0.25 }, uBoost: { value: additive ? 2.2 : 1 } },
       transparent: true, depthWrite: false,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
@@ -63,6 +83,9 @@ export class Particles {
     this.points.frustumCulled = false;
     this.points.renderOrder = additive ? 20 : 10;
     scene.add(this.points);
+    this.viewH = 720;
+    _particleSystems.add(this);
+    this._applyMax();
     // CPU 侧数据
     this.vel = new Float32Array(max * 3);
     this.life = new Float32Array(max);
@@ -76,7 +99,11 @@ export class Particles {
     this.c1 = new Float32Array(max * 3);
   }
 
+  _applyMax() { this.mat.uniforms.uMaxPx.value = Math.max(8, this.viewH * FX.maxPx * (window.devicePixelRatio || 1)); }
+
   setScale(viewportHeight, fovDeg) {
+    this.viewH = viewportHeight;
+    this._applyMax();
     this.mat.uniforms.uScale.value = viewportHeight / (2 * Math.tan(THREE.MathUtils.degToRad(fovDeg) / 2));
   }
 
@@ -101,7 +128,9 @@ export class Particles {
    *      color, color2, alpha, gravity, drag, radius(起点随机半径) }
    */
   burst(p, o) {
-    const n = o.count ?? 10;
+    const n0 = o.count ?? 10;
+    const n = n0 <= 2 ? n0 : Math.max(1, Math.round(n0 * FX.count));
+    const szMul = FX.size;
     const sp = o.speed ?? 5;
     const spVar = o.speedVar ?? 0.5;
     const spread = o.spread ?? 1;
@@ -123,7 +152,7 @@ export class Particles {
       const oy = rad ? (Math.random() * 2 - 1) * rad * 0.5 : 0;
       const oz = rad ? (Math.random() * 2 - 1) * rad : 0;
       this.spawn(p.x + ox, p.y + oy, p.z + oz, dx * s, dy * s + up, dz * s, life,
-        o.size ?? 0.5, o.sizeEnd ?? 0, o.color ?? 0xffffff, o.color2 ?? o.color ?? 0xffffff,
+        (o.size ?? 0.5) * szMul, (o.sizeEnd ?? 0) * szMul, o.color ?? 0xffffff, o.color2 ?? o.color ?? 0xffffff,
         o.alpha ?? 1, o.gravity ?? 0, o.drag ?? 0);
     }
   }
@@ -173,6 +202,7 @@ export class Particles {
   clear() { this.count = 0; this.geo.setDrawRange(0, 0); }
 
   dispose() {
+    _particleSystems.delete(this);
     this.points.parent && this.points.parent.remove(this.points);
     this.geo.dispose(); this.mat.dispose();
   }
@@ -214,7 +244,10 @@ export class Rings {
   disc(pos, { r = 4, life = 0.4, color = 0xffffff, opacity = 0.7, y = 0.2 } = {}) {
     const m = this._get('disc');
     m.position.set(pos.x, pos.y + y, pos.z);
-    m.material.color.set(color).multiplyScalar(1.6);
+    m.material.color.set(color).multiplyScalar(1.2);
+    // 整片加法发光圆盘最容易糊满屏：按特效强度缩半径、再额外压一次亮度
+    r *= 0.5 + 0.5 * FX.ring;
+    opacity *= FX.ring;
     m.scale.set(r, 1, r);
     this.items.push({ m, t: 0, life, r0: r * 0.6, r1: r, opacity, kind: 'disc' });
     return m;
@@ -237,7 +270,7 @@ export class Rings {
       const r = it.r0 + (it.r1 - it.r0) * e;
       if (it.kind === 'pillar') it.m.scale.set(r, it.h * (0.6 + 0.4 * e), r);
       else it.m.scale.set(r, 1, r);
-      it.m.material.opacity = it.opacity * (1 - k);
+      it.m.material.opacity = it.opacity * FX.ring * (1 - k);
       if (k >= 1) {
         it.m.visible = false;
         this.pool.push(it.m);
@@ -419,7 +452,7 @@ export class FloatingText {
     this.pool = [];
   }
   add(worldPos, text, cls = '', life = 0.9) {
-    if (this.items.length > 28 && (cls === '' || cls === 'burn' || cls === 'poison')) return;
+    if (this.items.length > FX.text && (cls === '' || cls === 'burn' || cls === 'poison')) return;
     let el = this.pool.pop();
     if (!el) { el = document.createElement('div'); this.layer.appendChild(el); }
     el.className = 'dmg ' + cls;
@@ -820,7 +853,7 @@ export class Streaks {
     _dm.makeBasis(_sx.multiplyScalar(len), _sy.multiplyScalar(width), _sz);
     _dm.setPosition(pos);
     this.mesh.setMatrixAt(this.n, _dm);
-    this.mesh.setColorAt(this.n, _c.set(color).multiplyScalar(boost));
+    this.mesh.setColorAt(this.n, _c.set(color).multiplyScalar(boost * (0.4 + 0.6 * FX.ring)));
     this.n++;
   }
   end() {
@@ -874,7 +907,7 @@ export class Afterimages {
     const s = this.slots[this.next];
     this.next = (this.next + 1) % this.slots.length;
     s.mat.color.set(color);
-    s.t = 0; s.life = life; s.a = alpha;
+    s.t = 0; s.life = life; s.a = alpha * FX.ring;
     for (let i = 0; i < this.src.length; i++) {
       const o = this.src[i], g = s.meshes[i];
       g.visible = o.visible && o.parent?.visible !== false;

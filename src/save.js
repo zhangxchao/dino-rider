@@ -16,7 +16,7 @@ function defaults() {
     endlessBest: 0,
     stats: { kills: 0, bosses: 0, plays: 0, wins: 0 },
     dinoWins: {},                      // 每只恐龙的胜场
-    settings: { music: 0.55, sfx: 0.8, quality: 'high', sensitivity: 1, shake: false, invertY: false, touch: 'auto', autoRes: true, showFps: false },
+    settings: { music: 0.55, sfx: 0.8, quality: 'high', sensitivity: 1, shake: false, invertY: false, touch: 'auto', autoRes: true, showFps: false, fx: 'medium' },
   };
 }
 

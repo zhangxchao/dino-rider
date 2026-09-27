@@ -1,5 +1,5 @@
 // 菜单界面：标题 / 选择坐骑 / 关卡 / 升级 / 设置 / 帮助 / 暂停 / 结算 / 结局
-import { DINOS, RIDERS, LEVELS, BOSSES, UPGRADES, upgradeCost } from './data.js';
+import { DINOS, RIDERS, LEVELS, BOSSES, UPGRADES, upgradeCost, DIFFICULTIES, DIFFICULTY_IDS } from './data.js';
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
@@ -250,6 +250,7 @@ export class UI {
         </div>`;
     }).join('');
     const endlessLocked = save.unlocked < 2;
+    const diff = DIFFICULTIES[save.settings.difficulty] ? save.settings.difficulty : 'medium';
     const n = el(`
       <div>
         <div class="topbar">
@@ -261,6 +262,11 @@ export class UI {
           ${this.coinPill()}
         </div>
         <div class="map">
+          <div class="diff-bar">
+            <span class="diff-label">${t('diff.label')}</span>
+            <div class="seg" data-diff>${DIFFICULTY_IDS.map((id) => `<button data-v="${id}" class="${id === diff ? 'on' : ''}">${t('diff.' + id)}</button>`).join('')}</div>
+            <span class="diff-desc">${t('diff.' + diff + '.desc')}</span>
+          </div>
           ${cards}
           <div class="level-card endless ${endlessLocked ? 'locked' : ''}" data-endless style="animation-delay:.4s">
             <div class="bg" style="background:linear-gradient(120deg,#3a1a0a,#7a2a1a 40%,#2a1a4a)"></div>
@@ -273,6 +279,13 @@ export class UI {
       </div>`);
     n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));
     n.querySelector('[data-sel]').addEventListener('click', () => this.show('select'));
+    n.querySelectorAll('.seg[data-diff] button').forEach((b) => b.addEventListener('click', () => {
+      save.settings.difficulty = b.dataset.v;
+      persist();
+      this.app.audio.play('select');
+      n.querySelectorAll('.seg[data-diff] button').forEach((x) => x.classList.toggle('on', x === b));
+      n.querySelector('.diff-desc').textContent = t('diff.' + b.dataset.v + '.desc');
+    }));
     n.querySelectorAll('.level-card[data-i]').forEach((c) => c.addEventListener('click', () => {
       const i = +c.dataset.i;
       if (i >= save.unlocked) { this.app.audio.play('error'); return; }
@@ -357,6 +370,7 @@ export class UI {
         <div class="center-panel panel">
           <h2>${t('settings.title')}</h2>
           <div class="set-row"><label>${t('settings.lang')}</label><div class="seg" data-lang>${LANGS.map((l) => `<button data-v="${l.id}" class="${l.id === getLang() ? 'on' : ''}">${l.label}</button>`).join('')}</div></div>
+          ${from === 'title' ? `<div class="set-row"><label>${t('settings.difficulty')}</label><div class="seg" data-k="difficulty">${DIFFICULTY_IDS.map((v) => `<button data-v="${v}" class="${(s.difficulty || 'medium') === v ? 'on' : ''}">${t('diff.' + v)}</button>`).join('')}</div></div>` : ''}
           <div class="set-row"><label>${t('settings.music')}</label><input type="range" min="0" max="1" step="0.05" value="${s.music}" data-k="music"></div>
           <div class="set-row"><label>${t('settings.sfx')}</label><input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-k="sfx"></div>
           <div class="set-row"><label>${t('settings.quality')}</label><div class="seg" data-k="quality"><button data-v="high" class="${s.quality === 'high' ? 'on' : ''}">${t('settings.qualityHigh')}</button><button data-v="low" class="${s.quality === 'low' ? 'on' : ''}">${t('settings.qualityLow')}</button></div></div>
@@ -381,7 +395,7 @@ export class UI {
     n.querySelectorAll('.seg[data-k]').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       const k = seg.dataset.k;
       const v = b.dataset.v;
-      s[k] = k === 'quality' || k === 'fx' ? v : v === '1';
+      s[k] = k === 'quality' || k === 'fx' || k === 'difficulty' ? v : v === '1';
       seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
       this.app.applySettings();
       persist();
@@ -463,7 +477,7 @@ export class UI {
     let body;
     if (r.win) {
       body = `
-        <h2 style="color:#ffe27a">${t('result.win')}</h2>
+        <h2 style="color:#ffe27a">${t('result.win')}${r.difficulty ? ` <span class="diff-tag ${r.difficulty}">${t('diff.' + r.difficulty)}</span>` : ''}</h2>
         <div class="big-stars">${[0, 1, 2].map((k) => `<span class="${k < r.stars ? 'on' : ''}" style="animation-delay:${0.2 + k * 0.25}s">★</span>`).join('')}</div>
         <div class="result-grid">
           <div class="cell"><div class="k">${t('result.time')}</div><div class="v">${formatTime(r.time)}</div></div>
@@ -481,7 +495,7 @@ export class UI {
     } else {
       body = `
         <h2 style="color:#ff8080">${r.endless ? t('result.endlessOver') : t('result.lose')}</h2>
-        ${r.endless ? `<div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:12px">${t('result.dist', { n: r.dist })}${r.newBest ? ` <span style="color:var(--gold)">${t('result.newBest')}</span>` : ''}</div>` : `<p style="text-align:center;color:var(--muted);margin-bottom:12px">${r.bossReached ? t('result.bossReached') : t('result.progress', { n: Math.round(r.progress * 100) })}${t('result.tryUpgrade')}</p>`}
+        ${r.endless ? `<div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:12px">${t('result.dist', { n: r.dist })}${r.newBest ? ` <span style="color:var(--gold)">${t('result.newBest')}</span>` : ''}</div>` : `<p style="text-align:center;color:var(--muted);margin-bottom:12px">${r.bossReached ? t('result.bossReached') : t('result.progress', { n: Math.round(r.progress * 100) })}${t('result.tryUpgrade')}${r.difficulty && r.difficulty !== 'easy' ? t('result.tryEasy') : ''}</p>`}
         <div class="result-grid">
           <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
           <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${r.kills}</div></div>

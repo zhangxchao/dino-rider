@@ -1,6 +1,6 @@
 // 一局游戏（跑道模式）：沿路线自动前进，怪物从前方涌来，终点首领战
 import * as THREE from 'three';
-import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED } from './data.js';
+import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, DIFFICULTIES } from './data.js';
 import { createTrack } from './track.js';
 import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars, Debris, Scorch, LightFlashes, Streaks } from './effects.js';
 import { Projectiles } from './projectiles.js';
@@ -149,10 +149,10 @@ class Gate {
       const g = new THREE.Group();
       g.position.set(cx, 0, 0);
       const col = new THREE.Color(opt.color);
-      const panelMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, fog: false });
+      const panelMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, fog: false, forceSinglePass: true });
       const panel = new THREE.Mesh(gateGeo(w, 4.2), panelMat);
       panel.position.y = 2.3;
-      const labelMat = new THREE.MeshBasicMaterial({ map: gateLabel(opt), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
+      const labelMat = new THREE.MeshBasicMaterial({ map: gateLabel(opt), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, forceSinglePass: true });
       const label = new THREE.Mesh(gateGeo(w * 0.9, w * 0.45), labelMat);
       label.position.set(0, 2.5, -0.06);
       label.rotation.y = Math.PI;
@@ -217,6 +217,8 @@ export class Game {
     this.endless = !!opts.endless;
     this.levelIdx = opts.levelIdx ?? 0;
     this.level = this.endless ? null : LEVELS[this.levelIdx];
+    this.diffId = DIFFICULTIES[opts.difficulty] ? opts.difficulty : DIFFICULTIES[save.settings.difficulty] ? save.settings.difficulty : 'medium';
+    this.diff = DIFFICULTIES[this.diffId];
     this.biome = this.endless ? pick(BIOMES) : this.level.biome;
     this.length = this.endless ? Infinity : this.level.length;
     this.quality = save.settings.quality;
@@ -306,8 +308,9 @@ export class Game {
     this.extendRoute(this.endless ? 600 : this.length - 45);
 
     this.audio.startMusic(this.biome);
-    if (this.endless) this.showBanner(t('banner.endless'), t('banner.endlessSub', { biome: this.biomeName() }));
-    else this.showBanner(this.level.name, t('banner.levelSub', { n: this.levelIdx + 1, len: this.length, boss: BOSSES[this.level.boss].name }));
+    const diffName = t('diff.' + this.diffId);
+    if (this.endless) this.showBanner(t('banner.endless'), `${diffName} · ${t('banner.endlessSub', { biome: this.biomeName() })}`);
+    else this.showBanner(this.level.name, `${diffName} · ${t('banner.levelSub', { n: this.levelIdx + 1, len: this.length, boss: BOSSES[this.level.boss].name })}`);
     this.resize(this.viewW, this.viewH);
     this.updateCamera(1);
     this.warmup(app.renderer);
@@ -333,9 +336,10 @@ export class Game {
   difficultyAt(z) { return this.endless ? Math.min(1, z / 3000) : clamp(z / this.length, 0, 1); }
 
   mulAt(z) {
-    if (this.endless) return { hp: (1 + z / 420 + Math.pow(z / 2500, 2)) * 0.72, dmg: 1 + z / 1600 };
+    const D = this.diff;
+    if (this.endless) return { hp: (1 + z / 420 + Math.pow(z / 2500, 2)) * 0.72 * D.hp, dmg: (1 + z / 1600) * D.dmg };
     const p = this.difficultyAt(z);
-    return { hp: this.level.mul * (1 + 1.6 * p) * 0.72, dmg: 1 + (this.level.mul - 1) * 0.5 + 0.3 * p };
+    return { hp: this.level.mul * (1 + 1.6 * p) * 0.72 * D.hp, dmg: (1 + (this.level.mul - 1) * 0.5 + 0.3 * p) * D.dmg };
   }
 
   poolAt(z) {
@@ -430,6 +434,7 @@ export class Game {
     let n = Math.round(5 + p * 6 + lvl * 0.6 + rand(0, 2));
     const big = ENEMIES[type].radius > 1.3;
     const ranged = !!ENEMIES[type].ranged;
+    n = Math.round(n * this.diff.count);
     if (big) n = Math.max(3, Math.round(n * 0.5));
     if (ranged) n = Math.max(3, Math.round(n * 0.6)); // 远程怪数量少一些
     const shapes = ['row', 'row', 'column', 'v', 'cluster', 'cluster', 'flank', 'swarm', 'swarm'];
@@ -584,7 +589,7 @@ export class Game {
     this.route.length = 0;
     this.hazards.clearZones();
     this.tele.clear();
-    this.boss = new Boss(this, type, 0, p.pos.z + 30, mul);
+    this.boss = new Boss(this, type, 0, p.pos.z + 30, { hp: mul.hp * this.diff.boss, dmg: mul.dmg * this.diff.bossDmg });
     this.enemies.push(this.boss);
     this.hud.showBoss(this.boss);
     this.audio.startMusic('boss');
@@ -647,7 +652,7 @@ export class Game {
     const stars = 1 + (hpR >= 0.5 ? 1 : 0) + (killRate >= 0.7 ? 1 : 0);
     this.after(3, () => {
       const coinsGained = this.stats.coins;
-      const reward = Math.round(this.level.reward * (0.6 + 0.2 * stars));
+      const reward = Math.round(this.level.reward * (0.6 + 0.2 * stars) * this.diff.coins);
       const firstClear = !save.cleared && this.levelIdx === LEVELS.length - 1;
       save.coins += coinsGained + reward;
       save.stars[this.levelIdx] = Math.max(save.stars[this.levelIdx] || 0, stars);
@@ -662,7 +667,7 @@ export class Game {
       this.app.onResult({
         win: true, stars, hpR, killRate, time: this.time, coins: coinsGained, reward, kills: this.stats.kills,
         maxCombo: this.stats.maxCombo, score: Math.round(this.stats.score), dmg: Math.round(this.stats.dmgDealt),
-        weaponLv: this.player.weapon.level, levelIdx: this.levelIdx, firstClear, final: this.levelIdx === LEVELS.length - 1,
+        weaponLv: this.player.weapon.level, levelIdx: this.levelIdx, firstClear, final: this.levelIdx === LEVELS.length - 1, difficulty: this.diffId,
       });
     });
   }
@@ -689,7 +694,7 @@ export class Game {
       this.app.onResult({
         win: false, endless: this.endless, dist, newBest, time: this.time, coins: this.stats.coins,
         kills: this.stats.kills, maxCombo: this.stats.maxCombo, score: Math.round(this.stats.score), dmg: Math.round(this.stats.dmgDealt),
-        weaponLv: this.player.weapon.level, levelIdx: this.levelIdx, progress: this.progress, bossReached: !!this.boss,
+        weaponLv: this.player.weapon.level, levelIdx: this.levelIdx, progress: this.progress, bossReached: !!this.boss, difficulty: this.diffId,
       });
     });
   }
@@ -1237,7 +1242,7 @@ export class Game {
     bendVec(pos);
     bendVec(look);
     look.x += (bendX(p.pos.z + 55) - bendX(p.pos.z + ahead)) * 0.35 * (1 - blend);
-    cam.roll = damp(cam.roll, clamp(curvature() * 14, -0.07, 0.07) * (1 - blend), 2, dt);
+    cam.roll = damp(cam.roll, this.juice.motion ? clamp(curvature() * 14, -0.07, 0.07) * (1 - blend) : 0, 2, dt);
     this.camera.position.copy(pos);
     this.camera.lookAt(look);
     this.camera.rotateZ(cam.roll);
@@ -1254,9 +1259,11 @@ export class Game {
     if (this.state === 'win' || this.state === 'intro') spd = 0;
     const rage = pl.buffs.rage > 0;
     if (rage) spd = Math.max(spd, 0.5);
-    J.speed = spd;
-    J.fov = spd * 12 + (rage ? 4 : 0);
-    J.radial = spd * 0.4;
+    // 速度感（视野变宽 / 速度线 / 径向模糊）只在打开“镜头晃动”时生效
+    const motion = this.juice.motion;
+    J.speed = motion ? spd : 0;
+    J.fov = motion ? spd * 12 + (rage ? 4 : 0) : 0;
+    J.radial = motion ? spd * 0.4 : 0;
     J.tint = rage ? 0.4 : 0;
     const low = pl.alive ? clamp(1 - pl.hp / (pl.stats.maxHp * 0.3), 0, 1) : 1;
     J.desat = pl.alive ? low * 0.35 : 0.75;
@@ -1316,8 +1323,8 @@ export class Game {
     // 强化门文字（贴图 + 双面透明）
     const tex = new THREE.CanvasTexture(document.createElement('canvas'));
     tex.colorSpace = THREE.SRGBColorSpace;
-    tmp.add(new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false })));
-    tmp.add(new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, fog: false })));
+    tmp.add(new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, forceSinglePass: true })));
+    tmp.add(new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, fog: false, forceSinglePass: true })));
     tmp.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ fog: false })));
     tmp.add(new THREE.Mesh(new THREE.CylinderGeometry(), new THREE.MeshStandardMaterial({ color: 0x3a3a44, metalness: 0.4, roughness: 0.5 })));
     const kinds = [[this.rider.weapon.type], ['wave', undefined, 5], ['wave', undefined, 7], ['meteor'], ['venom'], ['spike']];
@@ -1358,13 +1365,20 @@ export class Game {
       renderer.compile(this.scene, this.camera);
       // Metal 等驱动要到第一次真正绘制时才创建渲染管线：离屏实际画一帧
       renderer.render(this.scene, this.camera);
-      if (composer) { renderer.setRenderTarget(null); renderer.compile(this.scene, this.camera); }
+      if (composer) {
+        // 打击感后期平时关着，第一次闪光 / 色差时才会用到：也在这里先画一次
+        const jp = this.app.juice && this.app.juice.pass;
+        if (jp) jp.render(renderer, composer.writeBuffer, composer.readBuffer, 0, false);
+        renderer.setRenderTarget(null); renderer.compile(this.scene, this.camera);
+      }
     } catch { /* ignore */ }
     renderer.setRenderTarget(prevRT);
     for (const im of inst) im.count = 0;
     this.player.shield.visible = false;
     this.tele.remove(tele);
     this.scene.remove(tmp);
+    // 归还预热模型占用的骨骼（图集里的位置 / 独立骨骼贴图）
+    tmp.traverse((o) => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); });
     // 注意：不要 dispose 这些材质——three.js 会随材质一起删除着色器程序，预编译就白做了
     void models;
   }
@@ -1419,7 +1433,7 @@ export class Game {
     this.hazards.dispose();
     this.juice.reset();
     this.audio.setMusicRate(1);
-    this.tele.clear();
+    this.tele.dispose();
     this.text.clear();
     this.hud.dispose();
     this.track.dispose();

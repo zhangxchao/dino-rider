@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
 import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED } from './data.js';
-import { clamp, damp, prepareModel, mergeStaticMeshes } from './util.js';
+import { clamp, damp, prepareModel, mergeStaticMeshes, rigidSkin } from './util.js';
 import { createShield, Afterimages } from './effects.js';
 import { t } from './i18n.js';
 import { curvature } from './bend.js';
@@ -62,18 +62,23 @@ export class Player {
     this.riderModel.root.scale.setScalar(dinoDef.riderScale || 1);
     this.model.saddle.add(this.riderModel.root);
     this.root = this.model.root;
-    // 合并不会动的零件，减少 draw call
-    mergeStaticMeshes(this.root, () => {
-      let t = 0;
-      for (const a of [-1, 0.2, 0.5, 0.9]) for (const sk of [-1, 0.3, 0.7]) for (const mv of [0, 1, 1.7]) {
-        t += 0.23;
-        this.model.update(0.1, { t, move: mv, air: sk > 0.5, attack: a, skill: sk, hurt: a > 0.4 ? 1 : 0, dead: 0 });
-        this.riderModel.update(0.1, { t, bounce: mv, shoot: a, cheer: sk > 0.5, lean: mv - 0.8 });
-      }
-      this.model.update(0.1, { t: t + 1, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0.8 });
+    // 合并不会动的零件，再把会动的零件合成刚体蒙皮网格，减少 draw call（投影也少画一半以上）
+    const steps = [];
+    let t = 0;
+    for (const a of [-1, 0.2, 0.5, 0.9]) for (const sk of [-1, 0.3, 0.7]) for (const mv of [0, 1, 1.7]) {
+      const tt = (t += 0.23);
+      steps.push(() => {
+        this.model.update(0.1, { t: tt, move: mv, air: sk > 0.5, attack: a, skill: sk, hurt: a > 0.4 ? 1 : 0, dead: 0 });
+        this.riderModel.update(0.1, { t: tt, bounce: mv, shoot: a, cheer: sk > 0.5, lean: mv - 0.8 });
+      });
+    }
+    steps.push(() => this.model.update(0.1, { t: t + 1, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0.8 }));
+    steps.push(() => {
       this.model.update(0.1, { t: t + 2, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0 });
       this.riderModel.update(0.1, { t: t + 2, bounce: 0, shoot: -1, cheer: false, lean: 0 });
     });
+    mergeStaticMeshes(this.root, () => steps.forEach((f) => f()));
+    rigidSkin(this.root, steps);
     game.scene.add(this.root);
     this.flash = prepareModel(this.root, { cast: true });
     this.afterimages = new Afterimages(game.scene, this.root, 4);
@@ -898,5 +903,6 @@ export class Player {
     this.shield.geometry.dispose();
     this.shield.material.dispose();
     this.afterimages.dispose();
+    this.root.traverse((o) => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); });
   }
 }

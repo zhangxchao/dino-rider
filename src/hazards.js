@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { DINOS, RUN_SPEED } from './data.js';
 import { createDinoModel } from './models/dinos.js';
-import { clamp, damp, rand, pick, mergeStaticMeshes } from './util.js';
+import { clamp, damp, rand, pick, mergeStaticMeshes, rigidSkin } from './util.js';
 import { t } from './i18n.js';
 
 const _v = new THREE.Vector3();
@@ -67,6 +67,14 @@ const STRIKE_T = 0.95;
 // —— 恐龙宝宝 ——
 const BABY_LIFE = 20;
 const BABY_SCALE = 0.42;
+function removeBaby(g, b) {
+  g.scene.remove(b.model.root);
+  b.model.root.traverse((o) => {
+    if (o.material) o.material.dispose();
+    if (o.userData.mergedGeo && o.geometry) o.geometry.dispose();
+    if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose();
+  });
+}
 
 export class Hazards {
   constructor(game) {
@@ -255,11 +263,12 @@ export class Hazards {
       const model = createDinoModel(def);
       model.root.scale.multiplyScalar(BABY_SCALE);
       // 合并不会动的零件（同一种恐龙缓存复用），不投射实时阴影，改用圆形投影
-      mergeStaticMeshes(model.root, () => {
-        let tt = 0;
-        for (const a of [-1, 0.5]) for (const mv of [0, 1, 1.7]) { tt += 0.23; model.update(0.1, { t: tt, move: mv, air: false, attack: a, skill: -1, hurt: 0, dead: 0 }); }
-        model.update(0.1, { t: tt + 1, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0 });
-      }, 'baby:' + def.id);
+      const steps = [];
+      let tt = 0;
+      for (const a of [-1, 0.5]) for (const mv of [0, 1, 1.7]) { const t0 = (tt += 0.23); steps.push(() => model.update(0.1, { t: t0, move: mv, air: false, attack: a, skill: -1, hurt: 0, dead: 0 })); }
+      steps.push(() => model.update(0.1, { t: tt + 1, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0 }));
+      mergeStaticMeshes(model.root, () => steps.forEach((f) => f()), 'baby:' + def.id);
+      rigidSkin(model.root, steps, 'baby:' + def.id, { atlas: true });
       model.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
       g.scene.add(model.root);
       const b = {
@@ -283,7 +292,7 @@ export class Hazards {
       b.anim.t += dt;
       if (b.life <= 0 || !p.alive) {
         g.fx.sparks.burst(b.pos, { count: 24, speed: 4, life: 0.6, size: 0.8, color: 0xffffff, color2: 0xffd0f0, up: 3 });
-        g.scene.remove(b.model.root);
+        removeBaby(g, b);
         this.babies.splice(i, 1);
         continue;
       }
@@ -413,7 +422,7 @@ export class Hazards {
     const g = this.game;
     for (const r of this.ramps) g.scene.remove(r.grp);
     for (const s of this.strikes) if (s.mesh) g.scene.remove(s.mesh);
-    for (const b of this.babies) g.scene.remove(b.model.root);
+    for (const b of this.babies) removeBaby(g, b);
     this.ramps.length = 0; this.strikes.length = 0; this.babies.length = 0;
     this.rampMat.dispose(); this.chevMat.dispose(); this.chevTex.dispose(); this.hazMat.dispose();
   }

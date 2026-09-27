@@ -348,3 +348,12 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .hud-right .hud-stats { margin-top: 4px; }
 
 #fps-meter { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 50; padding: 3px 10px; border-radius: 8px; background: rgba(0,0,0,.6); font: 700 12px/1.4 ui-monospace, Menlo, monospace; color: #8f8; pointer-events: none; display: none; }
+
+/* ---------------- 难度 ---------------- */
+#s-levels .diff-bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-radius: 14px; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.12); animation: popIn .45s ease both; }
+#s-levels .diff-label { font-weight: 900; font-size: 16px; text-shadow: 0 2px 6px #000; }
+#s-levels .diff-bar .seg button { font-size: 15px; padding: 8px 16px; }
+#s-levels .diff-desc { color: #ffe6b0; font-size: 13.5px; font-weight: 700; text-shadow: 0 1px 4px #000; }
+.diff-tag { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 2px 10px; border-radius: 99px; font-size: 14px; letter-spacing: 0; background: rgba(255,255,255,.14); color: #fff; }
+.diff-tag.easy { background: rgba(98,227,127,.25); color: #b8ffc8; }
+.diff-tag.hard { background: rgba(255,90,60,.3); color: #ffc0b0; }

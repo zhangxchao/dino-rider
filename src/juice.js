@@ -89,6 +89,8 @@ export class Juice {
     this.flashCol = new THREE.Color(1, 1, 1);
     this.t = 0;
     this.css = null;
+    // 镜头动感（视野冲击 / 径向模糊 / 速度线 / 过弯侧倾）容易让人头晕：跟随设置里的“镜头晃动”开关，默认关闭
+    this.motion = false;
   }
 
   /** 由 main.js 插入 composer（泛光之后） */
@@ -103,9 +105,9 @@ export class Juice {
     this.k.flash = Math.min(0.8, Math.max(this.k.flash, a));
   }
   aberr(a) { a *= FX.screen; this.k.aberr = Math.min(2, this.k.aberr + a); }
-  radial(a) { a *= FX.screen; this.k.radial = Math.min(2, this.k.radial + a); }
+  radial(a) { if (!this.motion) return; a *= FX.screen; this.k.radial = Math.min(2, this.k.radial + a); }
   /** 正值拉远（视野变宽，速度感），负值推近（冲击） */
-  fovKick(deg) { deg *= 0.4 + 0.6 * FX.screen; this.fovVel = Math.max(-60, Math.min(60, this.fovVel + deg * 9)); }
+  fovKick(deg) { if (!this.motion) return; deg *= 0.4 + 0.6 * FX.screen; this.fovVel = Math.max(-60, Math.min(60, this.fovVel + deg * 9)); }
   bloom(a) { a *= FX.screen; this.k.bloom = Math.min(0.9, this.k.bloom + a); }
   setTint(color) { this.u.uTint.value.set(color); }
 

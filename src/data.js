@@ -370,6 +370,18 @@ export const LEVELS = [
 export const RUN_SPEED = 17;      // 前进速度（米/秒）
 
 // ---------------------------------------------------------------------
+//  难度：中等 = 原始数值
+//  hp / dmg：小怪、路障、天灾的血量与伤害；boss / bossDmg：首领
+//  count：每波怪物数量；rest：首领出招间隔、远程怪射击间隔；coins：通关奖励倍率
+// ---------------------------------------------------------------------
+export const DIFFICULTIES = {
+  easy:   { hp: 0.7, dmg: 0.55, count: 0.8, boss: 0.7, bossDmg: 0.6,  rest: 1.35, coins: 1 },
+  medium: { hp: 1,   dmg: 1,    count: 1,   boss: 1,   bossDmg: 1,    rest: 1,    coins: 1 },
+  hard:   { hp: 1.4, dmg: 1.5,  count: 1.2, boss: 1.4, bossDmg: 1.45, rest: 0.8,  coins: 1.5 },
+};
+export const DIFFICULTY_IDS = ['easy', 'medium', 'hard'];
+
+// ---------------------------------------------------------------------
 //  武器成长：击败怪物获得经验，逐级强化骑手武器（每关重新开始）
 // ---------------------------------------------------------------------
 export const WEAPON_LEVELS = [

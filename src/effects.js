@@ -224,7 +224,8 @@ export class Rings {
   _get(kind) {
     let m = this.pool.find((p) => p.userData.kind === kind);
     if (m) { this.pool.splice(this.pool.indexOf(m), 1); m.visible = true; return m; }
-    const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+    // 半透明双面材质默认会先画背面再画正面（两次绘制 + 每帧重算着色器参数）；加法混合与顺序无关，单遍即可
+    const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, forceSinglePass: true });
     m = new THREE.Mesh(kind === 'ring' ? ringGeo : kind === 'disc' ? discGeo : pillarGeo, mat);
     m.userData.kind = kind;
     m.renderOrder = 15;
@@ -339,33 +340,41 @@ export class Telegraphs {
     this.heightAt = heightAt;
     this.items = [];
     this.time = 0;
+    // 网格 / 材质对象池：材质一旦全部销毁，three.js 会连着色器程序一起释放，
+    // 下一个预警又要重新编译（首领战中每次出招卡顿 100~200ms），所以用完放回池里复用
+    this.pool = [];
   }
   /**
    * shape: 'circle' { x, z, radius } | 'rect' { x, z, angle, length, width }（x,z 为起点）| 'sector' { x, z, angle, radius, half }
    */
   add(o) {
-    const geo = new THREE.PlaneGeometry(1, 1, TELE_SEG, TELE_SEG);
-    const mat = new THREE.ShaderMaterial({
-      vertexShader: TELE_VS, fragmentShader: TELE_FS, transparent: true, depthWrite: false,
-      uniforms: {
-        uColor: { value: new THREE.Color(o.color ?? 0xff3030) },
-        uProgress: { value: 0 },
-        uShape: { value: o.shape === 'rect' ? 1 : o.shape === 'sector' ? 2 : 0 },
-        uTime: { value: 0 },
-        uHalf: { value: o.half ?? 0.6 },
-      },
-      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide,
-    });
-    const m = new THREE.Mesh(geo, mat);
-    m.renderOrder = 5;
-    m.frustumCulled = false;
-    this.scene.add(m);
-    const it = { m, geo, o: { ...o }, t: 0, duration: o.duration ?? 1, done: false };
+    let res = this.pool.pop();
+    if (!res) {
+      const geo = new THREE.PlaneGeometry(1, 1, TELE_SEG, TELE_SEG);
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: TELE_VS, fragmentShader: TELE_FS, transparent: true, depthWrite: false,
+        uniforms: { uColor: { value: new THREE.Color() }, uProgress: { value: 0 }, uShape: { value: 0 }, uTime: { value: 0 }, uHalf: { value: 0.6 } },
+        polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide, forceSinglePass: true,
+      });
+      const m = new THREE.Mesh(geo, mat);
+      m.renderOrder = 5;
+      m.frustumCulled = false;
+      res = { m, geo };
+    }
+    const u = res.m.material.uniforms;
+    u.uColor.value.set(o.color ?? 0xff3030);
+    u.uProgress.value = 0;
+    u.uShape.value = o.shape === 'rect' ? 1 : o.shape === 'sector' ? 2 : 0;
+    u.uTime.value = this.time;
+    u.uHalf.value = o.half ?? 0.6;
+    this.scene.add(res.m);
+    // 每次返回新的句柄：调用方持有的过期句柄（done）不会影响复用后的网格
+    const it = { m: res.m, geo: res.geo, res, o: { ...o }, t: 0, duration: o.duration ?? 1, done: false };
     this._conform(it);
     this.items.push(it);
     return it;
   }
-  move(it, x, z) { it.o.x = x; it.o.z = z; this._conform(it); }
+  move(it, x, z) { if (it.done) return; it.o.x = x; it.o.z = z; this._conform(it); }
   _conform(it) {
     const o = it.o;
     const pos = it.geo.attributes.position;
@@ -400,13 +409,19 @@ export class Telegraphs {
       it.m.material.uniforms.uTime.value = this.time;
       it.m.material.uniforms.uProgress.value = Math.min(1, it.t / it.duration);
       if (it.done || it.t > it.duration + (it.o.linger ?? 0.05)) {
-        this.scene.remove(it.m); it.geo.dispose(); it.m.material.dispose();
+        this.scene.remove(it.m);
+        this.pool.push(it.res);
         it.done = true;
         this.items.splice(i, 1);
       }
     }
   }
   clear() { for (const it of this.items) it.done = true; this.update(0); }
+  dispose() {
+    this.clear();
+    for (const r of this.pool) { r.geo.dispose(); r.m.material.dispose(); }
+    this.pool.length = 0;
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -435,7 +450,7 @@ export function createShield(color = 0xffd060) {
         gl_FragColor = vec4(uColor * (1.2 + f), a);
         #include <colorspace_fragment>
       }`,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, forceSinglePass: true,
   });
   const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 3), mat);
   m.renderOrder = 25;
@@ -830,7 +845,7 @@ export class Streaks {
   constructor(scene, max = 260) {
     this.max = max;
     this.tex = streakTexture();
-    const mat = new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+    const mat = new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, forceSinglePass: true });
     this.mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).translate(-0.5, 0, 0), mat, max);
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
     this.mesh.frustumCulled = false;

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { ENEMIES, BOSSES } from './data.js';
 import { createEnemyModel, createBossModel } from './models/enemies.js';
-import { clamp, damp, turnToward, prepareModel, rand, pick, mergeStaticMeshes } from './util.js';
+import { clamp, damp, turnToward, prepareModel, rand, pick, mergeStaticMeshes, rigidSkin } from './util.js';
 import { t } from './i18n.js';
 
 const _v = new THREE.Vector3();
@@ -35,15 +35,19 @@ const BOSS_STATES = (() => {
   return out;
 })();
 
-/** 创建怪物模型并合并静态零件（同种怪共享合并结果） */
+/** 创建怪物模型：合并静态零件，再把会动的零件合成刚体蒙皮网格（同种怪共享合并结果） */
 export function buildEnemyModel(type) {
   const model = createEnemyModel(type, ENEMIES[type]);
-  mergeStaticMeshes(model.root, () => { for (const st of ENEMY_STATES) model.update(0.1, st); }, 'e:' + type);
+  const steps = ENEMY_STATES.map((st) => () => model.update(0.1, st));
+  mergeStaticMeshes(model.root, () => steps.forEach((f) => f()), 'e:' + type);
+  rigidSkin(model.root, steps, 'e:' + type, { atlas: true });
   return model;
 }
 export function buildBossModel(type) {
   const model = createBossModel(type, BOSSES[type]);
-  mergeStaticMeshes(model.root, () => { for (const st of BOSS_STATES) model.update(0.1, st); }, 'b:' + type);
+  const steps = BOSS_STATES.map((st) => () => model.update(0.1, st));
+  mergeStaticMeshes(model.root, () => steps.forEach((f) => f()), 'b:' + type);
+  rigidSkin(model.root, steps, 'b:' + type);
   return model;
 }
 
@@ -51,6 +55,7 @@ function disposeModel(root) {
   root.traverse((o) => {
     if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
     if (o.userData.mergedGeo && o.geometry) o.geometry.dispose();
+    if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose();
   });
 }
 
@@ -231,7 +236,7 @@ export class Enemy {
           if (this.atkT >= 1) this.atkT = -1;
         } else {
           this.atkCd -= dt;
-          if (this.atkCd <= 0 && dz > 9 && dz < R) { this.atkT = 0; this.atkHit = false; this.atkCd = this.def.atkCd * rand(1.1, 1.6); }
+          if (this.atkCd <= 0 && dz > 9 && dz < R) { this.atkT = 0; this.atkHit = false; this.atkCd = this.def.atkCd * rand(1.1, 1.6) * this.game.diff.rest; }
         }
         if (this.def.teleport) {
           this.teleCd -= dt;
@@ -989,7 +994,7 @@ export class Boss {
     if (P.t >= P.dur) {
       this.endPattern();
       this.anim.burrow = 0;
-      this.patternCd = rand(1.2, 2.2) * (1 - 0.18 * (ph - 1));
+      this.patternCd = rand(1.2, 2.2) * (1 - 0.18 * (ph - 1)) * this.game.diff.rest;
     }
     return out;
   }

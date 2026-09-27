@@ -18,15 +18,35 @@ import { setFxLevel } from './effects.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
+const _groupOf = new WeakMap();
+const _groupIds = new Map();
+function programGroup(item) {
+  const m = item.material, o = item.object;
+  let k = _groupOf.get(m);
+  if (k === undefined) {
+    const sig = [m.type, m.vertexColors, m.flatShading, m.side, !!m.map, !!m.emissiveMap, m.fog, m.onBeforeCompile && m.onBeforeCompile.name].join('|');
+    k = _groupIds.get(sig);
+    if (k === undefined) { k = _groupIds.size + 1; _groupIds.set(sig, k); }
+    _groupOf.set(m, k);
+  }
+  return k * 4 + (o.isSkinnedMesh ? 1 : 0) + (o.isInstancedMesh ? 2 : 0);
+}
+
 class App {
   constructor() {
     this.canvas = document.getElementById('game');
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
+    // 高画质经过后期处理：场景画在离屏缓冲里，屏幕缓冲的多重采样只会白白消耗显存带宽；
+    // 流畅画质直接画到屏幕上，才需要开抗锯齿（切换画质后下次打开生效）
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: save.settings.quality !== 'high', powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // 不透明物体先按“着色器程序”分组再排序：默认按材质编号排，每只怪物各有一套材质，
+    // 画的时候着色器会来回切换（每次切换还要重新上传一遍矩阵等 uniform）
+    this.renderer.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder
+      || programGroup(a) - programGroup(b) || a.material.id - b.material.id || a.z - b.z || a.id - b.id);
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1500);
@@ -92,6 +112,7 @@ class App {
     this.setPixelRatio(this.dyn.pr);
     this.useComposer = s.quality === 'high';
     setFxLevel(s.fx || 'medium');
+    this.juice.motion = !!s.shake;
     if (this.game) this.game.shake.enabled = s.shake;
     this.fpsEl.style.display = s.showFps ? 'block' : 'none';
   }

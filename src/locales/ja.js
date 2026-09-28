@@ -336,7 +336,7 @@ export default {
       9: { name: 'クアッドショット' }, 10: { name: '究極武装' },
     },
     gates: {
-      count: { name: '弾数 +1' }, rate: { name: '連射 +25%' }, dmg: { name: '威力 +30%' }, pierce: { name: '貫通 +1' },
+      count: { name: '弾数 +1' }, rate: { name: '連射 +15%' }, dmg: { name: '威力 +20%' }, pierce: { name: '貫通 +1' },
       heal: { name: 'HP 40% 回復' }, shield: { name: 'シールド 8秒' }, skill: { name: 'スキルチャージ' }, xp: { name: '武器経験値 +25' }, magnet: { name: 'マグネット 10秒' }, gamble: { name: '運命のダイス' },
     },
     biomes: { jungle: 'ジャングル', desert: '砂漠', frost: '雪原', swamp: '沼地', volcano: '火山', shadow: '影', hive: '虫の巣' },
@@ -345,7 +345,7 @@ export default {
       atk: { name: '牙みがき', desc: '近接ダメージ +10%' },
       def: { name: '分厚い皮', desc: '被ダメージ -4%' },
       speed: { name: '疾風の脚', desc: '移動速度 +5%' },
-      rider: { name: 'ライダー特訓', desc: 'ライダー武器ダメージ +12%' },
+      rider: { name: 'ライダー特訓', desc: 'ライダー武器ダメージ +8%' },
       cdr: { name: '太古の知恵', desc: 'スキルクールダウン -6%' },
       magnet: { name: '磁力の牙', desc: '拾える範囲 +25%' },
     },

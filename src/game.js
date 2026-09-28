@@ -1,6 +1,6 @@
 // 一局游戏（跑道模式）：沿路线自动前进，怪物从前方涌来，终点首领战
 import * as THREE from 'three';
-import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, DIFFICULTIES } from './data.js';
+import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, DIFFICULTIES, BALANCE } from './data.js';
 import { createTrack } from './track.js';
 import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars, Debris, Scorch, LightFlashes, Streaks } from './effects.js';
 import { Projectiles } from './projectiles.js';
@@ -337,9 +337,9 @@ export class Game {
 
   mulAt(z) {
     const D = this.diff;
-    if (this.endless) return { hp: (1 + z / 420 + Math.pow(z / 2500, 2)) * 0.72 * D.hp, dmg: (1 + z / 1600) * D.dmg };
+    if (this.endless) return { hp: (1 + z / 420 + Math.pow(z / 2500, 2)) * 0.72 * D.hp, dmg: (1 + z / 1600) * D.dmg * BALANCE.enemyDmg };
     const p = this.difficultyAt(z);
-    return { hp: this.level.mul * (1 + 1.6 * p) * 0.72 * D.hp, dmg: (1 + (this.level.mul - 1) * 0.5 + 0.3 * p) * D.dmg };
+    return { hp: this.level.mul * (1 + 1.6 * p) * 0.72 * D.hp, dmg: (1 + (this.level.mul - 1) * 0.5 + 0.3 * p) * D.dmg * BALANCE.enemyDmg };
   }
 
   poolAt(z) {
@@ -589,7 +589,7 @@ export class Game {
     this.route.length = 0;
     this.hazards.clearZones();
     this.tele.clear();
-    this.boss = new Boss(this, type, 0, p.pos.z + 30, { hp: mul.hp * this.diff.boss, dmg: mul.dmg * this.diff.bossDmg });
+    this.boss = new Boss(this, type, 0, p.pos.z + 30, { hp: mul.hp * this.diff.boss * BALANCE.bossHp, dmg: mul.dmg * this.diff.bossDmg * BALANCE.bossDmg });
     this.enemies.push(this.boss);
     this.hud.showBoss(this.boss);
     this.audio.startMusic('boss');

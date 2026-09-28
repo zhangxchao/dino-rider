@@ -222,21 +222,21 @@ export const RIDERS = [
     id: 'knight', name: '圣光骑士', en: 'Knight',
     desc: '身披银甲的骑士，投出贯穿敌阵的圣光长枪。',
     colors: { main: 0xc8ccd6, accent: 0x2a4ab0, skin: 0xf2c9a0, extra: 0xffd24a },
-    weapon: { type: 'spear', name: '圣光投枪', dmg: 16, cd: 0.75, speed: 44, count: 1, spread: 0, pierce: 3, color: 0xffe27a },
+    weapon: { type: 'spear', name: '圣光投枪', dmg: 19, cd: 0.75, speed: 44, count: 1, spread: 0, pierce: 3, color: 0xffe27a },
     bonus: { def: 0.08 }, bonusText: '减伤 +8%',
   },
   {
     id: 'elf', name: '精灵弓手', en: 'Elf Archer',
     desc: '森林中的神射手，一次射出三支精灵之箭。',
     colors: { main: 0x3f8a4a, accent: 0x8a5a2a, skin: 0xf6d8b8, extra: 0xf0e070 },
-    weapon: { type: 'arrow', name: '三重精灵箭', dmg: 6.5, cd: 0.55, speed: 58, count: 3, spread: 14, color: 0x9cff7a },
+    weapon: { type: 'arrow', name: '三重精灵箭', dmg: 7.5, cd: 0.55, speed: 58, count: 3, spread: 14, color: 0x9cff7a },
     bonus: { crit: 0.15 }, bonusText: '暴击率 +15%',
   },
   {
     id: 'wizard', name: '烈焰法师', en: 'Fire Wizard',
     desc: '掌控火焰的大法师，火球落地爆炸灼烧敌人。',
     colors: { main: 0x6a2ab0, accent: 0xffc400, skin: 0xf2c9a0, extra: 0xeeeeee },
-    weapon: { type: 'fireball', name: '爆裂火球', dmg: 15, cd: 0.9, speed: 28, count: 1, aoe: 4, burn: 3, color: 0xff7a2a },
+    weapon: { type: 'fireball', name: '爆裂火球', dmg: 17, cd: 0.9, speed: 28, count: 1, aoe: 4, burn: 3, color: 0xff7a2a },
     bonus: { cdr: 0.15 }, bonusText: '技能冷却 -15%',
   },
   {
@@ -250,42 +250,42 @@ export const RIDERS = [
     id: 'cowboy', name: '西部牛仔', en: 'Cowboy',
     desc: '荒野快枪手，左轮子弹又快又准。',
     colors: { main: 0x8a5a2a, accent: 0x3a6aa0, skin: 0xe8b890, extra: 0xd0a050 },
-    weapon: { type: 'bullet', name: '快枪连射', dmg: 11, cd: 0.33, speed: 75, count: 1, color: 0xffd070 },
+    weapon: { type: 'bullet', name: '快枪连射', dmg: 9.5, cd: 0.33, speed: 75, count: 1, color: 0xffd070 },
     bonus: { crit: 0.2 }, bonusText: '暴击率 +20%',
   },
   {
     id: 'ninja', name: '暗影忍者', en: 'Ninja',
     desc: '来无影去无踪的忍者，手里剑能在敌人间弹射。',
     colors: { main: 0x22242e, accent: 0xd02a3a, skin: 0xf2c9a0, extra: 0xc0c8ff },
-    weapon: { type: 'shuriken', name: '弹射手里剑', dmg: 9, cd: 0.4, speed: 42, count: 1, bounce: 3, color: 0xc0c8ff },
+    weapon: { type: 'shuriken', name: '弹射手里剑', dmg: 8, cd: 0.4, speed: 42, count: 1, bounce: 2, color: 0xc0c8ff },
     bonus: { speed: 0.15 }, bonusText: '移动速度 +15%',
   },
   {
     id: 'mecha', name: '机甲战士', en: 'Mecha Pilot',
     desc: '驾驶小型机甲的少年，发射自动追踪导弹。',
     colors: { main: 0xe04a3a, accent: 0xf0f0f0, skin: 0xf2c9a0, extra: 0x46e0ff },
-    weapon: { type: 'missile', name: '追踪导弹', dmg: 14, cd: 1.0, speed: 30, count: 2, spread: 30, homing: 5, aoe: 3, color: 0xff5a3a },
+    weapon: { type: 'missile', name: '追踪导弹', dmg: 13, cd: 1.0, speed: 30, count: 2, spread: 30, homing: 5, aoe: 3, color: 0xff5a3a },
     bonus: { hp: 0.1 }, bonusText: '最大生命 +10%',
   },
   {
     id: 'princess', name: '冰雪公主', en: 'Ice Princess',
     desc: '来自北境的公主，冰晶魔法能冻结敌人。',
     colors: { main: 0x8ad0ff, accent: 0xffffff, skin: 0xf8dcc8, extra: 0xc0a0ff },
-    weapon: { type: 'ice', name: '冰晶之刺', dmg: 11, cd: 0.6, speed: 40, count: 1, slow: 0.5, slowTime: 2.5, color: 0xaaddff },
+    weapon: { type: 'ice', name: '冰晶之刺', dmg: 16, cd: 0.6, speed: 40, count: 1, slow: 0.5, slowTime: 2.5, color: 0xaaddff },
     bonus: { regen: 1.5 }, bonusText: '每秒回复 1.5 生命',
   },
   {
     id: 'caveman', name: '原始人阿猛', en: 'Caveman',
     desc: '力大无穷的原始部落勇士，投掷巨石砸扁敌人。',
     colors: { main: 0xa06a3a, accent: 0xe0c080, skin: 0xd8a070, extra: 0x5a3a1a },
-    weapon: { type: 'rock', name: '投石重击', dmg: 24, cd: 1.1, speed: 26, count: 1, aoe: 3, arc: true, color: 0x9a8a7a },
+    weapon: { type: 'rock', name: '投石重击', dmg: 27, cd: 1.1, speed: 26, count: 1, aoe: 3, arc: true, color: 0x9a8a7a },
     bonus: { atk: 0.12 }, bonusText: '近战伤害 +12%',
   },
   {
     id: 'pirate', name: '海盗船长', en: 'Pirate Captain',
     desc: '纵横七海的海盗船长，手持炮弹爆破一切。',
     colors: { main: 0x8a1a2a, accent: 0x1a1a1a, skin: 0xe8b890, extra: 0xffd24a },
-    weapon: { type: 'cannon', name: '爆破炮弹', dmg: 30, cd: 1.4, speed: 34, count: 1, aoe: 5, knock: 8, color: 0x333333 },
+    weapon: { type: 'cannon', name: '爆破炮弹', dmg: 34, cd: 1.4, speed: 34, count: 1, aoe: 5, knock: 8, color: 0x333333 },
     bonus: { coins: 0.25 }, bonusText: '金币收益 +25%',
   },
 ];
@@ -327,9 +327,9 @@ export const BOSSES = {
                 patterns: ['burrow', 'volley', 'slam', 'barrage'], summon: ['scorpion'], projColor: 0xffc04a, color: 0xc09060 },
   frostGiant: { name: '冰霜巨人', title: '永冻之王',   hp: 7500, dmg: 26, speed: 5, radius: 3.2, height: 8,
                 patterns: ['slam', 'barrage', 'summon', 'volley'], summon: ['wolf'], projColor: 0x9ae0ff, color: 0x8ab8e0 },
-  hydra:      { name: '沼泽三头蛇', title: '迷雾梦魇', hp: 9000, dmg: 24, speed: 4.5, radius: 3.5, height: 7,
+  hydra:      { name: '沼泽三头蛇', title: '迷雾梦魇', hp: 8000, dmg: 22, speed: 4.5, radius: 3.5, height: 7,
                 patterns: ['breath', 'volley', 'barrage', 'summon'], summon: ['mushroom', 'wisp'], projColor: 0x7aff4a, color: 0x3a6a4a },
-  magmaGolem: { name: '熔岩巨魔', title: '火山之心',   hp: 10500, dmg: 30, speed: 5, radius: 3.6, height: 8,
+  magmaGolem: { name: '熔岩巨魔', title: '火山之心',   hp: 10500, dmg: 26, speed: 5, radius: 3.6, height: 8,
                 patterns: ['slam', 'meteor', 'charge', 'volley'], summon: ['imp'], projColor: 0xff6a1a, color: 0x3a2a2a },
   overlord:   { name: '暗影魔王', title: '远古终焉',   hp: 12500, dmg: 32, speed: 6, radius: 3.0, height: 7,
                 patterns: ['barrage', 'volley', 'meteor', 'summon', 'charge', 'slam', 'breath'], summon: ['skeleton', 'mage', 'darkKnight'],
@@ -382,6 +382,20 @@ export const DIFFICULTIES = {
 export const DIFFICULTY_IDS = ['easy', 'medium', 'hard'];
 
 // ---------------------------------------------------------------------
+//  整体平衡（所有难度共用，难度倍率再乘在上面）—— 数值来自机器人实测
+// ---------------------------------------------------------------------
+export const BALANCE = {
+  riderDmg: 0.9,   // 骑手武器伤害总倍率
+  riderUpg: 0.08,   // 升级工坊「骑手特训」每级加成
+  gateDmg: 0.2,     // 伤害门
+  gateRate: 0.15,   // 射速门
+  bossHp: 1.8,      // 首领血量
+  bossDmg: 1.0,     // 首领伤害
+  bossRest: 0.9,   // 首领出招间隔
+  enemyDmg: 1.0,    // 小怪 / 路障 / 天灾伤害
+};
+
+// ---------------------------------------------------------------------
 //  武器成长：击败怪物获得经验，逐级强化骑手武器（每关重新开始）
 // ---------------------------------------------------------------------
 export const WEAPON_LEVELS = [
@@ -399,13 +413,13 @@ export const WEAPON_LEVELS = [
 ];
 export const WEAPON_MAX = WEAPON_LEVELS.length - 1;
 // XP_NEED[lv] = 从 lv 升到 lv+1 所需经验
-export const XP_NEED = [0, 16, 26, 36, 48, 60, 72, 86, 100, 118, Infinity];
+export const XP_NEED = [0, 16, 26, 36, 48, 60, 72, 86, 100, 118, Infinity].map((v) => Math.round(v * 1.1));
 
 // 强化门（路上二选一）
 export const GATES = {
   count:  { icon: '➕', name: '弹道 +1',    color: 0x3ab8ff },
-  rate:   { icon: '⚡', name: '射速 +25%',  color: 0xffc830 },
-  dmg:    { icon: '💥', name: '伤害 +30%',  color: 0xff5a3a },
+  rate:   { icon: '⚡', name: '射速 +15%',  color: 0xffc830 },
+  dmg:    { icon: '💥', name: '伤害 +20%',  color: 0xff5a3a },
   pierce: { icon: '🗡️', name: '穿透 +1',    color: 0xb070ff },
   heal:   { icon: '❤️', name: '回复 40% 生命', color: 0x50e070 },
   shield: { icon: '🛡️', name: '护盾 8 秒',  color: 0xffe070 },
@@ -427,7 +441,7 @@ export const UPGRADES = [
   { id: 'atk',    icon: '🦷', name: '利齿打磨', desc: '近战伤害 +10%',     max: 10, base: 60, step: 45 },
   { id: 'def',    icon: '🛡️', name: '厚皮护甲', desc: '受到伤害 -4%',       max: 8,  base: 70, step: 55 },
   { id: 'speed',  icon: '💨', name: '疾风之腿', desc: '移动速度 +5%',      max: 6,  base: 50, step: 45 },
-  { id: 'rider',  icon: '🎯', name: '骑手特训', desc: '骑手武器伤害 +12%', max: 10, base: 60, step: 45 },
+  { id: 'rider',  icon: '🎯', name: '骑手特训', desc: '骑手武器伤害 +8%',  max: 10, base: 60, step: 45 },
   { id: 'cdr',    icon: '⏳', name: '远古智慧', desc: '技能冷却 -6%',      max: 6,  base: 80, step: 60 },
   { id: 'magnet', icon: '🧲', name: '磁力獠牙', desc: '拾取范围 +25%',     max: 4,  base: 40, step: 40 },
 ];

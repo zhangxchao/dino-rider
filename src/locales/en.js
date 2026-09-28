@@ -336,7 +336,7 @@ export default {
       9: { name: 'Quad Shot' }, 10: { name: 'Ultimate Arsenal' },
     },
     gates: {
-      count: { name: 'Shots +1' }, rate: { name: 'Rate +25%' }, dmg: { name: 'DMG +30%' }, pierce: { name: 'Pierce +1' },
+      count: { name: 'Shots +1' }, rate: { name: 'Rate +15%' }, dmg: { name: 'DMG +20%' }, pierce: { name: 'Pierce +1' },
       heal: { name: 'Heal 40%' }, shield: { name: 'Shield 8s' }, skill: { name: 'Skill Charge' }, xp: { name: 'Weapon XP +25' }, magnet: { name: 'Magnet 10s' }, gamble: { name: 'Lucky Dice' },
     },
     biomes: { jungle: 'Jungle', desert: 'Desert', frost: 'Tundra', swamp: 'Swamp', volcano: 'Volcano', shadow: 'Shadow', hive: 'Hive' },
@@ -345,7 +345,7 @@ export default {
       atk: { name: 'Sharpened Fangs', desc: 'Melee damage +10%' },
       def: { name: 'Thick Hide', desc: 'Damage taken -4%' },
       speed: { name: 'Swift Legs', desc: 'Move speed +5%' },
-      rider: { name: 'Rider Training', desc: 'Rider weapon damage +12%' },
+      rider: { name: 'Rider Training', desc: 'Rider weapon damage +8%' },
       cdr: { name: 'Ancient Wisdom', desc: 'Skill cooldown -6%' },
       magnet: { name: 'Magnet Fangs', desc: 'Pickup range +25%' },
     },

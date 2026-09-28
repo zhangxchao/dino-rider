@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
-import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED } from './data.js';
+import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE } from './data.js';
 import { clamp, damp, prepareModel, mergeStaticMeshes, rigidSkin } from './util.js';
 import { createShield, Afterimages } from './effects.js';
 import { t } from './i18n.js';
@@ -32,7 +32,7 @@ export function computeStats(dino, rider, up) {
     ram: atk * 2.5 + 20,                  // 冲撞伤害：血量低于它的怪物直接撞飞
     def: Math.min(0.8, 1 - (1 - s.def) * (1 - 0.04 * up.def) * (1 - (b.def || 0))),
     lateral: 8.5 + speed * 0.6,           // 左右移动速度
-    riderMul: 1 + 0.12 * up.rider,
+    riderMul: 1 + BALANCE.riderUpg * up.rider,
     cdMul: (1 - 0.06 * up.cdr) * (1 - (b.cdr || 0)),
     crit: 0.05 + (b.crit || 0),
     regen: b.regen || 0,
@@ -153,7 +153,7 @@ export class Player {
     const rate = L.rate * W.rate * (this.buffs.frenzy > 0 ? 1.8 : 1) * (this.buffs.sprint > 0 ? 1.4 : 1) * (rage ? 1.15 : 1) * (1 + this.game.comboBonus());
     return {
       count,
-      dmg: w.dmg * this.stats.riderMul * L.dmg * W.dmg * (this.buffs.power > 0 ? 1.5 : 1) * (rage ? 1.1 : 1),
+      dmg: w.dmg * BALANCE.riderDmg * this.stats.riderMul * L.dmg * W.dmg * (this.buffs.power > 0 ? 1.5 : 1) * (rage ? 1.1 : 1),
       cd: w.cd / rate,
       pierce: (w.pierce || 0) + L.pierce + W.pierce + (rage ? 1 : 0),
       homing: w.homing || L.homing || 0,
@@ -178,8 +178,8 @@ export class Player {
     W.gates.push(kind);
     switch (kind) {
       case 'count': W.count++; break;
-      case 'rate': W.rate += 0.25; break;
-      case 'dmg': W.dmg += 0.3; break;
+      case 'rate': W.rate += BALANCE.gateRate; break;
+      case 'dmg': W.dmg += BALANCE.gateDmg; break;
       case 'pierce': W.pierce++; break;
       case 'heal': this.heal(this.stats.maxHp * 0.4); break;
       case 'shield': this.buffs.shield = 8; break;

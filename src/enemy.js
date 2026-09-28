@@ -1,6 +1,6 @@
 // 怪物 / 首领 / 路障（跑道模式）
 import * as THREE from 'three';
-import { ENEMIES, BOSSES } from './data.js';
+import { ENEMIES, BOSSES, BALANCE } from './data.js';
 import { createEnemyModel, createBossModel } from './models/enemies.js';
 import { clamp, damp, turnToward, prepareModel, rand, pick, mergeStaticMeshes, rigidSkin } from './util.js';
 import { t } from './i18n.js';
@@ -994,7 +994,7 @@ export class Boss {
     if (P.t >= P.dur) {
       this.endPattern();
       this.anim.burrow = 0;
-      this.patternCd = rand(1.2, 2.2) * (1 - 0.18 * (ph - 1)) * this.game.diff.rest;
+      this.patternCd = rand(1.2, 2.2) * (1 - 0.18 * (ph - 1)) * this.game.diff.rest * BALANCE.bossRest;
     }
     return out;
   }

@@ -96,7 +96,7 @@ const TRAILS = {
   fireball: { color: 0xffb040, color2: 0xff2000, size: 1.0, life: 0.35, rate: 90, spread: 0.6 },
   bullet: { color: 0xffd070, size: 0.18, life: 0.12, rate: 50 },
   shuriken: { color: 0xc0c8ff, size: 0.25, life: 0.15, rate: 35 },
-  missile: { color: 0xdddddd, color2: 0x888888, size: 0.5, sizeEnd: 1.4, life: 0.7, rate: 50, smoke: true },
+  missile: { color: 0xdddddd, color2: 0x888888, size: 0.5, sizeEnd: 1.4, life: 0.7, rate: 25, smoke: true },
   ice: { color: 0xaaddff, size: 0.35, life: 0.35, rate: 45 },
   cannon: { color: 0xffa040, size: 0.3, life: 0.25, rate: 35 },
   venom: { color: 0x9cff3a, size: 0.45, life: 0.3, rate: 55, drop: 6 },
@@ -294,7 +294,7 @@ export class Projectiles {
         }
         if (p.pos.y < h + 0.05) {
           if (p.aoe) this.explode(p, p.pos, null);
-          else fx.dust.burst(p.pos, { count: 5, speed: 3, life: 0.4, size: 0.5, sizeEnd: 1.2, color: 0xb0a080, alpha: 0.6, up: 2 });
+          else fx.dust.burst(p.pos, { count: 3, speed: 3, life: 0.4, size: 0.5, sizeEnd: 1.2, color: 0xb0a080, alpha: 0.6, up: 2 });
           this._kill(i);
           continue;
         }
@@ -386,7 +386,7 @@ export class Projectiles {
     const c1 = isFire ? 0xffc040 : p.kind === 'rock' ? 0xd8c8a8 : (p.color ?? 0xffffff);
     const c2 = isFire ? 0xff3000 : (p.color ?? 0xffffff);
     fx.sparks.burst(at, { count: 20 + r * 6, speed: r * 3, life: 0.5, size: 0.9, sizeEnd: 0.2, color: c1, color2: c2, up: 2 });
-    fx.dust.burst(at, { count: 10 + r * 3, speed: r * 1.2, life: 0.9, size: 1.2, sizeEnd: 3, color: isFire ? 0x3a3a3a : 0xb8a888, alpha: 0.55, up: 2.5, drag: 2 });
+    fx.dust.burst(at, { count: Math.round(5 + r * 1.5), speed: r * 1.2, life: 0.9, size: 1.2, sizeEnd: 3, color: isFire ? 0x3a3a3a : 0xb8a888, alpha: 0.55, up: 2.5, drag: 2 });
     game.fx.rings.ring(at, { r0: 0.5, r1: r * 1.1, life: 0.45, color: c1, opacity: 0.9 });
     // 爆炸升级：地面闪光圆盘 + 第二道冲击环 + 碎石 + 焦痕 + 点光源闪光 + 泛光脉冲
     const gy = game.heightAt(at.x, at.z);

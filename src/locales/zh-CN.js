@@ -205,6 +205,7 @@ export default {
     'hazard.swamp': '⚠ 毒泡沼泽！',
     'hazard.volcano': '⚠ 熔岩弹雨！',
     'hazard.shadow': '⚠ 暗影雷暴！',
+    'hazard.spider': '⚠ 小心头顶的毒蛛！',
     'hazard.hive': '⚠ 酸液虫卵！',
     'hazard.sub': '看准红圈，左右躲开！',
     'banner.ambush': '⚠ 精英伏击！',

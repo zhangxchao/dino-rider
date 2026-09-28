@@ -178,7 +178,7 @@ export class Hazards {
     const d = Math.hypot(p.pos.x - s.x, p.pos.z - s.z);
     const air = p.pos.y - g.heightAt(p.pos.x, p.pos.z);
     if (p.alive) {
-      if (d < STRIKE_R + p.radius * 0.35 && air < 2.2) {
+      if (d < STRIKE_R + p.radius * 0.35 && (p.alwaysHittable || air < 2.2)) {
         _v2.set(p.pos.x - s.x, 0, p.pos.z - s.z).normalize();
         p.takeDamage(15 * mul.dmg, { dir: _v2, knock: 8, poison: H.poison || 0, kind: 'melee' });
       } else if (d < STRIKE_R + 2.2) g.onPerfect(p.pos);

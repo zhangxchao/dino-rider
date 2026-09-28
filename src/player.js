@@ -139,6 +139,8 @@ export class Player {
 
   get center() { return _v.set(this.pos.x, this.pos.y + this.size.height * 0.75, this.pos.z); }
   getCenter(out) { return out.set(this.pos.x, this.pos.y + this.size.height * 0.75, this.pos.z); }
+  /** 翼龙体型大、飞得高，但飞在空中也躲不开攻击（高度不再算闪避） */
+  get alwaysHittable() { return this.def.body === 'pterosaur'; }
   get invulnerable() { return this.buffs.sprint > 0 || this.buffs.rage > 0 || !!(this.skill && this.skill.invuln); }
 
   // ------------------------------------------------------------------
@@ -256,7 +258,7 @@ export class Player {
 
     // --- 跳跃 ---
     if (ctl.enabled && ctl.jump && this.onGround && !(sk && sk.air)) {
-      this.vy = this.def.body === 'pterosaur' ? 13 : 11.5;
+      this.vy = this.def.body === 'pterosaur' ? 16 : 11.5;
       this.onGround = false;
       g.audio.play('jump', { pitch: 1.2 - this.size.height * 0.08 });
       g.fx.dust.burst(this.pos, { count: 10, speed: 3, life: 0.6, size: 0.8, sizeEnd: 2, color: g.dustColor, alpha: 0.5, flat: true, up: 1 });
@@ -502,8 +504,9 @@ export class Player {
         break;
       case 'pounce':
       case 'dive':
-        s.dur = 3; s.air = true; s.invuln = true; s.noBite = true;
-        this.vy = d.type === 'dive' ? 17 : 14; this.onGround = false;
+        // 俯冲轰炸飞得更高，但不再无敌
+        s.dur = 3; s.air = true; s.invuln = d.type !== 'dive'; s.noBite = true;
+        this.vy = d.type === 'dive' ? 21 : 14; this.onGround = false;
         g.audio.play(d.type === 'dive' ? 'dive' : 'pounce');
         g.fx.dust.burst(this.pos, { count: 16, speed: 5, life: 0.7, size: 1, sizeEnd: 2.5, color: g.dustColor, alpha: 0.5, flat: true, up: 1 });
         break;

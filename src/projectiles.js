@@ -323,7 +323,7 @@ export class Projectiles {
           if (p.sweepW) {
             // 横扫整条路的镰刃：按线段判定，贴地飞行，跳起来就能躲过
             const inLine = Math.abs(dz) < 0.9 + pl.radius * 0.4 && Math.abs(dx) < p.sweepW / 2;
-            const lowEnough = p.pos.y > pl.pos.y - 0.6 && p.pos.y < pl.pos.y + pl.size.height * 1.35 + 0.6;
+            const lowEnough = pl.alwaysHittable || (p.pos.y > pl.pos.y - 0.6 && p.pos.y < pl.pos.y + pl.size.height * 1.35 + 0.6);
             if (inLine && lowEnough) {
               _dir.set(0, 0, -1);
               pl.takeDamage(p.dmg, { dir: _dir, knock: p.knock, kind: 'proj' });
@@ -334,7 +334,7 @@ export class Projectiles {
           }
           // 擦弹：敌方弹体从身边 1.2 米内飞过
           if (!p.grazed && d2 < (rr + 1.2) * (rr + 1.2) && d2 >= rr * rr && dz < 0) { p.grazed = true; game.onPerfect(p.pos, false); }
-          if (d2 < rr * rr && p.pos.y > pl.pos.y - 0.6 && p.pos.y < top) {
+          if (d2 < rr * rr && (pl.alwaysHittable || (p.pos.y > pl.pos.y - 0.6 && p.pos.y < top))) {
             if (p.aoe) this.explode(p, p.pos, null);
             else {
               _dir.copy(p.vel).setY(0).normalize();
@@ -416,7 +416,7 @@ export class Projectiles {
     } else {
       const pl = game.player;
       const d = Math.hypot(pl.pos.x - at.x, pl.pos.z - at.z) - pl.radius * 0.6;
-      if (d < r && Math.abs(pl.pos.y - at.y) < r + pl.size.height) {
+      if (d < r && (pl.alwaysHittable || Math.abs(pl.pos.y - at.y) < r + pl.size.height)) {
         _dir.set(pl.pos.x - at.x, 0, pl.pos.z - at.z).normalize();
         pl.takeDamage(p.dmg, { dir: _dir, knock: p.knock + 4, poison: p.poison, kind: 'aoe' });
       }

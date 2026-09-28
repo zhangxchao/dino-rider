@@ -333,6 +333,53 @@ function buildScorpion(c) {
   };
 }
 
+// ---------------- 剧毒小蛛（丛林：从树上垂丝落下，喷毒雾） ----------------
+function buildSpiderling(c) {
+  const shell = mat(c.color, { roughness: 0.5 }), dark = mat(shade(c.color, 0.55), { roughness: 0.6 });
+  const markM = glowMat(0x9cff3a, 1.2), eyeM = glowMat(0xff3020, 2.2);
+  const body = grp(c.base, 0, 0.42, 0);
+  const abd = add(body, G.sph(0.34, 10, 8), shell, 0, 0.08, -0.3);
+  abd.scale.set(1, 0.85, 1.15);
+  add(body, G.sph(0.1, 6, 4), markM, 0, 0.36, -0.34).scale.set(1.3, 0.5, 1.8);
+  add(body, G.sph(0.2, 8, 6), shell, 0, 0, 0.12);
+  for (const [x, y] of [[-0.07, 0.1], [0.07, 0.1], [-0.13, 0.05], [0.13, 0.05]]) add(body, G.sph(0.035, 5, 4), eyeM, x, y, 0.3);
+  const fangs = [];
+  for (const side of [-1, 1]) {
+    const f = grp(body, side * 0.06, -0.06, 0.3);
+    add(f, G.cone(0.035, 0.14, 4), dark, 0, -0.05, 0).rotation.x = PI;
+    fangs.push({ f, side });
+  }
+  const legs = [];
+  for (let side = -1; side <= 1; side += 2) {
+    for (let i = 0; i < 4; i++) {
+      const p = grp(body, side * 0.14, 0, 0.22 - i * 0.12);
+      const up = add(p, G.box(0.42, 0.05, 0.05), dark, side * 0.2, 0.14, 0);
+      up.rotation.z = side * 0.6;
+      const lo = add(p, G.box(0.045, 0.5, 0.045), dark, side * 0.44, -0.08, 0);
+      lo.rotation.z = side * 0.35;
+      legs.push({ p, side, i, yaw: -side * (0.55 - i * 0.35) });
+    }
+  }
+  const muzzle = grp(body, 0, 0, 0.35);
+  return {
+    designR: 0.6, muzzle,
+    anim(t, mv, a) {
+      const m = Math.min(mv, 1.5), p = t * (10 + 8 * m);
+      for (const L of legs) {
+        const q = p + L.i * 1.4 + (L.side > 0 ? PI : 0);
+        L.p.rotation.y = L.yaw + Math.sin(q) * 0.25 * (m + 0.15);
+        L.p.rotation.z = L.side * Math.max(0, Math.cos(q)) * 0.2 * m;
+      }
+      const w = windup(a), s = strike(a);
+      // 蓄力时腹部抬起鼓胀，喷射时前冲
+      abd.rotation.x = -0.5 * w + 0.2 * s;
+      abd.scale.set(1 + 0.25 * w, 0.85 + 0.2 * w, 1.15 + 0.2 * w);
+      for (const F of fangs) F.f.rotation.z = F.side * (0.15 + 0.25 * Math.sin(t * 9)) * (0.3 + w);
+      body.position.set(0, 0.42 + 0.03 * Math.sin(t * 5), 0.12 * s - 0.05 * w);
+    },
+  };
+}
+
 // ---------------- 骷髅骨架（战士 / 弓手共用） ----------------
 function skeletonRig(c, eyeColor) {
   const bone = mat(c.color, { roughness: 0.9 }), dark = mat(0x1a1410), eyeM = glowMat(eyeColor, 2.4);
@@ -994,6 +1041,7 @@ const BUILDERS = {
   goblin: buildGoblin,
   bat: buildBat,
   scorpion: buildScorpion,
+  spiderling: buildSpiderling,
   skeleton: buildSkeleton,
   archer: buildArcher,
   wolf: buildWolf,

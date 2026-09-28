@@ -506,6 +506,7 @@ export class Game {
     if (this.state === 'run') {
       if (this.endless && this.routeGen < p.pos.z + 400) this.extendRoute(p.pos.z + 700);
       while (this.route.length && this.route[0].z <= p.pos.z + SPAWN_AHEAD) this.spawnEvent(this.route.shift());
+      if (!this.endless && this.level.spiders) this.updateSpiders(dt);
     }
 
     for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -734,6 +735,27 @@ export class Game {
   // ------------------------------------------------------------------
   //  战斗接口
   // ------------------------------------------------------------------
+  /** 丛林：剧毒小蛛不断从树上垂丝落到前方路上 */
+  updateSpiders(dt) {
+    const p = this.player;
+    if (p.pos.z < 70 || p.pos.z > this.length - 50) return;
+    this.spiderT = (this.spiderT ?? 0) - dt;
+    if (this.spiderT > 0) return;
+    this.spiderT = rand(3.4, 5.2) / this.diff.count;
+    if (!this.spiderWarned) {
+      this.spiderWarned = true;
+      this.showBanner(t('hazard.spider'), t('hazard.sub'), true, 1200);
+      this.audio.play('warning', { volume: 0.7 });
+    }
+    const rh = this.track.roadHalf - 1.5;
+    const n = randInt(2, 3);
+    for (let i = 0; i < n; i++) {
+      const x = i === 0 ? clamp(p.pos.x + rand(-2.5, 2.5), -rh, rh) : rand(-rh, rh);
+      const z = p.pos.z + rand(42, 54) + i * rand(3, 7);
+      this.spawnEnemy('spiderling', x, z, this.mulAt(z), true);
+    }
+  }
+
   spawnEnemy(type, x, z, mul, counted = false) {
     const rh = this.track.roadHalf - 1;
     x = clamp(x, -rh, rh);
@@ -1097,7 +1119,7 @@ export class Game {
     const ground = this.heightAt(p.pos.x, p.pos.z);
     const air = p.pos.y - ground;
     for (const e of this.enemies) {
-      if (!e.targetable || e.isBoss || e.treasure || e.collideCd > 0) continue;
+      if (!e.targetable || e.isBoss || e.treasure || e.collideCd > 0 || e.def.mist) continue; // 小蜘蛛太小，撞不到，只能射掉或躲开毒雾
       const dz = e.pos.z - p.pos.z;
       if (dz > p.frontReach * 0.7 + e.radius || dz < -p.radius - e.radius) continue;
       if (Math.abs(e.pos.x - p.pos.x) > p.radius * 0.85 + e.radius * 0.8) continue;
@@ -1314,7 +1336,7 @@ export class Game {
     if (!renderer || !renderer.compile) return;
     const tmp = new THREE.Group();
     tmp.position.set(0, this.heightAt(0, 25), 25);
-    const types = new Set(this.endless ? ENDLESS_POOL : [...Object.keys(this.level.pool), this.level.elite, ...BOSSES[this.level.boss].summon]);
+    const types = new Set(this.endless ? ENDLESS_POOL : [...Object.keys(this.level.pool), this.level.elite, ...BOSSES[this.level.boss].summon, ...(this.level.spiders ? ['spiderling'] : [])]);
     // 同时预热"合并静态零件"的缓存，首次刷怪不再需要合并
     for (const t of types) { try { tmp.add(buildEnemyModel(t).root); } catch { /* ignore */ } }
     const bossTypes = this.endless ? Object.keys(BOSSES) : [this.level.boss];

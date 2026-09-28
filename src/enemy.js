@@ -10,6 +10,10 @@ const _v2 = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 const _col = new THREE.Color();
+// 小蜘蛛垂下来的蛛丝（所有小蜘蛛共用几何与材质）
+const threadGeo = new THREE.CylinderGeometry(0.025, 0.025, 1, 4, 1, true).translate(0, 0.5, 0);
+const threadMat = new THREE.MeshBasicMaterial({ color: 0xe8f0e0, transparent: true, opacity: 0.55, depthWrite: false });
+const SPIDER_DROP_T = 1.2;
 const ICE_COL = new THREE.Color(0.5, 0.85, 1);
 
 // 头顶血条由 game.bars 统一批量绘制；这里只记录计时与高度
@@ -118,9 +122,19 @@ export class Enemy {
     this.barTop = 2;
     this.stunFx = 0;
     this.root.scale.setScalar(0.01);
+    if (this.def.drop) {
+      // 从树上垂丝落下：出生即全尺寸，挂在高处慢慢降下来（下落途中就能被打）
+      this.dropping = true;
+      this.lift = this.def.drop;
+      this.root.scale.setScalar(1);
+      this.thread = new THREE.Mesh(threadGeo, threadMat);
+      this.thread.position.y = 0.45;
+      this.thread.frustumCulled = false;
+      this.root.add(this.thread);
+    }
   }
 
-  get targetable() { return this.alive && this.state !== 'spawn'; }
+  get targetable() { return this.alive && (this.state !== 'spawn' || this.dropping); }
   getCenter(out) { return out.set(this.pos.x, this.pos.y + (this.flying ? this.hoverY : this.height * 0.5) + this.lift, this.pos.z); }
 
   applyStatus(o) {
@@ -140,6 +154,7 @@ export class Enemy {
     this.state = 'dead';
     this.deadT = 0;
     this.atkT = -1;
+    if (this.thread) { this.root.remove(this.thread); this.thread = null; this.dropping = false; }
   }
 
   update(dt) {
@@ -152,6 +167,27 @@ export class Enemy {
     const dz = this.pos.z - pl.pos.z;
     if (dz < -16 && this.state !== 'dead') { this.removed = true; return; } // 被甩在身后
 
+    if (this.state === 'spawn' && this.dropping) {
+      this.stateT += dt;
+      const k = Math.min(1, this.stateT / SPIDER_DROP_T);
+      const H = this.def.drop;
+      this.lift = H * (1 - k * k * (3 - 2 * k));
+      this.pos.y = g.heightAt(this.pos.x, this.pos.z);
+      this.root.position.set(this.pos.x, this.pos.y + this.lift, this.pos.z);
+      this.root.rotation.y = this.heading;
+      this.thread.scale.y = H + 4 - this.lift;
+      this.anim.move = 0.3;
+      this.model.update(dt, this.anim);
+      this.flash.setFlash(this.flashT > 0 ? this.flashT / 0.12 : 0);
+      updateBar(this, dt, this.height + 0.5);
+      if (k >= 1) {
+        this.state = 'active'; this.dropping = false; this.lift = 0;
+        this.root.remove(this.thread); this.thread = null;
+        this.atkCd = rand(0.05, 0.35);
+        g.fx.dust.burst(this.pos, { count: 6, speed: 2.5, life: 0.5, size: 0.6, sizeEnd: 1.4, color: g.dustColor, alpha: 0.4, flat: true, up: 1 });
+      }
+      return;
+    }
     if (this.state === 'spawn') {
       this.stateT += dt;
       const k = Math.min(1, this.stateT / 0.6);
@@ -218,6 +254,23 @@ export class Enemy {
       this.fleeT -= dt;
       if (this.fleeT <= 0 || dz > 90) { g.onGoblinEscape(this); return; }
       if (Math.random() < 0.35) { this.getCenter(_v); g.fx.sparks.burst(_v, { count: 1, speed: 1, life: 0.5, size: 0.6, color: 0xffe070, color2: 0xffa000, up: 1, radius: 0.5 }); }
+    } else if (active && this.def.mist) {
+      // 剧毒小蛛：原地不动，地上亮出毒雾预警圈，蓄力后喷出一大团毒雾
+      const M = this.def.mist;
+      if (this.mistT > 0) { this.mistT -= dt; if (!this.mistHit) this.mistCheck(); }
+      if (this.atkT >= 0) {
+        this.atkT += dt / (M.windup / 0.55);
+        if (!this.atkHit && this.atkT >= 0.55) { this.atkHit = true; this.spewMist(); }
+        if (this.atkT >= 1) this.atkT = -1;
+      } else {
+        this.atkCd -= dt;
+        // 等玩家冲到约一次蓄力的距离才亮圈，毒雾正好喷在玩家将要经过的地方
+        if (this.atkCd <= 0 && dz < 16 && dz > -2) {
+          this.atkT = 0; this.atkHit = false;
+          this.atkCd = this.def.atkCd * rand(0.9, 1.2) * g.diff.rest;
+          g.tele.add({ shape: 'circle', x: this.pos.x, z: this.pos.z, radius: M.radius, duration: M.windup, color: 0x80ff30 });
+        }
+      }
     } else if (active) {
       const sp = this.speed * this.slowMul;
       vz = -sp * MARCH[this.kind];
@@ -297,6 +350,31 @@ export class Enemy {
     g.audio.play('enemyShoot', { volume: 0.35, pitch: rand(0.9, 1.2) });
   }
 
+  /** 毒雾：伤害按天灾算（跳得够高能躲，翼龙除外），圈边擦过算完美闪避 */
+  spewMist() {
+    const g = this.game, pl = g.player, M = this.def.mist;
+    _v.copy(this.pos);
+    g.fx.dust.burst(_v, { count: 20, speed: 3.2, life: 1.4, size: 1.5, sizeEnd: 3.6, color: 0x7ad040, alpha: 0.45, flat: true, drag: 2, up: 1.5 });
+    g.fx.sparks.burst(_v, { count: 14, speed: 5, life: 0.7, size: 0.6, color: 0xc8ff60, color2: 0x306010, up: 4 });
+    g.fx.rings.ring(_v, { r0: 0.5, r1: M.radius * 1.2, life: 0.5, color: 0x9cff3a, opacity: 0.6 });
+    g.audio.play('poison', { volume: 0.5, pitch: 1.3 });
+    // 毒雾在原地滞留一小会儿，这期间冲进去同样中招（每团雾只伤一次）
+    this.mistT = 1.0; this.mistHit = false; this.mistNear = false;
+    this.mistCheck();
+  }
+  mistCheck() {
+    const g = this.game, pl = g.player, M = this.def.mist;
+    if (!pl.alive) return;
+    const d = Math.hypot(pl.pos.x - this.pos.x, pl.pos.z - this.pos.z);
+    const air = pl.pos.y - g.heightAt(pl.pos.x, pl.pos.z);
+    if (d < M.radius + pl.radius * 0.35 && (pl.alwaysHittable || air < 2.5)) {
+      this.mistHit = true;
+      _dir.set(pl.pos.x - this.pos.x, 0, pl.pos.z - this.pos.z).normalize();
+      pl.takeDamage(this.dmg, { dir: _dir, knock: 6, poison: M.poison, kind: 'melee' });
+    } else if (d < M.radius + 2.2) this.mistNear = true;
+    if (this.mistT <= 0 && this.mistNear && !this.mistHit) { this.mistHit = true; g.onPerfect(pl.pos); }
+  }
+
   teleport() {
     const g = this.game;
     this.teleCd = rand(4, 7);
@@ -312,6 +390,7 @@ export class Enemy {
   }
 
   dispose() {
+    if (this.thread) { this.root.remove(this.thread); this.thread = null; }
     this.game.scene.remove(this.root);
     disposeModel(this.root);
   }
@@ -715,7 +794,7 @@ export class Boss {
           for (const s of P.spots) {
             _v.set(s.x, g.heightAt(s.x, s.z), s.z);
             const dd = Math.hypot(pl.pos.x - s.x, pl.pos.z - s.z), hitR = 4.3 + pl.radius * 0.4;
-            if (dd < hitR && pl.pos.y - _v.y < 2.5) {
+            if (dd < hitR && (pl.alwaysHittable || pl.pos.y - _v.y < 2.5)) {
               _dir.set(pl.pos.x - s.x, 0, pl.pos.z - s.z).normalize();
               pl.takeDamage(this.dmg * 1.2, { dir: _dir, knock: 10, attacker: this, kind: 'melee' });
             } else if (dd < hitR + 2.4) g.onPerfect(pl.pos); // 擦身躲过 / 跳过砸地
@@ -806,7 +885,7 @@ export class Boss {
           this.pos.z -= P.speed * dt;
           this.pos.x = P.lane;
           this.vel.set(0, 0, -P.speed);
-          if (!P.hit && Math.abs(pl.pos.z - this.pos.z) < this.radius + pl.radius && Math.abs(pl.pos.x - this.pos.x) < this.radius + pl.radius * 0.6 && pl.pos.y - this.pos.y < 3) {
+          if (!P.hit && Math.abs(pl.pos.z - this.pos.z) < this.radius + pl.radius && Math.abs(pl.pos.x - this.pos.x) < this.radius + pl.radius * 0.6 && (pl.alwaysHittable || pl.pos.y - this.pos.y < 3)) {
             P.hit = true;
             _dir.set(Math.sign(pl.pos.x - this.pos.x) || 1, 0, -0.5).normalize();
             pl.takeDamage(this.dmg * 1.3, { dir: _dir, knock: 16, attacker: this, kind: 'melee' });
@@ -844,7 +923,7 @@ export class Boss {
               if (k % 2 === 0) g.fx.scorch.add(_v, 1.3, 3);
             }
           }
-          if (hit && pl.pos.y - g.heightAt(pl.pos.x, pl.pos.z) < 3) {
+          if (hit && (pl.alwaysHittable || pl.pos.y - g.heightAt(pl.pos.x, pl.pos.z) < 3)) {
             _dir.set(Math.sign(pl.pos.x - P.cx) || 1, 0, -0.4).normalize();
             pl.takeDamage(this.dmg * 1.3, { dir: _dir, knock: 12, attacker: this, kind: 'melee' });
           } else if (near) g.onPerfect(pl.pos);
@@ -896,7 +975,7 @@ export class Boss {
         } else if (!P.fired && k >= P.windup) {
           P.fired = true;
           const d = Math.hypot(pl.pos.x - P.sx, pl.pos.z - P.sz);
-          if (d < 4.2 + pl.radius * 0.4 && pl.pos.y - g.heightAt(pl.pos.x, pl.pos.z) < 2.5) {
+          if (d < 4.2 + pl.radius * 0.4 && (pl.alwaysHittable || pl.pos.y - g.heightAt(pl.pos.x, pl.pos.z) < 2.5)) {
             _dir.set(pl.pos.x - P.sx, 0, pl.pos.z - P.sz).normalize();
             pl.takeDamage(this.dmg * 1.4, { dir: _dir, knock: 14, attacker: this, kind: 'melee' });
           } else if (d < 6.6) g.onPerfect(pl.pos);

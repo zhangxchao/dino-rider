@@ -142,6 +142,12 @@ export default {
     'result.next': '下一关 →',
     'result.replay': '再玩一次',
     'result.retry': '再试一次',
+    'result.score': '本局得分',
+    'result.dmg': '总伤害',
+    'result.newRecord': '新纪录！',
+    'result.best': '最佳 {t}',
+    'result.firstClear': '🎉 首次通关奖励 +{n} 金币',
+    'result.needCoins': '再攒 {n} 金币就能在工坊升级一次',
     'result.shop': '🛠️ 升级工坊',
     'result.menu': '⌂ 主菜单',
 

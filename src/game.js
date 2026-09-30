@@ -680,7 +680,11 @@ export class Game {
       const coinsGained = this.stats.coins;
       const reward = Math.round(this.level.reward * (0.6 + 0.2 * stars) * this.diff.coins);
       const firstClear = !save.cleared && this.levelIdx === LEVELS.length - 1;
-      save.coins += coinsGained + reward;
+      // 第一次通关这一关：额外奖励一半关卡奖励
+      const firstBonus = (save.stars[this.levelIdx] || 0) === 0 ? Math.round(reward * 0.5) : 0;
+      const prevBest = save.bestTime[this.levelIdx] || 0;
+      const newBest = prevBest > 0 && this.time < prevBest;
+      save.coins += coinsGained + reward + firstBonus;
       save.stars[this.levelIdx] = Math.max(save.stars[this.levelIdx] || 0, stars);
       save.unlocked = Math.min(LEVELS.length, Math.max(save.unlocked, this.levelIdx + 2));
       if (!save.bestTime[this.levelIdx] || this.time < save.bestTime[this.levelIdx]) save.bestTime[this.levelIdx] = Math.round(this.time);
@@ -694,6 +698,7 @@ export class Game {
         win: true, stars, hpR, killRate, time: this.time, coins: coinsGained, reward, kills: this.stats.kills,
         maxCombo: this.stats.maxCombo, score: Math.round(this.stats.score), dmg: Math.round(this.stats.dmgDealt),
         weaponLv: this.player.weapon.level, levelIdx: this.levelIdx, firstClear, final: this.levelIdx === LEVELS.length - 1, difficulty: this.diffId,
+        firstBonus, newBest, prevBest,
       });
     });
   }

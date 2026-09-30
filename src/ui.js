@@ -35,6 +35,20 @@ function el(html) {
   return d.firstElementChild;
 }
 
+// 结算数字从 0 滚动到最终值（先慢后快再慢，0.9 秒）
+function countUp(root) {
+  const els = [...root.querySelectorAll('[data-count]')];
+  if (!els.length) return;
+  const t0 = performance.now() + 250;
+  const step = (now) => {
+    const k = Math.min(1, Math.max(0, (now - t0) / 900));
+    const e = 1 - Math.pow(1 - k, 3);
+    for (const el of els) el.textContent = el.dataset.pre + Math.round(+el.dataset.count * e).toLocaleString();
+    if (k < 1 && root.isConnected !== false) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 export class UI {
   constructor(app) {
     this.app = app;
@@ -474,19 +488,30 @@ export class UI {
   // ------------------------------------------------------------------
   build_result(r) {
     const hasNext = r.win && !r.final && r.levelIdx + 1 < LEVELS.length;
+    // 工坊里现在买得起几项升级；一项都买不起时算出还差多少
+    const costs = UPGRADES.filter((u) => (save.upgrades[u.id] || 0) < u.max).map((u) => upgradeCost(u, save.upgrades[u.id] || 0));
+    const affordable = costs.filter((c) => c <= save.coins).length;
+    const need = costs.length && !affordable ? Math.min(...costs) - save.coins : 0;
+    const cnt = (v, pre = '') => `<span data-count="${v}" data-pre="${pre}">${pre}0</span>`;
+    const scoreRow = r.score != null ? `
+        <div class="res-score"><div class="k">${t('result.score')}</div><div class="v">${cnt(r.score)}</div>
+          ${r.dmg ? `<div class="dm">${t('result.dmg')} ${cnt(r.dmg)}</div>` : ''}</div>` : '';
     let body;
     if (r.win) {
       body = `
+        ${r.newBest ? `<div class="stamp">${t('result.newRecord')}</div>` : ''}
         <h2 style="color:#ffe27a">${t('result.win')}${r.difficulty ? ` <span class="diff-tag ${r.difficulty}">${t('diff.' + r.difficulty)}</span>` : ''}</h2>
         <div class="big-stars">${[0, 1, 2].map((k) => `<span class="${k < r.stars ? 'on' : ''}" style="animation-delay:${0.2 + k * 0.25}s">★</span>`).join('')}</div>
-        <div class="result-grid">
-          <div class="cell"><div class="k">${t('result.time')}</div><div class="v">${formatTime(r.time)}</div></div>
-          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${r.kills}</div></div>
-          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${r.maxCombo}</div></div>
+        ${scoreRow}
+        <div class="result-grid three">
+          <div class="cell"><div class="k">${t('result.time')}</div><div class="v">${formatTime(r.time)}</div>${r.prevBest ? `<div class="sub">${t('result.best', { t: formatTime(r.newBest ? r.time : r.prevBest) })}</div>` : ''}</div>
+          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${cnt(r.kills)}</div></div>
+          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${cnt(r.maxCombo)}</div></div>
           <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
-          <div class="cell"><div class="k">${t('result.coinsPicked')}</div><div class="v gold">+${r.coins}</div></div>
-          <div class="cell"><div class="k">${t('result.reward')}</div><div class="v gold">+${r.reward}</div></div>
+          <div class="cell"><div class="k">${t('result.coinsPicked')}</div><div class="v gold">${cnt(r.coins, '+')}</div></div>
+          <div class="cell"><div class="k">${t('result.reward')}</div><div class="v gold">${cnt(r.reward, '+')}</div></div>
         </div>
+        ${r.firstBonus ? `<div class="first-bonus">${t('result.firstClear', { n: r.firstBonus })}</div>` : ''}
         <div class="star-reqs">
           <div class="ok">${t('result.starClear')}</div>
           <div class="${r.hpR >= 0.5 ? 'ok' : ''}">${t('result.starHp', { n: Math.round(r.hpR * 100) })}</div>
@@ -496,12 +521,14 @@ export class UI {
       body = `
         <h2 style="color:#ff8080">${r.endless ? t('result.endlessOver') : t('result.lose')}</h2>
         ${r.endless ? `<div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:12px">${t('result.dist', { n: r.dist })}${r.newBest ? ` <span style="color:var(--gold)">${t('result.newBest')}</span>` : ''}</div>` : `<p style="text-align:center;color:var(--muted);margin-bottom:12px">${r.bossReached ? t('result.bossReached') : t('result.progress', { n: Math.round(r.progress * 100) })}${t('result.tryUpgrade')}${r.difficulty && r.difficulty !== 'easy' ? t('result.tryEasy') : ''}</p>`}
+        ${scoreRow}
         <div class="result-grid">
           <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
-          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${r.kills}</div></div>
-          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${r.maxCombo}</div></div>
-          <div class="cell"><div class="k">${t('result.coinsGot')}</div><div class="v gold">+${r.coins}</div></div>
-        </div>`;
+          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${cnt(r.kills)}</div></div>
+          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${cnt(r.maxCombo)}</div></div>
+          <div class="cell"><div class="k">${t('result.coinsGot')}</div><div class="v gold">${cnt(r.coins, '+')}</div></div>
+        </div>
+        ${need > 0 ? `<div class="need-coins">${t('result.needCoins', { n: need })}</div>` : ''}`;
     }
     const n = el(`
       <div>
@@ -512,7 +539,7 @@ export class UI {
             ${r.final && r.win ? `<button class="btn" data-a="ending">${t('result.ending')}</button>` : ''}
             ${hasNext ? `<button class="btn" data-a="next">${t('result.next')}</button>` : ''}
             <button class="btn ${hasNext || (r.final && r.win) ? 'ghost' : ''}" data-a="retry">↻ ${r.win ? t('result.replay') : t('result.retry')}</button>
-            ${!r.win ? `<button class="btn ghost" data-a="shop">${t('result.shop')}</button>` : ''}
+            ${affordable ? `<button class="btn ghost shop-hot" data-a="shop">${t('result.shop')}<i class="badge">${affordable}</i></button>` : !r.win ? `<button class="btn ghost" data-a="shop">${t('result.shop')}</button>` : ''}
             <button class="btn ghost" data-a="menu">${t('result.menu')}</button>
           </div>
         </div>
@@ -526,6 +553,7 @@ export class UI {
       else this.app.exitToMenu();
     }));
     if (r.win) setTimeout(() => this.app.audio.play('star'), 250);
+    countUp(n);
     return n;
   }
 

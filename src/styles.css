@@ -288,6 +288,20 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .result-grid .cell .k { color: var(--muted); font-size: 12px; letter-spacing: .1em; }
 .result-grid .cell .v { font-size: 24px; font-weight: 900; margin-top: 2px; }
 .result-grid .cell .v.gold { color: var(--gold); }
+.result-grid.three { grid-template-columns: repeat(3, 1fr); }
+.result-grid .cell .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.result .res-score { text-align: center; margin: 0 0 10px; }
+.result .res-score .k { font-size: 12px; letter-spacing: .2em; color: var(--muted); }
+.result .res-score .v { font-size: 40px; font-weight: 900; line-height: 1.1; background: linear-gradient(180deg, #fff, #ffd54a); -webkit-background-clip: text; background-clip: text; color: transparent; font-variant-numeric: tabular-nums; }
+.result .res-score .dm { font-size: 13px; color: #ffcf9a; font-weight: 800; font-variant-numeric: tabular-nums; }
+.result .stamp { position: absolute; right: 18px; top: 16px; padding: 6px 14px; border: 3px solid #ff5a4a; color: #ff6a5a; border-radius: 10px; font-weight: 900; font-size: 20px; letter-spacing: .08em; transform: rotate(12deg); animation: stampIn .5s cubic-bezier(.2, 1.8, .4, 1) .9s both; box-shadow: 0 0 18px rgba(255,90,74,.35); background: rgba(40,0,0,.35); }
+@keyframes stampIn { from { opacity: 0; transform: rotate(12deg) scale(2.6); } to { opacity: 1; transform: rotate(12deg) scale(1); } }
+.result .first-bonus, .result .need-coins { margin-top: 12px; text-align: center; font-weight: 800; font-size: 14px; padding: 8px 12px; border-radius: 10px; }
+.result .first-bonus { background: rgba(255,213,74,.12); color: var(--gold); animation: popIn .5s ease 1.1s both; }
+.result .need-coins { background: rgba(255,255,255,.05); color: var(--muted); }
+.btn.shop-hot { position: relative; border-color: rgba(255,213,74,.8); }
+.btn .badge { position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: #ff4a3a; color: #fff; font-size: 12px; font-style: normal; font-weight: 900; line-height: 20px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+@media (max-height: 500px) { .result .big-stars { font-size: 38px; margin: 0 0 6px; } .result .res-score .v { font-size: 28px; } .result-grid .cell { padding: 6px; } .result-grid .cell .v { font-size: 18px; } }
 .star-reqs { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.8; }
 .star-reqs .ok { color: var(--good); }
 
@@ -414,3 +428,24 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 @keyframes tutIn { from { opacity: 0; transform: translate(-50%, 24px) scale(.9); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes tutOut { 0% { opacity: 1; } 30% { transform: translate(-50%, 0) scale(1.06); } 100% { opacity: 0; transform: translate(-50%, -16px) scale(.96); } }
 @media (max-height: 500px) { .tut { bottom: 30%; padding: 10px 16px 10px 12px; } .tut .tx { font-size: 14px; } .tut .ic { font-size: 26px; } }
+/* 结算：按钮行贴在面板底部，内容多时只滚动上面的数据 */
+.center-panel.result { padding-bottom: 0; }
+.result .row-btns { position: sticky; bottom: 0; margin: 14px -28px 0; padding: 14px 28px 18px; background: linear-gradient(180deg, rgba(16,20,28,0), rgba(16,20,28,.96) 30%); z-index: 2; }
+.result .big-stars { font-size: 50px; margin: 0 0 8px; }
+.result h2 { margin-bottom: 8px; }
+.result .star-reqs { margin-top: 10px; }
+@media (max-height: 500px) {
+  .center-panel.result { padding: 14px 18px 0; max-height: 94vh; }
+  .result h2 { font-size: 22px; margin-bottom: 2px; }
+  .result .big-stars { font-size: 30px; margin: 0 0 2px; }
+  .result .res-score { margin-bottom: 6px; }
+  .result .res-score .v { font-size: 24px; }
+  .result-grid { gap: 6px; }
+  .result .star-reqs { display: none; }
+  .result .row-btns { margin: 8px -18px 0; padding: 8px 18px 10px; gap: 8px; }
+  .result .row-btns .btn { padding: 8px 14px; font-size: 14px; }
+  .result .stamp { font-size: 15px; right: 10px; top: 8px; }
+}
+.result .row-btns { flex-wrap: nowrap; gap: 10px; }
+.result .row-btns .btn { padding: 11px 18px; font-size: 15px; white-space: nowrap; }
+.result .star-reqs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; font-size: 12.5px; }

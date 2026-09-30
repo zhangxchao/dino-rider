@@ -142,6 +142,12 @@ export default {
     'result.next': '次のステージ →',
     'result.replay': 'もう一度遊ぶ',
     'result.retry': 'もう一度挑戦',
+    'result.score': 'スコア',
+    'result.dmg': '総ダメージ',
+    'result.newRecord': '新記録！',
+    'result.best': 'ベスト {t}',
+    'result.firstClear': '🎉 初クリアボーナス +{n} コイン',
+    'result.needCoins': 'あと {n} コインで次の強化ができる',
     'result.shop': '🛠️ 強化工房',
     'result.menu': '⌂ メインメニュー',
 

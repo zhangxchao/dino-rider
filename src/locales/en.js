@@ -142,6 +142,12 @@ export default {
     'result.next': 'Next Stage →',
     'result.replay': 'Play Again',
     'result.retry': 'Try Again',
+    'result.score': 'Score',
+    'result.dmg': 'Total damage',
+    'result.newRecord': 'NEW RECORD!',
+    'result.best': 'Best {t}',
+    'result.firstClear': '🎉 First clear bonus +{n} coins',
+    'result.needCoins': '{n} more coins for your next upgrade',
     'result.shop': '🛠️ Workshop',
     'result.menu': '⌂ Main Menu',
 

@@ -19,6 +19,7 @@ const GRAVITY = 32;
 const smoothstep01 = (x) => x * x * (3 - 2 * x);
 export const RAGE_TIME = 6;
 const RAGE_COL = new THREE.Color(0xffb020);
+const HURT_COL = new THREE.Color(1, 0.45, 0.4);
 const _rc = new THREE.Color();
 
 export function computeStats(dino, rider, up) {
@@ -343,7 +344,8 @@ export class Player {
     this.riderAnim.lean = this.lean;
     this.riderModel.update(dt, this.riderAnim);
 
-    if (this.flashT > 0) this.flash.setFlash(this.flashT / 0.15);
+    // 受击闪一下暖红色（原来是满强度纯白，被围攻时整只恐龙一直是白的，看不清）
+    if (this.flashT > 0) this.flash.setFlash(0.55 * this.flashT / 0.15, HURT_COL);
     else if (this.buffs.rage > 0) this.flash.setFlash(0.16 + 0.08 * Math.sin(this.anim.t * 14), RAGE_COL);
     else if (this.buffs.frenzy > 0) this.flash.setFlash(0.22 + 0.12 * Math.sin(this.anim.t * 12), FRENZY_COL);
     else if (this.buffs.sprint > 0 || (sk && sk.type === 'charge')) this.flash.setFlash(0.3, SPRINT_COL);

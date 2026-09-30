@@ -551,14 +551,15 @@ export function applyCameraFade(root, uniform) {
       if (!(m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) continue;
       done.add(m);
       const prev = m.onBeforeCompile;
+      const keyBefore = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
       m.onBeforeCompile = (shader, renderer) => {
-        if (prev) prev(shader, renderer);
+        if (prev) prev.call(m, shader, renderer);
         shader.uniforms.uCamFade = uniform;
         shader.fragmentShader = 'uniform float uCamFade;\n' + shader.fragmentShader.replace(
           '#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + CAMFADE_GLSL);
       };
-      const prevKey = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => '';
-      m.customProgramCacheKey = () => prevKey() + '|camfade';
+      // 缓存键要在替换 onBeforeCompile 之前取（默认键就是它的源码）
+      m.customProgramCacheKey = () => keyBefore + '|camfade';
       m.needsUpdate = true;
     }
   });

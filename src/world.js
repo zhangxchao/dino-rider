@@ -327,11 +327,49 @@ function waterMaterial(ctx, color, opacity, amp) {
       vec4 dwW = modelMatrix * vec4(position, 1.0);
       transformed.y += (sin(dwW.x * 0.33 + uTime * 1.3) + cos(dwW.z * 0.27 + uTime * 1.05) + sin((dwW.x + dwW.z) * 0.52 + uTime * 1.9) * 0.5) * ${A};`,
     );
+    // 菲涅尔：俯视时更通透、看得见水下；掠射角越接近水平越不透明、越亮（反射天空）
+    sh.fragmentShader = sh.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      `{ float wF = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+        float wF2 = wF * wF;
+        diffuseColor.a = mix(diffuseColor.a * 0.72, 1.0, wF2);
+        outgoingLight *= 1.0 + wF2 * wF * 0.6; }
+      #include <opaque_fragment>`,
+    );
   };
   m.customProgramCacheKey = () => 'dr-water-' + A;
   return m;
 }
 // 旗帜摆动（Instanced 布料，局部坐标顶端 y=0 向下垂）
+/**
+ * 随风摆动的装饰材质（草、花、蕨类、树冠）：顶点按离地高度加权做正弦摆动 + 阵风
+ * amp：每米高度的摆幅；minY：这个高度以下不动（树干）
+ */
+function windMaterial(ctx, { amp = 0.05, minY = 0, key = 'soft' } = {}) {
+  const m = decoMaterial();
+  const timeU = ctx.timeU;
+  m.onBeforeCompile = (sh) => {
+    attachBend(sh);
+    sh.uniforms.uTime = timeU;
+    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+      {
+        float wPh = 0.0;
+        #ifdef USE_INSTANCING
+          wPh = instanceMatrix[3].x * 0.23 + instanceMatrix[3].z * 0.11;
+        #endif
+        float wH = max(position.y - ${minY.toFixed(2)}, 0.0);
+        float gust = 0.6 + 0.4 * sin(uTime * 0.45 + wPh * 0.3);
+        float w = wH * ${amp.toFixed(3)} * gust;
+        transformed.x += sin(uTime * 1.7 + wPh) * w;
+        transformed.z += sin(uTime * 1.3 + wPh * 1.7 + position.y * 0.6) * w * 0.6;
+      }`,
+    );
+  };
+  m.customProgramCacheKey = () => 'dr-wind-' + key;
+  return m;
+}
 function bannerMaterial(ctx, color) {
   const m = new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide, flatShading: true });
   const timeU = ctx.timeU;
@@ -1930,7 +1968,7 @@ export function createWorld(biome = 'jungle', scene, opts = {}) {
 // ---------------------------------------------------------------------
 export {
   BIOMES, W, clamp, lerp, smooth, mulberry32, hashStr, hash3, makeNoise, fbm, ridged,
-  T, part, merge, jitter, gradientY, ribbonGeometry, decoMaterial, makeSprite, waterMaterial, bannerMaterial, lavaMaterial, skyMaterial,
+  T, part, merge, jitter, gradientY, ribbonGeometry, decoMaterial, windMaterial, makeSprite, waterMaterial, bannerMaterial, lavaMaterial, skyMaterial,
   geoRock, geoCapRock, geoBroadleaf, geoPalm, geoFern, geoFlower, geoGrass, geoSaguaro, geoPricklyPear, geoMesa, geoArch, geoRibcage,
   geoSkull, geoShrub, geoPine, geoIceCluster, geoIceSpire, geoDrift, geoDeadTree, geoMushStem, geoMushCap, geoReeds, geoLily,
   geoShardCluster, geoPillar, geoWall, geoSpire, geoBannerPole, buildDistantVolcano, buildCitadel,

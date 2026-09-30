@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import {
   BIOMES, W, clamp, lerp, smooth, mulberry32, hashStr, hash3, makeNoise, fbm, ridged,
-  T, part, merge, jitter, gradientY, decoMaterial, makeSprite, waterMaterial, bannerMaterial, lavaMaterial, skyMaterial,
+  T, part, merge, jitter, gradientY, decoMaterial, windMaterial, makeSprite, waterMaterial, bannerMaterial, lavaMaterial, skyMaterial,
   geoRock, geoCapRock, geoBroadleaf, geoPalm, geoFern, geoFlower, geoGrass, geoSaguaro, geoPricklyPear, geoMesa, geoRibcage,
   geoSkull, geoShrub, geoPine, geoIceCluster, geoIceSpire, geoDrift, geoDeadTree, geoMushStem, geoMushCap, geoReeds, geoLily,
   geoShardCluster, geoPillar, geoWall, geoSpire, geoBannerPole, buildDistantVolcano, buildCitadel,
@@ -127,9 +127,18 @@ class GeoBuf {
 // ---------------------------------------------------------------------
 //  环形槽位装饰：每种装饰 = 近处(投影) + 远处(不投影) 两个 InstancedMesh
 // ---------------------------------------------------------------------
+// 会随风摆动的装饰（用共享装饰材质的这些种类自动换成风摆材质）
+const WIND_SOFT = new Set(['grass', 'dryGrass', 'flowers', 'ferns', 'reeds', 'shrubs']);
+const WIND_TREE = new Set(['trees', 'palms', 'pines', 'darkTrees']);
 class Deco {
   constructor(ctx, name, geo, mat, capNear, capFar, { split = 30, receive = true } = {}) {
     this.name = name;
+    if (mat === ctx.decoMat && (WIND_SOFT.has(name) || WIND_TREE.has(name))) {
+      const soft = WIND_SOFT.has(name);
+      const k = soft ? 'windSoft' : 'windTree';
+      if (!ctx[k]) { ctx[k] = soft ? windMaterial(ctx, { amp: 0.14, key: 'soft' }) : windMaterial(ctx, { amp: 0.035, minY: 1.6, key: 'tree' }); ctx.extraMats.push(ctx[k]); }
+      mat = ctx[k];
+    }
     this.cap = [capNear | 0, capFar | 0];
     this.split = split;
     this.meshes = this.cap.map((cap, k) => {
@@ -985,7 +994,8 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
   scene.fog = cfg.fog.density ? new THREE.FogExp2(horizon.getHex(), cfg.fog.density) : new THREE.Fog(horizon.getHex(), cfg.fog.near, Math.min(cfg.fog.far, 250));
   scene.background = horizon.clone();
   const L = cfg.light;
-  root.add(new THREE.HemisphereLight(L.hemiSky, L.hemiGround, L.hemi));
+  const hemi = new THREE.HemisphereLight(L.hemiSky, L.hemiGround, L.hemi);
+  root.add(hemi);
   if (L.ambI) root.add(new THREE.AmbientLight(L.amb, L.ambI));
   const sunDir = new THREE.Vector3(...s.sunDir).normalize();
   const sun = new THREE.DirectionalLight(L.sun, L.sunI);
@@ -1258,6 +1268,10 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
     baseAt: base,
     addFlat: (a, b) => { addFlat(a, b); rowCache.clear(); }, // 首领战场压平（只影响尚未生成的地形块）
     sun,
+    skyCfg: cfg.sky,
+    hemi,
+    lightCfg: cfg.light,
+    envI: cfg.envI,
     fogColor: horizon.clone(),
     update(dt, t, focus) {
       if (disposed) return;

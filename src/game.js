@@ -6,15 +6,17 @@ import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, Blo
 import { Projectiles } from './projectiles.js';
 import { Player, computeStats } from './player.js';
 import { Enemy, Boss, Prop, buildBossModel } from './enemy.js';
+import { buildEnvironment } from './envmap.js';
 import { Hud } from './hud.js';
 import { input } from './input.js';
 import { save, persist } from './save.js';
-import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut, uploadRange } from './util.js';
+import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut, uploadRange, RIM } from './util.js';
 import { t } from './i18n.js';
 import { Hazards } from './hazards.js';
 import { setBendProfile, updateBend, resetBend, bendX, bendVec, curvature } from './bend.js';
 
 const NO_OPTS = Object.freeze({});
+const _white = new THREE.Color(1, 1, 1);
 const _aoeOpts = {};
 const _aoeDir = new THREE.Vector3();
 function clearOpts(o) { for (const k in o) delete o[k]; }
@@ -232,6 +234,18 @@ export class Game {
     this.track = createTrack(this.biome, this.scene, { quality: this.quality, flat: [[bossZ - 40, bossZ + 140]] });
     setBendProfile(this.biome);
     updateBend(0, 1);
+    // 环境贴图（天空渐变 + 太阳），给所有标准材质加上环境光和高光反射
+    try {
+      this.envRT = buildEnvironment(app.renderer, this.track.skyCfg, this.track.lightCfg);
+      this.scene.environment = this.envRT.texture;
+      const envI = this.track.envI ?? 0.3;
+      this.scene.environmentIntensity = envI;
+      // 环境贴图本身带了天光的漫反射：半球光相应调暗，保持整体亮度和明暗对比
+      if (this.track.hemi) this.track.hemi.intensity *= 1 - envI * 0.7;
+      RIM.color.value.set(this.track.lightCfg.hemiSky).lerp(_white, 0.35);
+      RIM.strength.value = this.track.rimI ?? 0.3;
+      app.juice.setGrade(this.biome, this.track.skyCfg.sunDir, this.track.skyCfg.sunColor);
+    } catch { this.envRT = null; }
     this.world = this.track;
     this.heightAt = (x, z) => this.track.heightAt(x, z);
     this.dustColor = DUST[this.biome] ?? 0xa09070;
@@ -1447,6 +1461,8 @@ export class Game {
     this.tele.remove(tele);
     this.scene.remove(tmp);
     for (const e of warmEnemies) this.recycleEnemy(e);
+    // 预建的恐龙宝宝要留着用：先从临时组里拿出来，别把它们的骨骼也释放了
+    for (const b of this.hazards.babyPool || []) tmp.remove(b.model.root);
     // 归还预热模型占用的骨骼（图集里的位置 / 独立骨骼贴图）
     tmp.traverse((o) => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); });
     // 注意：不要 dispose 这些材质——three.js 会随材质一起删除着色器程序，预编译就白做了
@@ -1511,6 +1527,8 @@ export class Game {
     this.text.clear();
     this.hud.dispose();
     this.track.dispose();
+    if (this.envRT) { this.scene.environment = null; this.envRT.dispose(); this.envRT = null; }
+    this.app.juice.setGrade('menu');
     resetBend();
   }
 }

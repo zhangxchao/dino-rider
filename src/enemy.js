@@ -360,7 +360,7 @@ export class Enemy {
     this.animDt += dt;
     if ((dz < 60 && dz > -3) || ++this.animSkip % 3 === 0) { this.model.update(this.animDt, this.anim); this.animDt = 0; }
 
-    if (this.flashT > 0) this.flash.setFlash(this.flashT / 0.12);
+    if (this.flashT > 0) this.flash.setFlash(0.7 * this.flashT / 0.12);
     else if (this.slowT > 0) this.flash.setFlash(0.35, ICE_COL);
     else this.flash.setFlash(0);
     updateBar(this, dt, this.flying ? this.hoverY + 1.1 : this.height + 0.5);
@@ -481,7 +481,7 @@ export class Prop {
     this.root.position.copy(this.pos);
     this.root.rotation.y = Math.random() * Math.PI * 2;
     game.scene.add(this.root);
-    this.flash = prepareModel(this.root, { cast: false, receive: true });
+    this.flash = prepareModel(this.root, { cast: false, receive: true, rim: false });
     this.alive = true; this.removed = false; this.deadT = 0; this.state = 'active';
     this.hurt = 0; this.flashT = 0; this.collideCd = 0; this.stun = 0;
     this.barW = 1.6;
@@ -693,7 +693,7 @@ export class Boss {
     this.anim.pattern = this.pattern ? this.pattern.name : null;
     this.model.update(dt, this.anim);
 
-    if (this.flashT > 0) this.flash.setFlash(this.flashT / 0.12);
+    if (this.flashT > 0) this.flash.setFlash(0.7 * this.flashT / 0.12);
     else if (this.invulnT > 0) this.flash.setFlash(0.3 + 0.2 * Math.sin(this.anim.t * 20), _col.set(this.def.projColor));
     else this.flash.setFlash(0);
   }

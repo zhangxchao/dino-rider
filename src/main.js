@@ -52,7 +52,12 @@ class App {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1500);
 
-    this.composer = new EffectComposer(this.renderer);
+    // 后期合成的离屏缓冲开 4 倍多重采样（WebGL2）：高画质原来完全没有抗锯齿，边缘锯齿明显
+    const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+      type: THREE.HalfFloatType,
+      samples: this.renderer.capabilities.isWebGL2 !== false ? 4 : 0,
+    });
+    this.composer = new EffectComposer(this.renderer, rt);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.45, 0.85);
     this.composer.addPass(this.bloom);

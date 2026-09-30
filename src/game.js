@@ -5,15 +5,20 @@ import { createTrack } from './track.js';
 import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars, Debris, Scorch, LightFlashes, Streaks } from './effects.js';
 import { Projectiles } from './projectiles.js';
 import { Player, computeStats } from './player.js';
-import { Enemy, Boss, Prop, buildEnemyModel, buildBossModel } from './enemy.js';
+import { Enemy, Boss, Prop, buildBossModel } from './enemy.js';
 import { Hud } from './hud.js';
 import { input } from './input.js';
 import { save, persist } from './save.js';
-import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut } from './util.js';
+import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut, uploadRange } from './util.js';
 import { t } from './i18n.js';
 import { Hazards } from './hazards.js';
 import { setBendProfile, updateBend, resetBend, bendX, bendVec, curvature } from './bend.js';
 
+const NO_OPTS = Object.freeze({});
+const _aoeOpts = {};
+const _aoeDir = new THREE.Vector3();
+function clearOpts(o) { for (const k in o) delete o[k]; }
+let aoeDepth = 0;
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -260,6 +265,8 @@ export class Game {
     this.shake.enabled = save.settings.shake;
     this.projectiles = new Projectiles(this);
     this.enemies = [];
+    this.enemyPool = new Map();   // 按怪物类型回收的 Enemy（复用模型、材质、骨骼）
+    this.spawnQueue = [];         // 阵型分帧生成，避免一帧里建十几只怪
     this.pickups = [];
     this.gates = [];
     this.boss = null;
@@ -462,10 +469,7 @@ export class Game {
     } else {
       for (let i = 0; i < n; i++) spots.push({ x: rand(-W, W), z: ev.z + rand(-4, 5), t: type });
     }
-    for (const s of spots) {
-      const e = this.spawnEnemy(s.t, s.x, s.z, mul, true);
-      if (s.elite) { e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
-    }
+    for (const s of spots) { s.mul = mul; this.spawnQueue.push(s); }
   }
 
   // ------------------------------------------------------------------
@@ -508,12 +512,13 @@ export class Game {
       while (this.route.length && this.route[0].z <= p.pos.z + SPAWN_AHEAD) this.spawnEvent(this.route.shift());
       if (!this.endless && this.level.spiders) this.updateSpiders(dt);
     }
+    if (this.spawnQueue.length) this.drainSpawnQueue(6);
 
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       e.update(dt);
       if (e.removed) {
-        e.dispose();
+        this.recycleEnemy(e);
         this.enemies.splice(i, 1);
         if (e === this.boss && this.state !== 'bossDown' && this.state !== 'win') this.boss = null;
       }
@@ -545,6 +550,8 @@ export class Game {
     updateBend(p.pos.z, 1);
     this.updateCamera(realDt);
     this.shake.apply(this.camera, realDt);
+    // 先把镜头矩阵（含本帧震动）算好，飘字和准星的屏幕投影才和画面对得上，不会慢一帧、跟着震动抖
+    this.camera.updateMatrixWorld();
     this.renderBatches();
     this.text.update(realDt, this.camera, this.viewW, this.viewH);
     this.hud.update(this, realDt);
@@ -588,6 +595,7 @@ export class Game {
     for (const e of this.enemies) if (e.alive && !e.isBoss) this.killEnemy(e, true);
     this.projectiles.list.filter((pr) => pr.owner === 'enemy').forEach((pr) => { pr.life = 0; });
     this.route.length = 0;
+    this.spawnQueue.length = 0;
     this.hazards.clearZones();
     this.tele.clear();
     this.boss = new Boss(this, type, 0, p.pos.z + 30, { hp: mul.hp * this.diff.boss * BALANCE.bossHp, dmg: mul.dmg * this.diff.bossDmg * BALANCE.bossDmg });
@@ -756,16 +764,43 @@ export class Game {
     }
   }
 
+  /** 每帧按预算生成：对象池里有现成的就很便宜，现建一只模型要贵得多（每帧最多现建 1 只） */
+  drainSpawnQueue(budget) {
+    const q = this.spawnQueue;
+    let n = 0;
+    while (n < q.length && budget > 0) {
+      const s = q[n];
+      const pooled = this.enemyPool.get(s.t)?.length > 0;
+      if (!pooled && budget < 4 && n > 0) break;
+      budget -= pooled ? 1 : 4;
+      n++;
+      const e = this.spawnEnemy(s.t, s.x, s.z, s.mul, true);
+      if (s.elite) { e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
+    }
+    if (n) q.splice(0, n);
+  }
+
+  recycleEnemy(e) {
+    if (e.isBoss || e.isProp || e.noPool || e.treasure) { e.dispose(); return; }
+    // 骨骼矩阵放在共享图集里（共 2048 根），池子里闲置的怪也占着位置：限制总量，给首领 / 宝宝留余量
+    if (e.boneN === undefined) { let n = 0; e.root.traverse((o) => { if (o.isSkinnedMesh) n += o.skeleton.bones.length; }); e.boneN = n; }
+    let list = this.enemyPool.get(e.type);
+    if (!list) this.enemyPool.set(e.type, (list = []));
+    if (list.length < 16 && (this.poolBones || 0) + e.boneN <= 700) { e.release(); list.push(e); this.poolBones = (this.poolBones || 0) + e.boneN; } else e.dispose();
+  }
+
   spawnEnemy(type, x, z, mul, counted = false) {
     const rh = this.track.roadHalf - 1;
     x = clamp(x, -rh, rh);
-    const e = new Enemy(this, type, x, z, mul || this.mulAt(z));
+    const pool = this.enemyPool.get(type);
+    let e;
+    if (pool && pool.length) { e = pool.pop(); this.poolBones -= e.boneN; e.reset(x, z, mul || this.mulAt(z)); } else e = new Enemy(this, type, x, z, mul || this.mulAt(z));
     this.enemies.push(e);
     if (counted) this.stats.spawned++;
     return e;
   }
 
-  damageEnemy(e, dmg, o = {}) {
+  damageEnemy(e, dmg, o = NO_OPTS) {
     if (!e.alive) return 0;
     if (e.isBoss && (e.invulnT > 0 || e.state !== 'fight' || e.anim.burrow > 0.5)) {
       if (o.source !== 'dot' && Math.random() < 0.2) { e.getCenter(_v); _v.y += e.halfHeight; this.text.add(_v, t('float.immune'), 'info', 0.6); }
@@ -786,7 +821,7 @@ export class Game {
         this.checkComboTier();
       }
       if (e.isBoss) this.addFever(d / e.maxHp * 70);
-      e.applyStatus({ ...o, dotBase: d });
+      e.applyStatus(o, d);
     }
     if (o.source !== 'ram' || e.hp > 0) {
       e.getCenter(_v);
@@ -1040,7 +1075,11 @@ export class Game {
       if (_dir.lengthSq() < 1e-4) _dir.set(0, 0, 1);
       _dir.normalize();
       const crit = Math.random() < this.player.stats.crit;
-      this.damageEnemy(e, dmg * (crit ? 1.8 : 1), { ...o, crit, dir: _dir.clone() });
+      // 复用同一个参数对象（damageEnemy / applyStatus 只在调用期间读它）；击杀连锁引发的嵌套范围伤害另建对象
+      const oo = aoeDepth++ ? { ...o } : Object.assign(_aoeOpts, o);
+      oo.crit = crit; oo.dir = aoeDepth > 1 ? _dir.clone() : _aoeDir.copy(_dir);
+      this.damageEnemy(e, dmg * (crit ? 1.8 : 1), oo);
+      if (--aoeDepth === 0) clearOpts(_aoeOpts);
       n++;
     }
     return n;
@@ -1051,7 +1090,10 @@ export class Game {
     for (const e of this.enemies) {
       if (!e.targetable || e.pos.z < z0 || e.pos.z > z1 + e.radius || Math.abs(e.pos.x) > halfW) continue;
       const crit = Math.random() < this.player.stats.crit;
-      this.damageEnemy(e, dmg * (crit ? 1.8 : 1), { ...o, crit, dir: new THREE.Vector3(0, 0, 1) });
+      const oo = aoeDepth++ ? { ...o } : Object.assign(_aoeOpts, o);
+      oo.crit = crit; oo.dir = aoeDepth > 1 ? new THREE.Vector3(0, 0, 1) : _aoeDir.set(0, 0, 1);
+      this.damageEnemy(e, dmg * (crit ? 1.8 : 1), oo);
+      if (--aoeDepth === 0) clearOpts(_aoeOpts);
       n++;
     }
     return n;
@@ -1328,7 +1370,7 @@ export class Game {
       cm.setMatrixAt(n++, _m);
     }
     cm.count = n;
-    cm.instanceMatrix.needsUpdate = true;
+    uploadRange(cm.instanceMatrix, n);
   }
 
   /** 开局前预编译本关会出现的怪物 / 首领 / 弹体的着色器，避免第一次出现时卡顿 */
@@ -1337,8 +1379,13 @@ export class Game {
     const tmp = new THREE.Group();
     tmp.position.set(0, this.heightAt(0, 25), 25);
     const types = new Set(this.endless ? ENDLESS_POOL : [...Object.keys(this.level.pool), this.level.elite, ...BOSSES[this.level.boss].summon, ...(this.level.spiders ? ['spiderling'] : [])]);
-    // 同时预热"合并静态零件"的缓存，首次刷怪不再需要合并
-    for (const t of types) { try { tmp.add(buildEnemyModel(t).root); } catch { /* ignore */ } }
+    // 同时预热"合并静态零件"的缓存，并预先建好几只放进对象池：跑图时刷怪直接复用，不用现建模型
+    const warmEnemies = [];
+    const main = new Set(this.endless ? ENDLESS_POOL : Object.keys(this.level.pool));
+    for (const t of types) {
+      const n = main.has(t) ? (this.endless ? 6 : 10) : 3;
+      for (let k = 0; k < n; k++) { try { warmEnemies.push(new Enemy(this, t, 0, 25 + k * 0.01)); } catch { /* ignore */ } }
+    }
     const bossTypes = this.endless ? Object.keys(BOSSES) : [this.level.boss];
     for (const b of bossTypes) { try { tmp.add(buildBossModel(b).root); } catch { /* ignore */ } }
     for (const side of [THREE.FrontSide, THREE.DoubleSide]) tmp.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, side })));
@@ -1399,6 +1446,7 @@ export class Game {
     this.player.shield.visible = false;
     this.tele.remove(tele);
     this.scene.remove(tmp);
+    for (const e of warmEnemies) this.recycleEnemy(e);
     // 归还预热模型占用的骨骼（图集里的位置 / 独立骨骼贴图）
     tmp.traverse((o) => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); });
     // 注意：不要 dispose 这些材质——three.js 会随材质一起删除着色器程序，预编译就白做了
@@ -1435,6 +1483,10 @@ export class Game {
     this.app.toastEl.innerHTML = '';
     for (const e of this.enemies) e.dispose();
     this.enemies.length = 0;
+    for (const list of this.enemyPool.values()) for (const e of list) e.dispose();
+    this.enemyPool.clear();
+    this.poolBones = 0;
+    this.spawnQueue.length = 0;
     for (const gt of this.gates) gt.dispose();
     this.gates.length = 0;
     for (const pk of this.pickups) if (pk.mesh) this.scene.remove(pk.mesh);

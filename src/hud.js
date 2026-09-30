@@ -15,6 +15,13 @@ export const WEAPON_ICON = {
 };
 
 const _v = new THREE.Vector3();
+// 重新播放 CSS 动画：下一帧再加回类名，而不是读 offsetWidth（那会强制整页同步重排）
+function replay(el, cls) {
+  el.classList.remove(cls);
+  requestAnimationFrame(() => el.classList.add(cls));
+}
+const BUMP = [{ transform: 'scale(1.35)' }, { transform: 'scale(1)' }];
+const BUMP_OPT = { duration: 180, easing: 'ease-out' };
 
 export class Hud {
   constructor(root, fxLayer, { dino, rider, thumb, touch, endless }) {
@@ -99,17 +106,13 @@ export class Hud {
     const el = this.el.comboTier;
     this.el.combo.dataset.tier = tier;
     el.textContent = name;
-    el.classList.remove('pop');
-    void el.offsetWidth;
-    el.classList.add('pop');
+    replay(el, 'pop');
   }
 
   levelUp(lv, name) {
     const el = this.el.lvlup;
     el.innerHTML = `<div class="a">${t('hud.levelUp')}</div><div class="b">Lv.${lv}${lv >= WEAPON_MAX ? ' MAX' : ''} · ${name}</div>`;
-    el.classList.remove('show');
-    void el.offsetWidth;
-    el.classList.add('show');
+    replay(el, 'show');
     clearTimeout(this.lvlTimer);
     this.lvlTimer = setTimeout(() => el.classList.remove('show'), 1800);
   }
@@ -212,7 +215,7 @@ export class Hud {
     this.set('combo', c, (v) => {
       this.el.combo.classList.toggle('show', v >= 5);
       this.el.comboN.textContent = v;
-      if (v > this.lastCombo) { this.el.combo.classList.remove('bump'); void this.el.combo.offsetWidth; this.el.combo.classList.add('bump'); }
+      if (v > this.lastCombo && this.el.comboN.animate) this.el.comboN.animate(BUMP, BUMP_OPT);
       this.lastCombo = v;
     });
 
@@ -232,11 +235,11 @@ export class Hud {
     if (aim && game.state !== 'win') {
       bendVec(aim.getCenter(_v)).project(game.camera);
       if (_v.z < 1) {
-        this.reticle.style.display = 'block';
-        this.reticle.style.left = ((_v.x * 0.5 + 0.5) * game.viewW).toFixed(0) + 'px';
-        this.reticle.style.top = ((-_v.y * 0.5 + 0.5) * game.viewH).toFixed(0) + 'px';
-      } else this.reticle.style.display = 'none';
-    } else this.reticle.style.display = 'none';
+        // 用独立的 translate 属性定位（不触发重排，也不和旋转动画的 transform 冲突）
+        this.set('ret', 1, () => { this.reticle.style.display = 'block'; });
+        this.reticle.style.translate = `${((_v.x * 0.5 + 0.5) * game.viewW).toFixed(0)}px ${((-_v.y * 0.5 + 0.5) * game.viewH).toFixed(0)}px`;
+      } else this.set('ret', 0, () => { this.reticle.style.display = 'none'; });
+    } else this.set('ret', 0, () => { this.reticle.style.display = 'none'; });
   }
 
   dispose() {

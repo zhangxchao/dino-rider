@@ -42,7 +42,8 @@ class App {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // 流畅画质用普通 PCF 阴影（软阴影每个像素要多采样好几次）
+    this.renderer.shadowMap.type = save.settings.quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     // 不透明物体先按“着色器程序”分组再排序：默认按材质编号排，每只怪物各有一套材质，
     // 画的时候着色器会来回切换（每次切换还要重新上传一遍矩阵等 uniform）
     this.renderer.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder
@@ -73,7 +74,7 @@ class App {
     this.lastOpts = null;
     this.errorShown = false;
     // 动态分辨率 + 帧率统计
-    this.dyn = { t: 0, frames: 0, good: 0, lock: 0, pr: null, fps: 60 };
+    this.dyn = { t: 0, frames: 0, good: 0, bad: 0, lock: 0, pr: null, fps: 60, ft: [] };
     this.renderer.info.autoReset = false;
     this.fpsEl = document.createElement('div');
     this.fpsEl.id = 'fps-meter';
@@ -107,8 +108,8 @@ class App {
     const dpr = window.devicePixelRatio || 1;
     this.maxPR = s.quality === 'high' ? Math.min(dpr, 2) : Math.min(dpr, 1);
     this.minPR = s.quality === 'high' ? 0.75 : 0.6;
-    this.dyn.pr = Math.min(this.maxPR, s.quality === 'high' ? 1.5 : 1);
-    this.dyn.good = 0;
+    this.dyn.pr = Math.min(this.maxPR, s.quality === 'high' ? 1.25 : 1);
+    this.dyn.good = 0; this.dyn.bad = 0;
     this.setPixelRatio(this.dyn.pr);
     this.useComposer = s.quality === 'high';
     setFxLevel(s.fx || 'medium');
@@ -117,10 +118,12 @@ class App {
     this.fpsEl.style.display = s.showFps ? 'block' : 'none';
   }
 
+  // renderer / composer 的 setPixelRatio 内部已经按新分辨率重建缓冲，不要再 resize() 一遍（那会再重建一次）
   setPixelRatio(pr) {
     this.renderer.setPixelRatio(pr);
     this.composer.setPixelRatio(pr);
-    this.resize();
+    this.juice.setSize(window.innerWidth, window.innerHeight);
+    if (this.game) this.game.resize(window.innerWidth, window.innerHeight);
   }
 
   // 每秒根据帧率调整渲染分辨率：卡了就降，稳定流畅再慢慢升回去
@@ -129,13 +132,20 @@ class App {
     if (document.hidden || rawDt > 0.5) return;
     d.t += rawDt; d.frames++;
     d.lock -= rawDt;
+    // 单帧长卡顿（刷怪、加载、切后台回来）不算进分辨率判断：看帧时间中位数，而不是平均帧率
+    if (rawDt < 0.1) d.ft.push(rawDt);
     if (d.t < 1) return;
     d.fps = d.frames / d.t;
     d.t = 0; d.frames = 0;
+    const ft = d.ft.sort((a, b) => a - b);
+    const medFps = ft.length ? 1 / ft[ft.length >> 1] : d.fps;
+    d.ft.length = 0;
     if (save.settings.autoRes !== false) {
-      if (d.fps < 50 && d.pr > this.minPR + 0.01) {
+      // 连续两秒都明显掉帧才降一档；降完冷却 6 秒，避免一路连降（每次改分辨率本身也会顿一下）
+      if (medFps < 50) d.bad++; else d.bad = 0;
+      if (d.bad >= 2 && d.lock <= 0 && d.pr > this.minPR + 0.01) {
         d.pr = Math.max(this.minPR, Math.round((d.pr - 0.25) * 100) / 100);
-        d.lock = 8; d.good = 0;
+        d.lock = 6; d.good = 0; d.bad = 0;
         this.setPixelRatio(d.pr);
       } else if (d.fps >= 58 && d.pr < this.maxPR - 0.01 && d.lock <= 0 && !(this.game && !this.game.paused)) {
         // 提高分辨率需要重建后期缓冲（会顿一下），所以只在菜单 / 暂停时往上调

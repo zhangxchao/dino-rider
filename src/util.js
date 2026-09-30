@@ -8,6 +8,15 @@ export const randInt = (a, b) => Math.floor(rand(a, b + 1));
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 export const damp = (a, b, lambda, dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
 
+/** 只把前 n 个元素标记为需要上传到 GPU（默认会整块上传整个缓冲，哪怕只用了几个）；n 为 0 时什么也不传 */
+export function uploadRange(attr, n) {
+  if (!attr) return;
+  attr.clearUpdateRanges();
+  if (n <= 0) return;
+  attr.addUpdateRange(0, n * attr.itemSize);
+  attr.needsUpdate = true;
+}
+
 export function angleDiff(a, b) {
   let d = (b - a) % (Math.PI * 2);
   if (d > Math.PI) d -= Math.PI * 2;

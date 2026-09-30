@@ -202,7 +202,6 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .combo.show { opacity: 1; }
 .combo .n { font-size: 56px; font-weight: 900; font-style: italic; background: linear-gradient(180deg, #fff, #ffb938); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 0 #7a3a00); line-height: 1; }
 .combo .l { font-size: 14px; font-weight: 900; letter-spacing: .3em; color: #ffd98a; }
-.combo.bump .n { animation: bump .18s ease; }
 .combo .tier { font-size: 20px; font-weight: 900; font-style: italic; letter-spacing: .05em; margin-top: 4px; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8); min-height: 24px; }
 .combo .tier.pop { animation: tierPop .45s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes tierPop { 0% { transform: scale(2.2) rotate(-6deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }

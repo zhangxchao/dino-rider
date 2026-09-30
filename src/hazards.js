@@ -104,6 +104,9 @@ export class Hazards {
     const h = new THREE.Mesh(this.hazGeo, this.hazMat);
     h.position.x = 3;
     group.add(r, c, h);
+    // 预先造好两只恐龙宝宝：捡到蛋时直接孵化，不用现场合并模型（也顺便编译它们的着色器）
+    this.babyPool = [this.buildBaby(), this.buildBaby()];
+    for (const b of this.babyPool) { b.model.root.position.set(-3, 0, 2); group.add(b.model.root); }
   }
 
   /** 路线事件分派：处理了返回 true */
@@ -214,7 +217,7 @@ export class Hazards {
     const g = this.game;
     const mul = g.mulAt(z);
     const e = g.spawnEnemy('goblin', rand(-4, 4), g.player.pos.z + 42, mul);
-    e.treasure = true;
+    e.treasure = true; e.noPool = true;
     e.flee = 13.2;
     e.fleeT = 9.5;
     e.maxHp = e.hp = Math.round(e.hp * 5);
@@ -254,22 +257,31 @@ export class Hazards {
   // ------------------------------------------------------------------
   //  恐龙宝宝
   // ------------------------------------------------------------------
+  /** 造一只恐龙宝宝模型（合并静态零件 + 刚体蒙皮，比较费时，所以关卡开始时先备好两只） */
+  buildBaby() {
+    const p = this.game.player;
+    const def = pick(DINOS.filter((d) => d.id !== p.def.id && d.body !== 'pterosaur'));
+    const model = createDinoModel(def);
+    model.root.scale.multiplyScalar(BABY_SCALE);
+    // 合并不会动的零件（同一种恐龙缓存复用），不投射实时阴影，改用圆形投影
+    const steps = [];
+    let tt = 0;
+    for (const a of [-1, 0.5]) for (const mv of [0, 1, 1.7]) { const t0 = (tt += 0.23); steps.push(() => model.update(0.1, { t: t0, move: mv, air: false, attack: a, skill: -1, hurt: 0, dead: 0 })); }
+    steps.push(() => model.update(0.1, { t: tt + 1, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0 }));
+    mergeStaticMeshes(model.root, () => steps.forEach((f) => f()), 'baby:' + def.id);
+    rigidSkin(model.root, steps, 'baby:' + def.id, { atlas: true });
+    model.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    return { def, model };
+  }
+
   hatch(n = 1) {
     const g = this.game, p = g.player;
+    this.babyPool = this.babyPool || [];
     for (let k = 0; k < n; k++) {
       if (this.babies.length >= 2) { this.babies[0].life = BABY_LIFE; continue; }
       const side = this.babies.length && this.babies[0].side > 0 ? -1 : 1;
-      const def = pick(DINOS.filter((d) => d.id !== p.def.id && d.body !== 'pterosaur'));
-      const model = createDinoModel(def);
-      model.root.scale.multiplyScalar(BABY_SCALE);
-      // 合并不会动的零件（同一种恐龙缓存复用），不投射实时阴影，改用圆形投影
-      const steps = [];
-      let tt = 0;
-      for (const a of [-1, 0.5]) for (const mv of [0, 1, 1.7]) { const t0 = (tt += 0.23); steps.push(() => model.update(0.1, { t: t0, move: mv, air: false, attack: a, skill: -1, hurt: 0, dead: 0 })); }
-      steps.push(() => model.update(0.1, { t: tt + 1, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0 }));
-      mergeStaticMeshes(model.root, () => steps.forEach((f) => f()), 'baby:' + def.id);
-      rigidSkin(model.root, steps, 'baby:' + def.id, { atlas: true });
-      model.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+      const { def, model } = this.babyPool.pop() || this.buildBaby();
+      model.root.visible = true;
       g.scene.add(model.root);
       const b = {
         def, model, side, life: BABY_LIFE, t: 0, atkT: -1, atkCd: 0.6, hit: false, target: null,
@@ -423,6 +435,7 @@ export class Hazards {
     for (const r of this.ramps) g.scene.remove(r.grp);
     for (const s of this.strikes) if (s.mesh) g.scene.remove(s.mesh);
     for (const b of this.babies) removeBaby(g, b);
+    for (const b of this.babyPool || []) removeBaby(g, b);
     this.ramps.length = 0; this.strikes.length = 0; this.babies.length = 0;
     this.rampMat.dispose(); this.chevMat.dispose(); this.chevTex.dispose(); this.hazMat.dispose();
   }

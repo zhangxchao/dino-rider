@@ -1,6 +1,7 @@
 // 视觉特效：GPU 粒子、冲击波环、光柱、地面预警、护盾、伤害飘字
 import * as THREE from 'three';
 import { bendVec } from './bend.js';
+import { uploadRange } from './util.js';
 
 const _c = new THREE.Color();
 const _v = new THREE.Vector3();
@@ -181,10 +182,8 @@ export class Particles {
     }
     const g = this.geo;
     g.setDrawRange(0, this.count);
-    g.attributes.position.needsUpdate = true;
-    g.attributes.color.needsUpdate = true;
-    g.attributes.size.needsUpdate = true;
-    g.attributes.alpha.needsUpdate = true;
+    const A = g.attributes;
+    uploadRange(A.position, this.count); uploadRange(A.color, this.count); uploadRange(A.size, this.count); uploadRange(A.alpha, this.count);
   }
 
   _copy(from, to) {
@@ -610,7 +609,7 @@ export class BlobShadows {
   }
   end() {
     this.mesh.count = this.n;
-    this.mesh.instanceMatrix.needsUpdate = true;
+    uploadRange(this.mesh.instanceMatrix, this.n);
   }
   dispose() {
     this.mesh.parent && this.mesh.parent.remove(this.mesh);
@@ -656,9 +655,9 @@ export class Bars {
   }
   end() {
     this.bg.count = this.fg.count = this.n;
-    this.bg.instanceMatrix.needsUpdate = true;
-    this.fg.instanceMatrix.needsUpdate = true;
-    this.fg.instanceColor.needsUpdate = true;
+    uploadRange(this.bg.instanceMatrix, this.n);
+    uploadRange(this.fg.instanceMatrix, this.n);
+    uploadRange(this.fg.instanceColor, this.n);
   }
   dispose() {
     for (const m of [this.bg, this.fg]) { m.parent && m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); }
@@ -725,8 +724,8 @@ export class Debris {
       n++;
     }
     m.count = n;
-    m.instanceMatrix.needsUpdate = true;
-    m.instanceColor.needsUpdate = true;
+    uploadRange(m.instanceMatrix, n);
+    uploadRange(m.instanceColor, n);
   }
   clear() { this.items.length = 0; this.mesh.count = 0; }
   dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.mesh.dispose(); }
@@ -796,8 +795,8 @@ export class Scorch {
       n++;
     }
     this.mesh.count = n;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.fade.needsUpdate = true;
+    uploadRange(this.mesh.instanceMatrix, n);
+    uploadRange(this.fade, n);
   }
   clear() { this.items.length = 0; this.mesh.count = 0; }
   dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.mesh.geometry.dispose(); this.mesh.dispose(); }
@@ -873,8 +872,8 @@ export class Streaks {
   }
   end() {
     this.mesh.count = this.n;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    uploadRange(this.mesh.instanceMatrix, this.n);
+    uploadRange(this.mesh.instanceColor, this.n);
   }
   dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.tex.dispose(); this.mesh.dispose(); }
 }

@@ -449,11 +449,15 @@ export class UI {
           ${from === 'title' ? `<div class="set-row"><label>${t('settings.difficulty')}</label><div class="seg" data-k="difficulty">${DIFFICULTY_IDS.map((v) => `<button data-v="${v}" class="${(s.difficulty || 'medium') === v ? 'on' : ''}">${t('diff.' + v)}</button>`).join('')}</div></div>` : ''}
           <div class="set-row"><label>${t('settings.music')}</label><input type="range" min="0" max="1" step="0.05" value="${s.music}" data-k="music"></div>
           <div class="set-row"><label>${t('settings.sfx')}</label><input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-k="sfx"></div>
+          <div class="set-row"><label>${t('settings.mute')}</label><div class="seg" data-k="mute"><button data-v="1" class="${s.mute ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.mute ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.quality')}</label><div class="seg" data-k="quality"><button data-v="high" class="${s.quality === 'high' ? 'on' : ''}">${t('settings.qualityHigh')}</button><button data-v="low" class="${s.quality === 'low' ? 'on' : ''}">${t('settings.qualityLow')}</button></div></div>
           <div class="set-row"><label>${t('settings.fx')}</label><div class="seg" data-k="fx">${['full', 'medium', 'low'].map((v) => `<button data-v="${v}" class="${(s.fx || 'medium') === v ? 'on' : ''}">${t('settings.fx.' + v)}</button>`).join('')}</div></div>
           <div class="set-row"><label>${t('settings.autoRes')}</label><div class="seg" data-k="autoRes"><button data-v="1" class="${s.autoRes !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.autoRes === false ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.fps')}</label><div class="seg" data-k="showFps"><button data-v="1" class="${s.showFps ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.showFps ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.shake')}</label><div class="seg" data-k="shake"><button data-v="1" class="${s.shake ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.shake ? 'on' : ''}">${t('common.off')}</button></div></div>
+          <div class="set-row"><label>${t('settings.reduceMotion')}</label><div class="seg" data-k="reduceMotion"><button data-v="1" class="${s.reduceMotion ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.reduceMotion ? 'on' : ''}">${t('common.off')}</button></div></div>
+          ${this.app.isTouch ? `<div class="set-row"><label>${t('settings.vibrate')}</label><div class="seg" data-k="vibrate"><button data-v="1" class="${s.vibrate !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.vibrate === false ? 'on' : ''}">${t('common.off')}</button></div></div>` : ''}
+          ${from === 'title' ? `<div class="set-row"><label>${t('settings.tutorial')}</label><button class="btn ghost small" data-tut>${save.tutorialDone ? t('settings.tutorialBtn') : t('settings.tutorialOn')}</button></div>` : ''}
           ${from === 'title' ? `<div class="set-row"><label>${t('settings.reset')}</label><button class="btn danger small" data-reset>${t('settings.resetBtn')}</button></div>` : ''}
           <div class="row-btns"><button class="btn" data-back>${t('settings.done')}</button></div>
         </div>
@@ -476,6 +480,8 @@ export class UI {
       this.app.applySettings();
       persist();
     })));
+    const tut = n.querySelector('[data-tut]');
+    if (tut) tut.addEventListener('click', () => { save.tutorialDone = false; save.tutUlt = false; persist(); tut.textContent = t('settings.tutorialOn'); });
     const reset = n.querySelector('[data-reset]');
     if (reset) {
       let armed = false;
@@ -522,12 +528,22 @@ export class UI {
 
   // ------------------------------------------------------------------
   build_pause() {
+    const g = this.app.game;
+    const st = g ? `
+          <div class="pause-stats">
+            <div><b>${Math.round(g.player.pos.z)}</b><span>${t('pause.dist')}</span></div>
+            <div><b>${g.stats.kills}</b><span>${t('result.kills')}</span></div>
+            <div><b>${g.stats.maxCombo}</b><span>${t('result.combo')}</span></div>
+            <div><b class="gold">${g.stats.coins}</b><span>${t('pause.coins')}</span></div>
+          </div>
+          ${meta.daily.list.map((m) => `<div class="pause-m ${m.prog >= m.goal ? 'ok' : ''}">${m.prog >= m.goal ? '✓' : '🎯'} ${meta.missionText(m)} <em>${Math.min(m.prog, m.goal).toLocaleString()}/${m.goal.toLocaleString()}</em></div>`).join('')}` : '';
     const n = el(`
       <div>
         <div class="overlay-dim"></div>
-        <div class="center-panel panel" style="width:min(420px,92vw)">
+        <div class="center-panel panel" style="width:min(440px,92vw)">
           <h2>${t('pause.title')}</h2>
-          <div style="display:flex;flex-direction:column;gap:12px">
+          ${st}
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
             <button class="btn" data-a="resume">${t('pause.resume')}</button>
             <button class="btn ghost" data-a="restart">${t('pause.restart')}</button>
             <button class="btn ghost" data-a="settings">${t('pause.settings')}</button>
@@ -536,8 +552,20 @@ export class UI {
           </div>
         </div>
       </div>`);
+    // 重新开始 / 退出会丢掉这一局：要再点一次确认
+    const armed = new Set();
+    const confirm = (b, a) => {
+      if (armed.has(a)) return true;
+      armed.add(a);
+      b.dataset.label = b.textContent;
+      b.textContent = t('pause.confirm');
+      b.classList.add('armed');
+      setTimeout(() => { armed.delete(a); b.textContent = b.dataset.label; b.classList.remove('armed'); }, 2500);
+      return false;
+    };
     n.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
       const a = b.dataset.a;
+      if ((a === 'restart' || a === 'quit') && !confirm(b, a)) return;
       if (a === 'resume') this.app.resume();
       else if (a === 'restart') this.app.restart();
       else if (a === 'settings') this.show('settings', { from: 'pause' });

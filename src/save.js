@@ -21,7 +21,7 @@ function defaults() {
     life: {},                          // 累计统计（成就用）：perfect / ult / gate / coin / bestCombo …
     achv: {},                          // 成就状态：id -> 'done' | 'claimed'
     daily: null,                       // 每日任务 { date, list }
-    settings: { music: 0.55, sfx: 0.8, quality: 'high', sensitivity: 1, shake: false, invertY: false, touch: 'auto', autoRes: true, showFps: false, fx: 'medium', difficulty: 'medium' },
+    settings: { music: 0.55, sfx: 0.8, quality: 'high', sensitivity: 1, shake: false, invertY: false, touch: 'auto', autoRes: true, showFps: false, fx: 'medium', difficulty: 'medium', vibrate: true, reduceMotion: false, mute: false },
   };
 }
 

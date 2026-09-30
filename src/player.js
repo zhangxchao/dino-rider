@@ -1,6 +1,7 @@
 // 玩家（跑道模式）：恐龙自动前进，左右走位；骑手自动射击；武器随击杀升级
 import * as THREE from 'three';
 import { meta } from './meta.js';
+import { input } from './input.js';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
 import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE } from './data.js';
@@ -877,6 +878,7 @@ export class Player {
       g.audio.play(this.buffs.fortress > 0 || this.buffs.shield > 0 ? 'shieldHit' : 'playerHurt', { volume: 0.7 });
       g.shake.add(Math.min(0.3, 0.1 + dmg / this.stats.maxHp * 1.2));
       g.hud && g.hud.damageFlash();
+      input.buzz(amount > this.stats.maxHp * 0.12 ? 45 : 22, 150);
       const heavy = Math.min(1, dmg / this.stats.maxHp * 6);
       g.juice.flash(0xff2020, 0.08 + heavy * 0.2);
       g.juice.aberr(0.5 + heavy * 1.2);

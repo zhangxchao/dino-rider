@@ -553,7 +553,13 @@ export class Game {
     this.updatePickups(dt);
     this.updateFlow(dt);
 
-    if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) { this.combo = 0; this.comboTier = 0; } }
+    if (this.comboT > 0) {
+      this.comboT -= dt;
+      if (this.comboT <= 0) {
+        if (this.combo >= 10 && this.player.alive && !this.finished) this.hud.comboLost(this.combo);
+        this.combo = 0; this.comboTier = 0;
+      }
+    }
     if (this.perfectCd > 0) this.perfectCd -= realDt;
     this.fx.sparks.update(dt);
     this.fx.dust.update(dt);
@@ -641,6 +647,7 @@ export class Game {
     this.stats.bosses++;
     this.bossCount++;
     meta.track('boss');
+    input.buzz([80, 60, 120], 0);
     this.hitstopT = 0;
     for (let i = 0; i < 16; i++) this.spawnPickup('coin', boss.pos, Math.round(boss.maxHp / 600) + 1);
     for (const e of this.enemies) if (e !== boss && e.alive) this.killEnemy(e, true);
@@ -904,6 +911,7 @@ export class Game {
   onRageStart() {
     const p = this.player;
     meta.track('ult');
+    input.buzz([30, 40, 60], 0);
     this.feverReady = false;
     this.slowmoT = Math.max(this.slowmoT, 0.45);
     this.showBanner(t('banner.rage'), t('banner.rageSub'), false, 1300);
@@ -952,6 +960,7 @@ export class Game {
     }
     this.addFever(7);
     meta.track('perfect');
+    input.buzz(15, 200);
     this.slowmoT = Math.max(this.slowmoT, 0.18);
     this.juice.flash(0x60e0ff, 0.18);
     this.juice.aberr(0.6);

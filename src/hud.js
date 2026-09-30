@@ -22,6 +22,8 @@ function replay(el, cls) {
 }
 const BUMP = [{ transform: 'scale(1.35)' }, { transform: 'scale(1)' }];
 const BUMP_OPT = { duration: 180, easing: 'ease-out' };
+const PULSE = [{ transform: 'scale(1.14)' }, { transform: 'scale(1)' }];
+const PULSE_OPT = { duration: 160, easing: 'ease-out' };
 
 export class Hud {
   constructor(root, fxLayer, { dino, rider, thumb, touch, endless }) {
@@ -100,6 +102,14 @@ export class Hud {
     this.lvlTimer = null;
   }
 
+  pulse(el, key) {
+    const now = performance.now();
+    this.pulseT = this.pulseT || {};
+    if (!el.animate || now - (this.pulseT[key] || 0) < 140) return;
+    this.pulseT[key] = now;
+    el.animate(PULSE, PULSE_OPT);
+  }
+
   set(key, val, fn) {
     if (this.cache[key] === val) return;
     this.cache[key] = val;
@@ -118,6 +128,15 @@ export class Hud {
     this.el.combo.dataset.tier = tier;
     el.textContent = name;
     replay(el, 'pop');
+  }
+
+  /** 连击中断：在连击数位置飘一行灰色提示 */
+  comboLost(n) {
+    const d = document.createElement('div');
+    d.className = 'combo-lost';
+    d.textContent = t('hud.comboLost', { n });
+    this.root.appendChild(d);
+    setTimeout(() => d.remove(), 1300);
   }
 
   levelUp(lv, name) {
@@ -214,8 +233,9 @@ export class Hud {
       this.set('dist', Math.floor(p.pos.z), (v) => { this.el.dist.innerHTML = t('hud.dist', { n: v }); });
     }
 
-    this.set('coins', game.stats.coins, (v) => { this.el.coins.textContent = v; });
-    this.set('kills', game.stats.kills, (v) => { this.el.kills.textContent = v; });
+    // 数字变化时对应的小胶囊轻轻跳一下（Web Animations，不触发重排）
+    this.set('coins', game.stats.coins, (v) => { this.el.coins.textContent = v; this.pulse(this.el.coins.parentElement, 'c'); });
+    this.set('kills', game.stats.kills, (v) => { this.el.kills.textContent = v; this.pulse(this.el.kills.parentElement, 'k'); });
     this.set('time', Math.floor(game.time), () => { this.el.time.textContent = formatTime(game.time); });
 
     const rage = game.player.buffs.rage;
@@ -248,7 +268,10 @@ export class Hud {
         this.bossEl.ghost.style.width = (r * 100).toFixed(1) + '%';
         this.bossEl.text.textContent = `${Math.ceil(b.hp)} / ${b.maxHp}`;
       });
-      this.set('bph', b.phase, (v) => { this.bossEl.phase.textContent = b.phases > 1 ? t('hud.phase', { n: v, max: b.phases }) : ''; });
+      this.set('bph', b.phase, (v) => {
+        this.bossEl.phase.textContent = b.phases > 1 ? t('hud.phase', { n: v, max: b.phases }) : '';
+        if (v > 1) replay(this.bossEl.phase.parentElement, 'phase-up');
+      });
     }
 
     // 自动瞄准标记

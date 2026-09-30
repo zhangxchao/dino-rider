@@ -475,3 +475,30 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .menu .btn { position: relative; }
 .coin-float { position: fixed; transform: translate(-50%, 0); z-index: 80; color: var(--gold); font-weight: 900; font-size: 20px; text-shadow: 0 2px 6px #000; pointer-events: none; animation: coinFloat 1.1s ease-out forwards; }
 @keyframes coinFloat { from { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 20% { opacity: 1; transform: translate(-50%, -8px) scale(1.15); } to { opacity: 0; transform: translate(-50%, -60px) scale(1); } }
+
+.combo-lost { position: absolute; right: 30px; top: calc(40% + 70px); font-size: 15px; font-weight: 900; color: #c8ccd6; text-shadow: 0 2px 4px #000; letter-spacing: .08em; pointer-events: none; animation: comboLost 1.3s ease forwards; }
+@keyframes comboLost { 0% { opacity: 0; transform: translateY(-6px); } 15% { opacity: 1; transform: none; } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(14px); } }
+.boss-bar.phase-up .bar-outer { animation: phaseUp .9s ease; }
+.boss-bar.phase-up .boss-phase { animation: phaseTxt .9s ease; color: #fff; }
+@keyframes phaseUp { 0%, 30%, 60% { box-shadow: 0 0 0 2px #ff5040, 0 0 22px rgba(255,60,40,.9); } 15%, 45%, 100% { box-shadow: none; } }
+@keyframes phaseTxt { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
+
+/* ---------------- 暂停面板 ---------------- */
+.pause-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+.pause-stats > div { text-align: center; padding: 8px 4px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.pause-stats b { display: block; font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.pause-stats b.gold { color: var(--gold); }
+.pause-stats span { font-size: 11px; color: var(--muted); }
+.pause-m { font-size: 13px; color: var(--muted); padding: 3px 2px; }
+.pause-m em { font-style: normal; float: right; font-variant-numeric: tabular-nums; }
+.pause-m.ok { color: var(--good); }
+.btn.armed { background: #c8323f !important; color: #fff !important; border-color: #ff7a7a !important; }
+
+/* ---------------- 可访问性 ---------------- */
+.btn:focus-visible, .tab:focus-visible, .seg button:focus-visible, .card:focus-visible { outline: 3px solid #7ad8ff; outline-offset: 2px; }
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; transition-duration: .001s !important; }
+/* 标题菜单 6 个按钮：收紧一点，不顶到宣传语 */
+#s-title .menu { bottom: 7vh; gap: 9px; }
+#s-title .menu .btn { padding-top: 11px; padding-bottom: 11px; }
+@media (max-height: 640px) { #s-title .menu { gap: 6px; bottom: 4vh; } #s-title .menu .btn { padding-top: 8px; padding-bottom: 8px; font-size: 15px; } }
+.set-row { padding: 9px 0; }

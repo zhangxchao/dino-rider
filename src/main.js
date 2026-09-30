@@ -105,11 +105,15 @@ class App {
   }
 
   get quality() { return save.settings.quality; }
+  get isTouch() { return input.isTouch; }
 
   applySettings() {
     const s = save.settings;
-    audio.setMusicVolume(s.music);
-    audio.setSfxVolume(s.sfx);
+    audio.setMusicVolume(s.mute ? 0 : s.music);
+    audio.setSfxVolume(s.mute ? 0 : s.sfx);
+    // 减少动效：跟随系统设置或手动开启（关掉界面上的循环 / 弹跳动画，镜头动感也一起关）
+    const rm = s.reduceMotion || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    document.documentElement.classList.toggle('reduce-motion', !!rm);
     const dpr = window.devicePixelRatio || 1;
     this.maxPR = s.quality === 'high' ? Math.min(dpr, 2) : Math.min(dpr, 1);
     this.minPR = s.quality === 'high' ? 0.75 : 0.6;
@@ -118,7 +122,8 @@ class App {
     this.setPixelRatio(this.dyn.pr);
     this.useComposer = s.quality === 'high';
     setFxLevel(s.fx || 'medium');
-    this.juice.motion = !!s.shake;
+    this.juice.motion = !!s.shake && !rm;
+    input.vibrate = s.vibrate !== false;
     if (this.game) this.game.shake.enabled = s.shake;
     this.fpsEl.style.display = s.showFps ? 'block' : 'none';
   }

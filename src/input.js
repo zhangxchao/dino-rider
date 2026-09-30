@@ -21,6 +21,8 @@ class Input {
     this.onUnlock = null;         // 游戏中意外失去指针锁定时回调（用于暂停）
     this.joy = { x: 0, y: 0 };
     this.isTouch = false;
+    this.vibrate = true;          // 设置里的「震动反馈」
+    this.lastBuzz = 0;
     this.lastLockAttempt = 0;
   }
 
@@ -75,6 +77,15 @@ class Input {
 
   exitLock() {
     if (document.pointerLockElement) document.exitPointerLock();
+  }
+
+  /** 手机震动反馈（只在触屏设备上；同一类震动之间至少隔 minGap 毫秒） */
+  buzz(pattern, minGap = 120) {
+    if (!this.isTouch || !this.vibrate || !navigator.vibrate) return;
+    const now = performance.now();
+    if (now - this.lastBuzz < minGap) return;
+    this.lastBuzz = now;
+    try { navigator.vibrate(pattern); } catch { /* ignore */ }
   }
 
   held(action) { return ACTIONS[action].some((c) => this.down.has(c)); }

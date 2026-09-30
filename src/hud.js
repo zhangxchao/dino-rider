@@ -69,7 +69,18 @@ export class Hud {
       <div class="hud-hints">
         ${t('hud.hints')}
       </div>`;
-    if (touch) root.querySelector('.hud-hints').classList.add('hidden');
+    root.classList.toggle('touch', !!touch);
+    // 触屏：技能冷却和狂热进度直接画在可点的触屏按钮上（原来的技能卡被按钮挡住了）
+    this.tb = null;
+    if (touch) {
+      root.querySelector('.hud-hints').classList.add('hidden');
+      const tr = document.getElementById('touch');
+      const sk = tr && tr.querySelector('.tbtn.skill'), ul = tr && tr.querySelector('.tbtn.ult');
+      if (sk && ul) {
+        sk.querySelector('.ico').textContent = SKILL_ICON[dino.skill.type] || '✨';
+        this.tb = { skill: sk, cd: sk.querySelector('.tcd'), ct: sk.querySelector('.tct'), ult: ul, fill: ul.querySelector('.tfill') };
+      }
+    }
     const $ = (s) => root.querySelector(s);
     this.el = {
       flash: $('.dmg-flash'), hp: $('.bar-fill.hp'), ghost: $('.bar-fill.ghost'), hpText: $('.bar-text'),
@@ -178,11 +189,16 @@ export class Hud {
     // 技能
     const scd = p.def.skill.cd * st.cdMul;
     const sr = Math.max(0, p.skillCd / scd);
+    const tb = this.tb;
     this.set('scd', Math.round(sr * 100), () => {
       this.el.skillCd.style.setProperty('--p', (sr * 100).toFixed(0) + '%');
       this.el.skill.classList.toggle('ready', sr <= 0);
+      if (tb) { tb.cd.style.setProperty('--p', (sr * 100).toFixed(0) + '%'); tb.skill.classList.toggle('ready', sr <= 0); }
     });
-    this.set('scdt', p.skillCd > 0 ? Math.ceil(p.skillCd) : 0, (v) => { this.el.skillCdt.textContent = v > 0 ? v : ''; });
+    this.set('scdt', p.skillCd > 0 ? Math.ceil(p.skillCd) : 0, (v) => {
+      this.el.skillCdt.textContent = v > 0 ? v : '';
+      if (tb) tb.ct.textContent = v > 0 ? v : '';
+    });
 
     // 路线进度
     if (!this.endless) {
@@ -208,6 +224,11 @@ export class Hud {
       this.el.feverFill.style.height = fv.toFixed(1) + '%';
       this.el.fever.classList.toggle('ready', rage <= 0 && game.fever >= 100);
       this.el.fever.classList.toggle('active', rage > 0);
+      if (tb) {
+        tb.fill.style.height = fv.toFixed(1) + '%';
+        tb.ult.classList.toggle('ready', rage <= 0 && game.fever >= 100);
+        tb.ult.classList.toggle('active', rage > 0);
+      }
     });
 
     const c = game.combo;
@@ -244,6 +265,10 @@ export class Hud {
 
   dispose() {
     clearTimeout(this.lvlTimer);
+    if (this.tb) {
+      this.tb.skill.classList.remove('ready'); this.tb.ult.classList.remove('ready', 'active');
+      this.tb.fill.style.height = '0%'; this.tb.ct.textContent = ''; this.tb.cd.style.setProperty('--p', '0%');
+    }
     this.root.innerHTML = '';
     this.root.classList.remove('low-hp');
     this.reticle.remove();

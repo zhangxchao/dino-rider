@@ -119,10 +119,11 @@ class Input {
     root.innerHTML = `
       <div class="look" style="left:0;width:100%;height:100%"></div>
       <div class="joy"><div class="knob"></div></div>
-      <div class="tbtn" data-a="skill" style="right:24px;bottom:120px;width:86px;height:86px"><span>✨</span>${t('touch.skill')}</div>
-      <div class="tbtn" data-a="jump" style="right:120px;bottom:34px"><span>⤴️</span>${t('touch.jump')}</div>
-      <div class="tbtn ult" data-a="ult" style="right:130px;bottom:128px"><span>🦖</span>${t('touch.ult')}</div>
-      <button class="btn small ghost tpause" data-a="pause">${t('touch.pause')}</button>`;
+      <div class="tbtn skill" data-a="skill"><div class="tcd"></div><span class="ico">✨</span><b>${t('touch.skill')}</b><div class="tct"></div></div>
+      <div class="tbtn jump" data-a="jump"><span class="ico">⤴️</span><b>${t('touch.jump')}</b></div>
+      <div class="tbtn ult" data-a="ult"><div class="tfill"></div><span class="ico">🦖</span><b>${t('touch.ult')}</b></div>
+      <button class="btn small ghost tpause" data-a="pause">${t('touch.pause')}</button>
+      <div class="rotate-hint"><div class="ph">📱</div><div>${t('touch.rotate')}</div></div>`;
     const look = root.querySelector('.look');
     const lastPos = new Map();
     look.addEventListener('touchstart', (e) => { for (const t of e.changedTouches) lastPos.set(t.identifier, t.clientX); e.preventDefault(); }, { passive: false });

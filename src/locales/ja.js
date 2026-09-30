@@ -249,6 +249,17 @@ export default {
 
     'touch.skill': 'スキル',
     'touch.jump': 'ジャンプ',
+    'touch.rotate': 'スマホを横向きにしてプレイしてね',
+    'tut.move.key': '<kbd>A</kbd> <kbd>D</kbd> か <kbd>←</kbd> <kbd>→</kbd> で左右に移動（マウスドラッグでもOK）',
+    'tut.move.touch': '左下のスティックを左右に倒すか、画面を左右にスワイプ',
+    'tut.jump.key': 'モンスターが来た！<kbd>スペース</kbd>で飛び越えよう。着地で衝撃波も出るよ',
+    'tut.jump.touch': 'モンスターが来た！「ジャンプ」で飛び越えよう。着地で衝撃波も出るよ',
+    'tut.gate.key': '強化ゲートだ：欲しい方のゲートをくぐろう',
+    'tut.gate.touch': '強化ゲートだ：スティックで欲しい方のゲートをくぐろう',
+    'tut.skill.key': 'スキル準備完了！<kbd>Q</kbd>で恐竜の必殺技',
+    'tut.skill.touch': 'スキル準備完了！右下のスキルボタンをタップ',
+    'tut.ult.key': 'フィーバー満タン！<kbd>R</kbd>で太古の覚醒：巨大化・無敵・弾幕全開',
+    'tut.ult.touch': 'フィーバー満タン！「覚醒」をタップ：巨大化・無敵・弾幕全開',
     'touch.pause': '⏸ 停止',
   },
 

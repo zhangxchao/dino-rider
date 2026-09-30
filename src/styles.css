@@ -310,12 +310,50 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
   #touch .joy .knob { width: 50px; height: 50px; margin: -25px 0 0 -25px; }
 }
 #touch .look { position: absolute; right: 0; top: 0; width: 55%; height: 65%; pointer-events: auto; touch-action: none; }
-#touch .tbtn { position: absolute; width: 70px; height: 70px; border-radius: 50%; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.3); color: #fff; font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; pointer-events: auto; touch-action: none; flex-direction: column; }
-#touch .tbtn span { font-size: 26px; line-height: 1; }
-#touch .tbtn.on { background: rgba(255,185,56,.5); }
-#touch .tbtn.ult { width: 62px; height: 62px; border-color: rgba(255,200,80,.6); font-size: 11px; }
-#touch .tbtn.ult span { font-size: 22px; }
-#touch .tpause { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: auto; }
+#touch .tbtn { position: absolute; width: 70px; height: 70px; border-radius: 50%; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.3); color: #fff; font-size: 12px; font-weight: 900; display: flex; align-items: center; justify-content: center; pointer-events: auto; touch-action: none; flex-direction: column; overflow: hidden; -webkit-user-select: none; user-select: none; transition: transform .08s; }
+#touch .tbtn .ico { font-size: 26px; line-height: 1; position: relative; }
+#touch .tbtn b { position: relative; font-weight: 900; text-shadow: 0 1px 2px #000; }
+#touch .tbtn.on { background: rgba(255,185,56,.5); transform: scale(.94); }
+#touch .tbtn.skill { right: 24px; bottom: 116px; width: 88px; height: 88px; border-color: rgba(79,201,255,.55); }
+#touch .tbtn.skill .ico { font-size: 34px; }
+#touch .tbtn.jump { right: 124px; bottom: 30px; width: 76px; height: 76px; }
+#touch .tbtn.ult { right: 124px; bottom: 124px; width: 64px; height: 64px; border-color: rgba(255,200,80,.6); font-size: 11px; }
+#touch .tbtn.ult .ico { font-size: 22px; }
+/* 技能冷却扫光 + 剩余秒数；觉醒按钮里的狂热填充 */
+#touch .tbtn .tcd { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(rgba(0,0,0,.72) var(--p, 0%), transparent 0); pointer-events: none; }
+#touch .tbtn .tct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; text-shadow: 0 2px 4px #000; pointer-events: none; }
+#touch .tbtn.skill.ready { border-color: rgba(79,201,255,.95); animation: glowPulse 1.2s infinite alternate; }
+#touch .tbtn .tfill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, rgba(255,90,32,.8), rgba(255,192,64,.55)); pointer-events: none; transition: height .15s; }
+#touch .tbtn.ult.ready { border-color: #ffe070; animation: goldPulse .6s infinite alternate; }
+#touch .tbtn.ult.active .tfill { background: linear-gradient(0deg, #ff3000, #ffd040, #ffffff); }
+#touch .tpause { position: absolute; top: 10px; right: 12px; pointer-events: auto; }
+#hud.touch .hud-skills { display: none; }
+#hud.touch .hud-right { top: 56px; }
+#touch .rotate-hint { display: none; }
+@media (orientation: portrait) {
+  #touch .rotate-hint { display: flex; position: fixed; inset: 0; z-index: 60; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(8,10,16,.92); color: #fff; font-size: 18px; font-weight: 800; text-align: center; padding: 24px; pointer-events: auto; }
+  #touch .rotate-hint .ph { font-size: 56px; animation: rotPhone 1.6s ease-in-out infinite; }
+}
+@keyframes rotPhone { 0%, 20% { transform: rotate(0); } 50%, 70% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+/* 横屏手机：HUD 紧凑一些，少挡画面 */
+@media (max-height: 500px) {
+  .hud-player { left: 10px; top: 8px; padding: 6px 10px 6px 6px; gap: 8px; }
+  .hud-player .portrait { width: 44px; height: 44px; border-radius: 10px; }
+  .hud-player .nm { display: none; }
+  .hud-player .bar-outer { width: 150px; }
+  .weapon-row { margin-top: 4px; font-size: 11px; }
+  .hud-top { top: 8px; }
+  .route { width: 34vw; }
+  .route-text { font-size: 11px; }
+  .hud-stat { padding: 4px 9px; font-size: 12px; }
+  .combo .n { font-size: 40px; }
+  .combo { top: 34%; right: 16px; }
+  .boss-bar { width: 46vw; }
+  .boss-bar .nm { font-size: 16px; }
+  #touch .tbtn.skill { width: 76px; height: 76px; bottom: 100px; right: 18px; }
+  #touch .tbtn.jump { width: 66px; height: 66px; right: 106px; bottom: 22px; }
+  #touch .tbtn.ult { width: 56px; height: 56px; right: 106px; bottom: 104px; }
+}
 
 @media (max-width: 900px) {
   #s-select .grid-panel { width: 46vw; top: 70px; }
@@ -365,3 +403,14 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .diff-tag { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 2px 10px; border-radius: 99px; font-size: 14px; letter-spacing: 0; background: rgba(255,255,255,.14); color: #fff; }
 .diff-tag.easy { background: rgba(98,227,127,.25); color: #b8ffc8; }
 .diff-tag.hard { background: rgba(255,90,60,.3); color: #ffc0b0; }
+
+/* ---------------- 新手引导 ---------------- */
+.tut { position: absolute; left: 50%; bottom: 23%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; max-width: min(620px, 86vw); padding: 14px 22px 14px 16px; border-radius: 18px; background: linear-gradient(135deg, rgba(20,28,44,.92), rgba(40,30,12,.9)); border: 2px solid rgba(255,200,80,.75); box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 24px rgba(255,190,60,.25); animation: tutIn .45s cubic-bezier(.2, 1.4, .4, 1); pointer-events: none; }
+.tut.hidden { display: none; }
+.tut .ic { font-size: 34px; line-height: 1; animation: bump 1s infinite; }
+.tut .tx { font-size: 17px; font-weight: 800; line-height: 1.5; color: #fff; text-shadow: 0 1px 2px #000; }
+.tut kbd { font-size: 14px; padding: 2px 8px; }
+.tut.done { animation: tutOut .45s ease forwards; border-color: #7dff8a; }
+@keyframes tutIn { from { opacity: 0; transform: translate(-50%, 24px) scale(.9); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+@keyframes tutOut { 0% { opacity: 1; } 30% { transform: translate(-50%, 0) scale(1.06); } 100% { opacity: 0; transform: translate(-50%, -16px) scale(.96); } }
+@media (max-height: 500px) { .tut { bottom: 30%; padding: 10px 16px 10px 12px; } .tut .tx { font-size: 14px; } .tut .ic { font-size: 26px; } }

@@ -7,6 +7,7 @@ import { Projectiles } from './projectiles.js';
 import { Player, computeStats } from './player.js';
 import { Enemy, Boss, Prop, buildBossModel } from './enemy.js';
 import { buildEnvironment } from './envmap.js';
+import { Tutorial } from './tutorial.js';
 import { Hud } from './hud.js';
 import { input } from './input.js';
 import { save, persist } from './save.js';
@@ -306,6 +307,7 @@ export class Game {
     this.viewH = window.innerHeight;
 
     this.hud = new Hud(app.hudRoot, app.fxLayer, { dino: this.dino, rider: this.rider, thumb: app.thumbs?.dino[this.dino.id], touch: input.isTouch, endless: this.endless });
+    this.tutorial = new Tutorial(this, input.isTouch);
 
     this.state = 'intro';
     this.stateT = 0;
@@ -569,6 +571,7 @@ export class Game {
     this.renderBatches();
     this.text.update(realDt, this.camera, this.viewW, this.viewH);
     this.hud.update(this, realDt);
+    this.tutorial.update(realDt);
   }
 
   updateFlow() {
@@ -735,7 +738,7 @@ export class Game {
       this.fx.sparks.spawn(pp.x + Math.cos(a) * R, pp.y + 0.3 + k * 1.5, pp.z + Math.sin(a) * R,
         -Math.sin(a) * 3.5, 5 + k * 6, Math.cos(a) * 3.5, 0.9 + k * 0.4, 0.9, 0.1, 0x7fe8ff, k > 0.5 ? 0xffffff : 0x46a0ff, 1, -2, 1.5);
     }
-    this.fx.rings.pillar(pp, { r: R, h: 10, life: 0.7, color: 0x7fe8ff, opacity: 0.5 });
+    this.fx.rings.pillar(pp, { r: R, h: 8, life: 0.6, color: 0x7fe8ff, opacity: 0.22 });
     this.juice.flash(0x7fe8ff, 0.18);
     this.juice.bloom(0.35);
   }
@@ -760,7 +763,7 @@ export class Game {
   /** 丛林：剧毒小蛛不断从树上垂丝落到前方路上 */
   updateSpiders(dt) {
     const p = this.player;
-    if (p.pos.z < 70 || p.pos.z > this.length - 50) return;
+    if (p.pos.z < 70 || p.pos.z > this.length - 50 || this.tutorial.calm) return;
     this.spiderT = (this.spiderT ?? 0) - dt;
     if (this.spiderT > 0) return;
     this.spiderT = rand(3.4, 5.2) / this.diff.count;
@@ -1525,6 +1528,7 @@ export class Game {
     this.audio.setMusicRate(1);
     this.tele.dispose();
     this.text.clear();
+    this.tutorial.dispose();
     this.hud.dispose();
     this.track.dispose();
     if (this.envRT) { this.scene.environment = null; this.envRT.dispose(); this.envRT = null; }

@@ -256,7 +256,7 @@ export class Rings {
   pillar(pos, { r = 1.2, h = 12, life = 0.8, color = 0x88ccff, opacity = 0.7 } = {}) {
     const m = this._get('pillar');
     m.position.copy(pos);
-    m.material.color.set(color).multiplyScalar(2);
+    m.material.color.set(color).multiplyScalar(1.5);
     m.scale.set(r, h, r);
     this.items.push({ m, t: 0, life, r0: r, r1: r * 0.2, opacity, kind: 'pillar', h });
     return m;

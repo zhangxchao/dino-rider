@@ -249,6 +249,17 @@ export default {
 
     'touch.skill': '技能',
     'touch.jump': '跳跃',
+    'touch.rotate': '请把手机横过来玩',
+    'tut.move.key': '按 <kbd>A</kbd> <kbd>D</kbd> 或 <kbd>←</kbd> <kbd>→</kbd> 左右移动，也可以按住鼠标左右拖',
+    'tut.move.touch': '按住左下角的摇杆往左右推，或在屏幕上左右滑动',
+    'tut.jump.key': '怪物来了！按 <kbd>空格</kbd> 跳过去，落地还能踩出冲击波',
+    'tut.jump.touch': '怪物来了！点「跳跃」跳过去，落地还能踩出冲击波',
+    'tut.gate.key': '前面是强化门：左右移动，从想要的那道门穿过去',
+    'tut.gate.touch': '前面是强化门：推摇杆，从想要的那道门穿过去',
+    'tut.skill.key': '技能充好了！按 <kbd>Q</kbd> 释放恐龙的专属技能',
+    'tut.skill.touch': '技能充好了！点右下角的技能按钮',
+    'tut.ult.key': '狂热槽满了！按 <kbd>R</kbd> 远古觉醒：变大、无敌、弹幕全开',
+    'tut.ult.touch': '狂热槽满了！点「觉醒」：变大、无敌、弹幕全开',
     'touch.pause': '⏸ 暂停',
   },
 };

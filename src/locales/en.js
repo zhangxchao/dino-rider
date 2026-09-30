@@ -249,6 +249,17 @@ export default {
 
     'touch.skill': 'Skill',
     'touch.jump': 'Jump',
+    'touch.rotate': 'Rotate your phone to landscape',
+    'tut.move.key': 'Press <kbd>A</kbd> <kbd>D</kbd> or <kbd>←</kbd> <kbd>→</kbd> to steer (or drag with the mouse)',
+    'tut.move.touch': 'Push the joystick at bottom-left, or swipe left and right',
+    'tut.jump.key': 'Monsters ahead! Press <kbd>Space</kbd> to jump over them — landing makes a shockwave',
+    'tut.jump.touch': 'Monsters ahead! Tap Jump to leap over them — landing makes a shockwave',
+    'tut.gate.key': 'Power gates ahead: steer through the one you want',
+    'tut.gate.touch': 'Power gates ahead: steer through the one you want',
+    'tut.skill.key': 'Skill ready! Press <kbd>Q</kbd> to unleash your dino’s special move',
+    'tut.skill.touch': 'Skill ready! Tap the skill button at bottom-right',
+    'tut.ult.key': 'Fever is full! Press <kbd>R</kbd> to Awaken: grow huge, invincible, full barrage',
+    'tut.ult.touch': 'Fever is full! Tap Awaken: grow huge, invincible, full barrage',
     'touch.pause': '⏸ Pause',
   },
 

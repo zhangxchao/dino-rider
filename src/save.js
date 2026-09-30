@@ -18,6 +18,9 @@ function defaults() {
     dinoWins: {},                      // 每只恐龙的胜场
     tutorialDone: false,               // 新手引导是否完成
     tutUlt: false,                     // 是否提示过觉醒
+    life: {},                          // 累计统计（成就用）：perfect / ult / gate / coin / bestCombo …
+    achv: {},                          // 成就状态：id -> 'done' | 'claimed'
+    daily: null,                       // 每日任务 { date, list }
     settings: { music: 0.55, sfx: 0.8, quality: 'high', sensitivity: 1, shake: false, invertY: false, touch: 'auto', autoRes: true, showFps: false, fx: 'medium', difficulty: 'medium' },
   };
 }

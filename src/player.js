@@ -1,5 +1,6 @@
 // 玩家（跑道模式）：恐龙自动前进，左右走位；骑手自动射击；武器随击杀升级
 import * as THREE from 'three';
+import { meta } from './meta.js';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
 import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE } from './data.js';
@@ -497,6 +498,7 @@ export class Player {
     const d = this.def.skill;
     const s = { type: d.type, t: 0, dur: 1, fired: false, hit: new Set(), count: 0, running };
     this.skillJuice(d.type);
+    meta.track('skill');
     switch (d.type) {
       case 'roar': s.dur = 1.2; break;
       case 'charge':

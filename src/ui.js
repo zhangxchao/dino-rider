@@ -4,6 +4,7 @@ import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
 import { t, LANGS, getLang, setLang } from './i18n.js';
+import { meta, MISSIONS, ACHIEVEMENTS } from './meta.js';
 
 const BIOME_EMOJI = { jungle: '🌴', desert: '🏜️', frost: '❄️', swamp: '🍄', volcano: '🌋', shadow: '🏰', hive: '🦗' };
 const BIOME_BG = {
@@ -98,6 +99,7 @@ export class UI {
           <button class="btn" data-act="levels"><span class="ico">⚔️</span>${t('title.start')}</button>
           <button class="btn ghost" data-act="select"><span class="ico">🦖</span>${t('title.select')}</button>
           <button class="btn ghost" data-act="shop"><span class="ico">🛠️</span>${t('title.shop')}</button>
+          <button class="btn ghost" data-act="missions"><span class="ico">🎯</span>${t('title.missions')}${meta.claimable ? `<i class="badge">${meta.claimable}</i>` : ''}</button>
           <button class="btn ghost" data-act="settings"><span class="ico">⚙️</span>${t('title.settings')}</button>
           <button class="btn ghost" data-act="help"><span class="ico">📖</span>${t('title.help')}</button>
         </div>
@@ -315,6 +317,66 @@ export class UI {
   }
 
   // ------------------------------------------------------------------
+  // ------------------------------------------------------------------
+  build_missions() {
+    const n = el(`
+      <div>
+        <div class="topbar">
+          <button class="btn ghost small" data-back>${t('common.back')}</button>
+          <h2>${t('missions.title')}</h2>
+          <div class="spacer"></div>
+          ${this.coinPill()}
+        </div>
+        <div class="missions panel"></div>
+      </div>`);
+    const box = n.querySelector('.missions');
+    const burst = (btn, amount) => {
+      const r = btn.getBoundingClientRect();
+      const f = document.createElement('div');
+      f.className = 'coin-float';
+      f.textContent = t('missions.got', { n: amount });
+      f.style.left = (r.left + r.width / 2) + 'px'; f.style.top = r.top + 'px';
+      document.body.appendChild(f);
+      setTimeout(() => f.remove(), 1100);
+      this.app.audio.play('coin', { volume: 0.6, pitch: 0.9 });
+      setTimeout(() => this.app.audio.play('star', { volume: 0.4 }), 120);
+    };
+    const render = () => {
+      n.querySelector('.coin-pill span').textContent = save.coins;
+      meta.checkAchievements();
+      const D = meta.daily;
+      const now = new Date(), mid = new Date(now); mid.setHours(24, 0, 0, 0);
+      const left = Math.max(0, mid - now) / 60000;
+      const bar = (p, g) => `<div class="mbar"><i style="width:${Math.min(100, p / g * 100).toFixed(1)}%"></i></div>`;
+      const btn = (state, key, reward) => state === 'claimed' ? `<span class="m-claimed">✓ ${t('missions.claimed')}</span>`
+        : state === 'ready' ? `<button class="btn small" data-claim="${key}"><i class="coin-ico"></i> ${reward}</button>`
+        : `<span class="m-reward"><i class="coin-ico"></i> ${reward}</span>`;
+      const doneN = ACHIEVEMENTS.filter((a) => save.achv[a.id]).length;
+      box.innerHTML = `
+        <div class="m-head"><h3>📅 ${t('missions.daily')}</h3><span>${t('missions.reset', { h: Math.floor(left / 60), m: Math.floor(left % 60) })}</span></div>
+        <div class="m-daily">${D.list.map((m, i) => {
+          const tpl = MISSIONS.find((x) => x.id === m.id) || { icon: '🎯' };
+          const st = m.claimed ? 'claimed' : m.prog >= m.goal ? 'ready' : 'todo';
+          return `<div class="m-card ${st}"><div class="ic">${tpl.icon}</div><div class="main"><div class="tt">${meta.missionText(m)}</div>${bar(m.prog, m.goal)}<div class="pr">${Math.min(m.prog, m.goal).toLocaleString()} / ${m.goal.toLocaleString()}</div></div>${btn(st, 'm' + i, meta.missionReward(m))}</div>`;
+        }).join('')}</div>
+        <div class="m-head"><h3>🏅 ${t('missions.achv')}</h3><span>${t('missions.count', { n: doneN, total: ACHIEVEMENTS.length })}</span></div>
+        <div class="m-achv">${ACHIEVEMENTS.map((a) => {
+          const s = save.achv[a.id];
+          const st = s === 'claimed' ? 'claimed' : s === 'done' ? 'ready' : 'todo';
+          const v = Math.min(a.get(), a.goal);
+          return `<div class="a-card ${st}"><div class="ic">${a.icon}</div><div class="main"><div class="tt">${t(`meta.a.${a.id}.name`)}</div><div class="ds">${t(`meta.a.${a.id}.desc`)}</div>${st === 'todo' ? bar(v, a.goal) : ''}</div>${btn(st, 'a' + a.id, a.reward)}</div>`;
+        }).join('')}</div>`;
+      box.querySelectorAll('[data-claim]').forEach((b) => b.addEventListener('click', () => {
+        const k = b.dataset.claim;
+        const got = k[0] === 'm' ? meta.claimMission(+k.slice(1)) : meta.claimAchievement(k.slice(1));
+        if (got) { burst(b, got); render(); }
+      }));
+    };
+    render();
+    n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));
+    return n;
+  }
+
   build_shop() {
     const n = el(`
       <div>

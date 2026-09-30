@@ -12,6 +12,7 @@ import { DINOS, RUN_SPEED } from './data.js';
 import { createDinoModel } from './models/dinos.js';
 import { clamp, damp, rand, pick, mergeStaticMeshes, rigidSkin } from './util.js';
 import { t } from './i18n.js';
+import { meta } from './meta.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -281,6 +282,7 @@ export class Hazards {
       if (this.babies.length >= 2) { this.babies[0].life = BABY_LIFE; continue; }
       const side = this.babies.length && this.babies[0].side > 0 ? -1 : 1;
       const { def, model } = this.babyPool.pop() || this.buildBaby();
+      meta.track('egg');
       model.root.visible = true;
       g.scene.add(model.root);
       const b = {

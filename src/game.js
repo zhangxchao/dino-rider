@@ -8,6 +8,7 @@ import { Player, computeStats } from './player.js';
 import { Enemy, Boss, Prop, buildBossModel } from './enemy.js';
 import { buildEnvironment } from './envmap.js';
 import { Tutorial } from './tutorial.js';
+import { meta } from './meta.js';
 import { Hud } from './hud.js';
 import { input } from './input.js';
 import { save, persist } from './save.js';
@@ -308,6 +309,7 @@ export class Game {
 
     this.hud = new Hud(app.hudRoot, app.fxLayer, { dino: this.dino, rider: this.rider, thumb: app.thumbs?.dino[this.dino.id], touch: input.isTouch, endless: this.endless });
     this.tutorial = new Tutorial(this, input.isTouch);
+    meta.onNotify = (msg) => { this.toast(msg); this.audio.play('star', { volume: 0.5 }); };
 
     this.state = 'intro';
     this.stateT = 0;
@@ -638,6 +640,7 @@ export class Game {
     this.audio.play('bossDie');
     this.stats.bosses++;
     this.bossCount++;
+    meta.track('boss');
     this.hitstopT = 0;
     for (let i = 0; i < 16; i++) this.spawnPickup('coin', boss.pos, Math.round(boss.maxHp / 600) + 1);
     for (const e of this.enemies) if (e !== boss && e.alive) this.killEnemy(e, true);
@@ -693,6 +696,7 @@ export class Game {
       save.stats.wins++;
       save.dinoWins[this.dino.id] = (save.dinoWins[this.dino.id] || 0) + 1;
       if (this.levelIdx === LEVELS.length - 1) save.cleared = true;
+      this.trackRunEnd(true);
       persist();
       this.app.onResult({
         win: true, stars, hpR, killRate, time: this.time, coins: coinsGained, reward, kills: this.stats.kills,
@@ -721,6 +725,7 @@ export class Game {
       save.stats.bosses += this.stats.bosses;
       let newBest = false;
       if (this.endless && dist > save.endlessBest) { save.endlessBest = dist; newBest = true; }
+      this.trackRunEnd(false);
       persist();
       this.app.onResult({
         win: false, endless: this.endless, dist, newBest, time: this.time, coins: this.stats.coins,
@@ -750,6 +755,7 @@ export class Game {
 
   onGate(kind, panel) {
     const opt = GATES[kind];
+    meta.track('gate');
     this.player.applyGate(kind);
     if (kind === 'gamble') this.after(0.35, () => this.rollGamble());
     this.stats.gates++;
@@ -897,6 +903,7 @@ export class Game {
 
   onRageStart() {
     const p = this.player;
+    meta.track('ult');
     this.feverReady = false;
     this.slowmoT = Math.max(this.slowmoT, 0.45);
     this.showBanner(t('banner.rage'), t('banner.rageSub'), false, 1300);
@@ -944,6 +951,7 @@ export class Game {
       return;
     }
     this.addFever(7);
+    meta.track('perfect');
     this.slowmoT = Math.max(this.slowmoT, 0.18);
     this.juice.flash(0x60e0ff, 0.18);
     this.juice.aberr(0.6);
@@ -1062,6 +1070,8 @@ export class Game {
     if (silent) return;
     if (!e.isProp) {
       this.stats.kills++;
+      meta.track('kill');
+      if (e.elite) meta.track('elite');
       this.onKillFx(e);
       this.addFever(e.elite ? 5 : 0.7);
       this.stats.score += (e.def.score || 10) * (1 + Math.min(this.combo, 50) * 0.02);
@@ -1258,6 +1268,7 @@ export class Game {
         const v = Math.floor(this.coinFrac);
         this.coinFrac -= v;
         this.stats.coins += v;
+        if (v) meta.track('coin', v);
         this.audio.play('coin', { volume: 0.3, pitch: rand(0.95, 1.15) });
         break;
       }
@@ -1491,6 +1502,14 @@ export class Game {
     }, hold);
   }
 
+  /** 一局结束：上报跑了多远、最高连击、胜利（困难胜利另算），再检查成就 */
+  trackRunEnd(win) {
+    meta.track('dist', Math.round(this.player.pos.z));
+    meta.track('combo', this.stats.maxCombo);
+    if (win) { meta.track('win'); if (this.diffId === 'hard') meta.track('hardWin'); }
+    meta.checkAchievements();
+  }
+
   toast(msg) {
     const box = this.app.toastEl;
     const d = document.createElement('div');
@@ -1534,6 +1553,9 @@ export class Game {
     this.tele.dispose();
     this.text.clear();
     this.tutorial.dispose();
+    meta.onNotify = null;
+    if (!this.finished && this.player) meta.track('dist', Math.round(this.player.pos.z));
+    persist();   // 中途退出也保住每日任务 / 成就进度
     this.hud.dispose();
     this.track.dispose();
     if (this.envRT) { this.scene.environment = null; this.envRT.dispose(); this.envRT = null; }

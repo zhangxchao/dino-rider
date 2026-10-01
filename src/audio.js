@@ -11,7 +11,7 @@
 //   界面   click hover select buy error
 //   近战   bite claw horn tail stomp peck headbutt
 //          whoosh hit hitHeavy crit playerHurt enemyHurt enemyDie bossDie explosion shieldHit
-//   骑手   spear arrow fireball laser bullet shuriken missile ice rock cannon
+//   骑手   spear arrow fireball laser bullet shuriken missile ice rock cannon heart slash
 //   技能   charge pounce spin quake frenzy fortress dive sonic venom wave spikes sprint
 //          （roar 请用 roar(size)；play('roar') 也可，pitch 越低体型越大）
 //   其它   jump land step coin heal powerup levelUp portal waveStart warning bossAppear bossRoar
@@ -235,6 +235,18 @@ const SFX = {
     a._noise(o, t, { ft: 'lowpass', ff: 2500, ff2: 120, dur: 0.8, v: 0.9, a: 0.001 });
     a._noise(o, t, { ft: 'highpass', ff: 1500, dur: 0.05, v: 0.6, a: 0.001 });
     a._noise(o, t, { color: 'brown', ft: 'lowpass', ff: 300, dur: 1.1, v: 0.7 });
+  } },
+  // 爱心：俏皮的“啵～”加一点亮晶晶
+  heart: { d: 0.35, r: 0.15, v: 0.65, f(a, o, t) {
+    a._tone(o, t, { type: 'sine', f: 520, f2: 1150, dur: 0.12, v: 0.32, a: 0.002 });
+    a._tone(o, t, { at: 0.05, type: 'triangle', f: 1560, f2: 2100, dur: 0.1, v: 0.1 });
+    a._tone(o, t, { at: 0.09, type: 'sine', f: 2637, dur: 0.16, v: 0.06 });
+  } },
+  // 刀光：锐利的破风声 + 一声清脆的刀鸣
+  slash: { d: 0.5, r: 0.15, v: 0.75, f(a, o, t) {
+    a._noise(o, t, { color: 'pink', ft: 'bandpass', ff: 900, ff2: 5200, q: 2, dur: 0.16, v: 0.5, a: 0.012 });
+    a._noise(o, t, { ft: 'highpass', ff: 4500, dur: 0.06, v: 0.2, a: 0.002 });
+    a._fm(o, t, { at: 0.03, f: 2400, ratio: 1.41, index: 2, idur: 0.15, dur: 0.38, v: 0.07 });
   } },
 
   // ---------------- 技能 ----------------

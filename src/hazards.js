@@ -248,7 +248,7 @@ export class Hazards {
       const e = g.spawnEnemy(eliteType, side * (rh - 1), zz + rand(-2, 2), mul, true);
       e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2;
       list.push(e);
-      for (let i = 0; i < 4; i++) list.push(g.spawnEnemy(g.pickWeighted(pool), side * rand(rh * 0.5, rh), zz - 4 - i * 2.5, mul, true));
+      for (let i = 0; i < 2; i++) list.push(g.spawnEnemy(g.pickWeighted(pool), side * rand(rh * 0.5, rh), zz - 4 - i * 2.5, mul, true));
     }
     this.ambushes.push({ list, done: false });
     g.showBanner(t('banner.ambush'), t('banner.ambushSub'), true, 1400);

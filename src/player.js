@@ -47,7 +47,7 @@ export function computeStats(dino, rider, up) {
 }
 
 const MELEE_KNOCK = { bite: 6, peck: 5, horn: 10, headbutt: 10, claw: 6, tail: 9, stomp: 8 };
-const RADII = { spear: 0.7, arrow: 0.55, fireball: 0.8, laser: 0.6, bullet: 0.5, shuriken: 0.7, missile: 0.7, ice: 0.6, rock: 0.9, cannon: 0.8 };
+const RADII = { spear: 0.7, arrow: 0.55, fireball: 0.8, laser: 0.6, bullet: 0.5, shuriken: 0.7, missile: 0.7, ice: 0.6, rock: 0.9, cannon: 0.8, heart: 0.6, slash: 1.1 };
 const FRENZY_COL = new THREE.Color(1, 0.15, 0.05);
 const SPRINT_COL = new THREE.Color(0.4, 0.85, 1);
 const POISON_COL = new THREE.Color(0.4, 1, 0.2);

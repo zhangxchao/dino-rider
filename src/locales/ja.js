@@ -405,6 +405,8 @@ export default {
       princess: { name: '氷雪の姫', desc: '北の国から来た姫。氷の魔法で敵を凍らせる。', bonusText: '毎秒 HP 1.5 回復', weapon: { name: 'アイスシャード' } },
       caveman: { name: '原始人ガオ', desc: '怪力の原始部族の勇者。巨岩を投げて敵をぺしゃんこにする。', bonusText: '近接ダメージ +12%', weapon: { name: '岩石投げ' } },
       pirate: { name: '海賊船長', desc: '七つの海を駆ける海賊船長。砲弾ですべてを吹き飛ばす。', bonusText: 'コイン獲得 +25%', weapon: { name: '爆裂キャノン' } },
+      bubu: { name: 'いたずら精霊ブブ', desc: 'もふもふの森の小さな精霊。長いとんがり耳とギザ歯の笑顔で、敵を追いかけて跳ね回るハートを投げる。', bonusText: 'クリティカル率 +8%、コイン +12%', weapon: { name: 'いたずらハート' } },
+      samurai: { name: '剣豪サムライ', desc: '赤備えの侍。刀から放つ三日月の剣気が、敵の列をまとめて斬り裂く。', bonusText: '近接ダメージ +10%、被ダメージ -5%', weapon: { name: '三日月剣気' } },
     },
     enemies: {
       slime: { name: 'スライム' }, goblin: { name: 'ゴブリン' }, bat: { name: '吸血コウモリ' }, spiderling: { name: '毒グモ' }, scorpion: { name: '砂漠の大サソリ' },

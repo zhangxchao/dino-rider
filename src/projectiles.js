@@ -1,7 +1,7 @@
 // 弹道系统：骑手武器 / 恐龙技能弹 / 怪物与首领弹幕
 import * as THREE from 'three';
 import { FX } from './effects.js';
-import { uploadRange } from './util.js';
+import { uploadRange, setCount } from './util.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -21,6 +21,8 @@ function glow(color, boost = 2.5, opts = {}) {
   const m = new THREE.MeshBasicMaterial({
     color, transparent: !!opts.additive || (opts.opacity ?? 1) < 1, opacity: opts.opacity ?? 1,
     blending: opts.additive ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: !opts.additive, side: opts.side ?? THREE.FrontSide,
+    // 半透明双面（冲击波 / 镰刃波 / 剑气）单遍绘制：否则 three.js 每帧拆成背面、正面两遍画，还要来回切换着色器
+    forceSinglePass: true,
   });
   m.color.multiplyScalar(boost);
   return (matCache[key] = m);
@@ -82,6 +84,33 @@ const MAKERS = {
   scythewave: (c, w = 20) => new THREE.Mesh(
     G('sw' + w, () => new THREE.TorusGeometry(w / 2, 0.45, 6, 40, Math.PI).rotateX(Math.PI / 2).scale(1, 2.6, 0.22)),
     glow(0xc0ff60, 3.6, { additive: true, opacity: 0.9, side: THREE.DoubleSide })),
+  // 布布的爱心：立着飞，尖朝下（左右摇摆在 _render 里做）
+  heart: () => {
+    const g = new THREE.Group();
+    const sh = new THREE.Shape();
+    sh.moveTo(0, -0.9);
+    sh.bezierCurveTo(-0.35, -0.55, -1, -0.2, -1, 0.25);
+    sh.bezierCurveTo(-1, 0.7, -0.45, 0.95, 0, 0.55);
+    sh.bezierCurveTo(0.45, 0.95, 1, 0.7, 1, 0.25);
+    sh.bezierCurveTo(1, -0.2, 0.35, -0.55, 0, -0.9);
+    g.add(new THREE.Mesh(G('heart', () => new THREE.ExtrudeGeometry(sh, { depth: 0.5, bevelEnabled: false, curveSegments: 6 }).translate(0, 0, -0.25).scale(0.42, 0.42, 0.42)), glow(0xff6aa0, 2.2)));
+    g.add(new THREE.Mesh(G('heartHi', () => new THREE.SphereGeometry(0.09, 6, 5).translate(-0.18, 0.16, -0.13)), glow(0xffffff, 1.6)));
+    return g;
+  },
+  // 武士的月牙剑气：中间厚、两头尖的新月，凸面朝前，斜着劈出去
+  slash: () => {
+    // 半宽 W、外弧拱高 S、正中厚度 T：外弧和内弧是两段过同样两个端点的圆弧
+    const W = 1.5, S = 0.7, T = 0.38;
+    const R = (W * W + S * S) / (2 * S), al = Math.acos(W / R), yE = R * Math.sin(al);
+    const top = R - T, c = (top * top - W * W - yE * yE) / (2 * (top - yE)), r = top - c, be = Math.atan2(yE - c, W);
+    const sh = new THREE.Shape();
+    sh.absarc(0, 0, R, al, Math.PI - al, false);
+    sh.absarc(0, c, r, Math.PI - be, be, true);
+    // 躺平成水平的新月（凸面朝 +Z），再绕前进方向斜过来，像从右肩往左下劈出的一刀
+    const geo = G('slash', () => new THREE.ExtrudeGeometry(sh, { depth: 0.2, bevelEnabled: false, curveSegments: 16 })
+      .translate(0, -(R + yE) / 2, -0.1).rotateX(Math.PI / 2).scale(1, 1.5, 1).rotateZ(-0.42));
+    return new THREE.Mesh(geo, glow(0xa8dcff, 2, { additive: true, opacity: 0.9, side: THREE.DoubleSide }));
+  },
   spore: () => new THREE.Mesh(G('spore', () => new THREE.IcosahedronGeometry(0.36, 0)), glow(0xb070ff, 2.6)),
   orb: (c = 0x7affd0) => new THREE.Mesh(G('orb', () => new THREE.SphereGeometry(0.42, 12, 10)), glow(c, 3)),
   efire: () => new THREE.Mesh(G('efire', () => new THREE.IcosahedronGeometry(0.42, 1)), glow(0xff6a1a, 3.2)),
@@ -104,6 +133,8 @@ const TRAILS = {
   wave: { color: 0xcff4ff, size: 1.4, life: 0.35, rate: 70, spread: 2 },
   scythewave: { color: 0xb8ff60, color2: 0x40a010, size: 1.3, life: 0.35, rate: 90, spread: 7 },
   spore: { color: 0xb070ff, size: 0.4, life: 0.4, rate: 30 },
+  heart: { color: 0xff8ab8, color2: 0xffffff, size: 0.35, life: 0.3, rate: 30 },
+  slash: { color: 0xe8fbff, color2: 0x6ac8ff, size: 0.5, life: 0.22, rate: 70, spread: 2.2 },
   orb: { size: 0.5, life: 0.3, rate: 40 },
   efire: { color: 0xffa040, color2: 0xff2000, size: 0.7, life: 0.3, rate: 60 },
   borb: { size: 0.55, life: 0.25, rate: 30 },
@@ -137,6 +168,8 @@ const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
 const _sc = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+const FWD = new THREE.Vector3(0, 0, 1);
+const _q2 = new THREE.Quaternion();
 
 class Batch {
   constructor(scene, template, cap = 400) {
@@ -149,7 +182,7 @@ class Batch {
       const g = o.geometry.clone().applyMatrix4(o.matrixWorld);
       const im = new THREE.InstancedMesh(g, o.material, cap);
       im.frustumCulled = false;
-      im.count = 0;
+      setCount(im, 0);
       im.renderOrder = o.renderOrder;
       scene.add(im);
       this.layers.push(im);
@@ -162,7 +195,7 @@ class Batch {
     this.n++;
   }
   end() {
-    for (const im of this.layers) { im.count = this.n; uploadRange(im.instanceMatrix, this.n); }
+    for (const im of this.layers) { setCount(im, this.n); uploadRange(im.instanceMatrix, this.n); }
   }
   dispose() {
     for (const im of this.layers) { im.parent && im.parent.remove(im); im.geometry.dispose(); }
@@ -208,6 +241,11 @@ export class Projectiles {
       }
       _sc.setScalar(p.scale);
       if (p.kind === 'shuriken') _q.setFromEuler(_e.set(0, p.spinT, 0));
+      else if (p.kind === 'heart') {
+        _v.copy(p.pos).add(p.vel);
+        _m.lookAt(_v, p.pos, UP);
+        _q.setFromRotationMatrix(_m).multiply(_q2.setFromAxisAngle(FWD, Math.sin(p.spinT) * 0.45));
+      }
       else if (p.kind === 'rock' || p.kind === 'cannon') _q.setFromEuler(_e.set(p.spinT, p.spinT * 0.7, 0));
       else {
         _v.copy(p.pos).add(p.vel);
@@ -269,6 +307,7 @@ export class Projectiles {
       p.pos.addScaledVector(p.vel, dt);
       if (p.hover !== null) p.pos.y = game.heightAt(p.pos.x, p.pos.z) + p.hover; // 贴地飞行
       if (p.kind === 'shuriken') p.spinT += dt * 22;
+      else if (p.kind === 'heart') p.spinT += dt * 9;
       else if (p.kind === 'rock' || p.kind === 'cannon') p.spinT += dt * 8;
 
       // 拖尾

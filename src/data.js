@@ -214,7 +214,7 @@ export const DINOS = [
 
 // ---------------------------------------------------------------------
 //  骑手：提供远程武器 + 被动加成
-//  weapon.type: spear arrow fireball laser bullet shuriken missile ice rock cannon
+//  weapon.type: spear arrow fireball laser bullet shuriken missile ice rock cannon heart slash
 //  bonus: hp(比例) atk(比例) def(减伤) speed(比例) cdr(比例) crit(暴击率) regen(每秒回血) coins(金币比例)
 // ---------------------------------------------------------------------
 export const RIDERS = [
@@ -287,6 +287,20 @@ export const RIDERS = [
     colors: { main: 0x8a1a2a, accent: 0x1a1a1a, skin: 0xe8b890, extra: 0xffd24a },
     weapon: { type: 'cannon', name: '爆破炮弹', dmg: 34, cd: 1.4, speed: 34, count: 1, aoe: 5, knock: 8, color: 0x333333 },
     bonus: { coins: 0.25 }, bonusText: '金币收益 +25%',
+  },
+  {
+    id: 'bubu', name: '淘气精灵布布', en: 'Bubu the Imp',
+    desc: '毛茸茸的森林小精灵，长耳朵、尖牙坏笑，丢出会追人、还会弹跳的爱心。',
+    colors: { main: 0xf4c6cf, accent: 0xfff2e6, skin: 0xffe8dc, extra: 0xff5a8a },
+    weapon: { type: 'heart', name: '淘气爱心', dmg: 6.5, cd: 0.48, speed: 36, count: 2, spread: 18, homing: 3, bounce: 1, color: 0xff6aa0 },
+    bonus: { crit: 0.08, coins: 0.12 }, bonusText: '暴击率 +8%，金币 +12%',
+  },
+  {
+    id: 'samurai', name: '武士剑豪', en: 'Samurai',
+    desc: '身披赤甲的日本武士，挥刀斩出月牙剑气，一刀劈穿整排敌人。',
+    colors: { main: 0xb8242c, accent: 0x1e1e26, skin: 0xf2c9a0, extra: 0xe8c040 },
+    weapon: { type: 'slash', name: '月牙剑气', dmg: 23, cd: 0.95, speed: 38, count: 1, pierce: 3, color: 0xbfe6ff },
+    bonus: { atk: 0.1, def: 0.05 }, bonusText: '近战伤害 +10%，减伤 +5%',
   },
 ];
 
@@ -396,6 +410,9 @@ export const BALANCE = {
   bossDmg: 1.0,     // 首领伤害
   bossRest: 0.9,   // 首领出招间隔
   enemyDmg: 1.0,    // 小怪 / 路障 / 天灾伤害
+  pathCount: 0.5,   // 路上的怪物数量（阵型 / 怪物潮 / 伏击 / 毒蛛）
+  // 怪物少了，每只的经验、金币、狂热和掉落按比例加回来，武器升级节奏和首领战难度保持不变
+  killReward: 2,
 };
 
 // ---------------------------------------------------------------------

@@ -1,7 +1,7 @@
 // 视觉特效：GPU 粒子、冲击波环、光柱、地面预警、护盾、伤害飘字
 import * as THREE from 'three';
 import { bendVec } from './bend.js';
-import { uploadRange } from './util.js';
+import { setCount, uploadRange } from './util.js';
 
 const _c = new THREE.Color();
 const _v = new THREE.Vector3();
@@ -182,6 +182,7 @@ export class Particles {
     }
     const g = this.geo;
     g.setDrawRange(0, this.count);
+    this.points.visible = this.count > 0;
     const A = g.attributes;
     uploadRange(A.position, this.count); uploadRange(A.color, this.count); uploadRange(A.size, this.count); uploadRange(A.alpha, this.count);
   }
@@ -198,7 +199,7 @@ export class Particles {
     this.size[to] = this.size[from]; this.alpha[to] = this.alpha[from];
   }
 
-  clear() { this.count = 0; this.geo.setDrawRange(0, 0); }
+  clear() { this.count = 0; this.geo.setDrawRange(0, 0); this.points.visible = false; }
 
   dispose() {
     _particleSystems.delete(this);
@@ -600,7 +601,7 @@ export class BlobShadows {
     this.mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mat, max);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 2;
-    this.mesh.count = 0;
+    setCount(this.mesh, 0);
     scene.add(this.mesh);
     this.n = 0;
   }
@@ -612,7 +613,7 @@ export class BlobShadows {
     this.mesh.setMatrixAt(this.n++, _m4);
   }
   end() {
-    this.mesh.count = this.n;
+    setCount(this.mesh, this.n);
     uploadRange(this.mesh.instanceMatrix, this.n);
   }
   dispose() {
@@ -634,7 +635,7 @@ export class Bars {
     this.bg = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), bgMat, max);
     this.fg = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).translate(0.5, 0, 0), fgMat, max);
     this.fg.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
-    for (const m of [this.bg, this.fg]) { m.frustumCulled = false; m.count = 0; scene.add(m); }
+    for (const m of [this.bg, this.fg]) { m.frustumCulled = false; setCount(m, 0); scene.add(m); }
     this.bg.renderOrder = 30; this.fg.renderOrder = 31;
     this.n = 0;
     this.q = new THREE.Quaternion();
@@ -658,7 +659,7 @@ export class Bars {
     this.fg.setColorAt(i, _col2.set(color).multiplyScalar(1.3));
   }
   end() {
-    this.bg.count = this.fg.count = this.n;
+    setCount(this.bg, this.n); setCount(this.fg, this.n);
     uploadRange(this.bg.instanceMatrix, this.n);
     uploadRange(this.fg.instanceMatrix, this.n);
     uploadRange(this.fg.instanceColor, this.n);
@@ -684,7 +685,7 @@ export class Debris {
     this.mesh = new THREE.InstancedMesh(debrisGeo, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.85 }), max);
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * 3).fill(1), 3);
     this.mesh.frustumCulled = false;
-    this.mesh.count = 0;
+    setCount(this.mesh, 0);
     scene.add(this.mesh);
     this.scene = scene;
     this.items = [];
@@ -727,11 +728,11 @@ export class Debris {
       m.instanceColor.setXYZ(n, d.r, d.g, d.b);
       n++;
     }
-    m.count = n;
+    setCount(m, n);
     uploadRange(m.instanceMatrix, n);
     uploadRange(m.instanceColor, n);
   }
-  clear() { this.items.length = 0; this.mesh.count = 0; }
+  clear() { this.items.length = 0; setCount(this.mesh, 0); }
   dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.mesh.dispose(); }
 }
 
@@ -773,7 +774,7 @@ export class Scorch {
     this.mesh = new THREE.InstancedMesh(geo, mat, max);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 1;
-    this.mesh.count = 0;
+    setCount(this.mesh, 0);
     scene.add(this.mesh);
     this.scene = scene;
     this.items = [];
@@ -798,11 +799,11 @@ export class Scorch {
       this.fade.setX(n, Math.min(1, it.t * 12) * (k > 0.6 ? (1 - k) / 0.4 : 1));
       n++;
     }
-    this.mesh.count = n;
+    setCount(this.mesh, n);
     uploadRange(this.mesh.instanceMatrix, n);
     uploadRange(this.fade, n);
   }
-  clear() { this.items.length = 0; this.mesh.count = 0; }
+  clear() { this.items.length = 0; setCount(this.mesh, 0); }
   dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.mesh.geometry.dispose(); this.mesh.dispose(); }
 }
 
@@ -853,7 +854,7 @@ export class Streaks {
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 12;
-    this.mesh.count = 0;
+    setCount(this.mesh, 0);
     scene.add(this.mesh);
     this.scene = scene;
     this.n = 0;
@@ -875,7 +876,7 @@ export class Streaks {
     this.n++;
   }
   end() {
-    this.mesh.count = this.n;
+    setCount(this.mesh, this.n);
     uploadRange(this.mesh.instanceMatrix, this.n);
     uploadRange(this.mesh.instanceColor, this.n);
   }

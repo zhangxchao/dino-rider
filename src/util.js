@@ -18,6 +18,12 @@ export function uploadRange(attr, n) {
   attr.needsUpdate = true;
 }
 
+/** 设置实例数：为 0 时直接隐藏——three.js 不会跳过 0 个实例的网格，照样切着色器、传矩阵、发一次空绘制 */
+export function setCount(im, n) {
+  im.count = n;
+  im.visible = n > 0;
+}
+
 export function angleDiff(a, b) {
   let d = (b - a) % (Math.PI * 2);
   if (d > Math.PI) d -= Math.PI * 2;

@@ -263,7 +263,7 @@ export class UI {
     const d = DINOS.find((x) => x.id === save.dino) || DINOS[0];
     const r = RIDERS.find((x) => x.id === save.rider) || RIDERS[0];
     const cards = LEVELS.map((lv, i) => {
-      const locked = i >= save.unlocked;
+      const locked = false;   // 所有关卡一开始就能挑战
       const stars = save.stars[i] || 0;
       return `
         <div class="level-card ${locked ? 'locked' : ''}" data-i="${i}" style="animation-delay:${i * 0.06}s">
@@ -278,7 +278,7 @@ export class UI {
           ${locked ? '<div class="lock">🔒</div>' : ''}
         </div>`;
     }).join('');
-    const endlessLocked = save.unlocked < 2;
+    const endlessLocked = false;
     const diff = DIFFICULTIES[save.settings.difficulty] ? save.settings.difficulty : 'medium';
     const n = el(`
       <div>
@@ -317,7 +317,6 @@ export class UI {
     }));
     n.querySelectorAll('.level-card[data-i]').forEach((c) => c.addEventListener('click', () => {
       const i = +c.dataset.i;
-      if (i >= save.unlocked) { this.app.audio.play('error'); return; }
       this.app.audio.play('select');
       this.app.startGame({ levelIdx: i, dinoId: save.dino, riderId: save.rider });
     }));
@@ -661,6 +660,23 @@ export class UI {
     }));
     if (r.win) setTimeout(() => this.app.audio.play('star'), 250);
     countUp(n);
+    // 通关后自动进入下一关（最后一关自动看结局）：按钮上倒数，点任何按钮都会取消倒数
+    const auto = n.querySelector('[data-a=next], [data-a=ending]');
+    if (r.win && auto) {
+      const label = auto.textContent;
+      let left = 6;
+      const tick = () => {
+        if (!n.isConnected || this.current !== 'result') return;
+        if (left <= 0) { auto.click(); return; }
+        auto.textContent = `${label} (${left})`;
+        left--;
+        this.autoTimer = setTimeout(tick, 1000);
+      };
+      clearTimeout(this.autoTimer);
+      auto.textContent = `${label} (${left})`;
+      this.autoTimer = setTimeout(tick, 50);   // 等界面挂到页面上之后再开始倒数
+      n.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => clearTimeout(this.autoTimer), { capture: true }));
+    }
     return n;
   }
 

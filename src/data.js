@@ -106,7 +106,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.1, riderScale: 1.0,
     features: ['browHorns', 'stripes'],
     colors: { main: 0xa0663a, belly: 0xe6c9a0, accent: 0x5a2e1a, extra: 0xd24a2a, eye: 0xffc400 },
-    stats: { hp: 280, atk: 26, def: 0.12, speed: 11, reach: 2.3, atkRate: 1.1 },
+    stats: { hp: 300, atk: 29, def: 0.12, speed: 11, reach: 2.3, atkRate: 1.1 },
     attack: 'bite',
     skill: { type: 'pounce', name: '猎杀突袭', desc: '猛然跃起扑杀，落地撕裂一片区域并释放冲击波。', cd: 7, power: 1.25, radius: 7, dist: 22 },
   },

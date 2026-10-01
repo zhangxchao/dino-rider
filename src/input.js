@@ -21,6 +21,8 @@ class Input {
     this.onUnlock = null;         // 游戏中意外失去指针锁定时回调（用于暂停）
     this.joy = { x: 0, y: 0 };
     this.isTouch = false;
+    this.vibrate = true;          // 设置里的「震动反馈」
+    this.lastBuzz = 0;
     this.lastLockAttempt = 0;
   }
 
@@ -77,6 +79,15 @@ class Input {
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
+  /** 手机震动反馈（只在触屏设备上；同一类震动之间至少隔 minGap 毫秒） */
+  buzz(pattern, minGap = 120) {
+    if (!this.isTouch || !this.vibrate || !navigator.vibrate) return;
+    const now = performance.now();
+    if (now - this.lastBuzz < minGap) return;
+    this.lastBuzz = now;
+    try { navigator.vibrate(pattern); } catch { /* ignore */ }
+  }
+
   held(action) { return ACTIONS[action].some((c) => this.down.has(c)); }
   pressed(action) { return ACTIONS[action].some((c) => this.edge.has(c)); }
   key(code) { return this.down.has(code); }
@@ -99,7 +110,8 @@ class Input {
     let x = 0;
     if (this.down.has('KeyA') || this.down.has('ArrowLeft')) x -= 1;
     if (this.down.has('KeyD') || this.down.has('ArrowRight')) x += 1;
-    return x;
+    x += this.joy.x;                 // 触屏虚拟摇杆
+    return Math.max(-1, Math.min(1, x));
   }
 
   consumeMouse() {
@@ -110,17 +122,19 @@ class Input {
 
   endFrame() { this.edge.clear(); }
 
-  releaseAll() { this.down.clear(); this.edge.clear(); this.joy.x = 0; this.joy.y = 0; }
+  releaseAll() { this.down.clear(); this.edge.clear(); this.joy.x = 0; this.joy.y = 0; if (this.joyReset) this.joyReset(); }
 
   // ---------------- 触屏 ----------------
   buildTouch(root) {
     this.isTouch = true;
     root.innerHTML = `
       <div class="look" style="left:0;width:100%;height:100%"></div>
-      <div class="tbtn" data-a="skill" style="right:24px;bottom:120px;width:86px;height:86px"><span>✨</span>${t('touch.skill')}</div>
-      <div class="tbtn" data-a="jump" style="right:120px;bottom:34px"><span>⤴️</span>${t('touch.jump')}</div>
-      <div class="tbtn ult" data-a="ult" style="right:130px;bottom:128px"><span>🦖</span>${t('touch.ult')}</div>
-      <button class="btn small ghost tpause" data-a="pause">${t('touch.pause')}</button>`;
+      <div class="joy"><div class="knob"></div></div>
+      <div class="tbtn skill" data-a="skill"><div class="tcd"></div><span class="ico">✨</span><b>${t('touch.skill')}</b><div class="tct"></div></div>
+      <div class="tbtn jump" data-a="jump"><span class="ico">⤴️</span><b>${t('touch.jump')}</b></div>
+      <div class="tbtn ult" data-a="ult"><div class="tfill"></div><span class="ico">🦖</span><b>${t('touch.ult')}</b></div>
+      <button class="btn small ghost tpause" data-a="pause">${t('touch.pause')}</button>
+      <div class="rotate-hint"><div class="ph">📱</div><div>${t('touch.rotate')}</div></div>`;
     const look = root.querySelector('.look');
     const lastPos = new Map();
     look.addEventListener('touchstart', (e) => { for (const t of e.changedTouches) lastPos.set(t.identifier, t.clientX); e.preventDefault(); }, { passive: false });
@@ -134,6 +148,36 @@ class Input {
     }, { passive: false });
     const lookEnd = (e) => { for (const t of e.changedTouches) lastPos.delete(t.identifier); };
     look.addEventListener('touchend', lookEnd); look.addEventListener('touchcancel', lookEnd);
+
+    // 左下角虚拟摇杆：按住往左 / 往右推，恐龙持续横移（推一半 = 半速）
+    const joy = root.querySelector('.joy'), knob = joy.querySelector('.knob');
+    let joyId = null, cx = 0, cy = 0;
+    const setKnob = (x, y) => { knob.style.transform = `translate(${x}px, ${y}px)`; };
+    this.joyReset = () => { joyId = null; this.joy.x = 0; joy.classList.remove('on'); setKnob(0, 0); };
+    const joyMove = (tc) => {
+      const R = joy.clientWidth * 0.42;
+      const dx = Math.max(-R, Math.min(R, tc.clientX - cx));
+      const dy = Math.max(-20, Math.min(20, (tc.clientY - cy) * 0.35));
+      const v = dx / R;
+      this.joy.x = Math.abs(v) < 0.12 ? 0 : (v - Math.sign(v) * 0.12) / 0.88;
+      setKnob(dx, dy);
+    };
+    joy.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (joyId !== null) return;
+      const tc = e.changedTouches[0];
+      const r = joy.getBoundingClientRect();
+      cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+      joyId = tc.identifier;
+      joy.classList.add('on');
+      joyMove(tc);
+    }, { passive: false });
+    joy.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (const tc of e.changedTouches) if (tc.identifier === joyId) joyMove(tc);
+    }, { passive: false });
+    const joyEnd = (e) => { for (const tc of e.changedTouches) if (tc.identifier === joyId) this.joyReset(); };
+    joy.addEventListener('touchend', joyEnd); joy.addEventListener('touchcancel', joyEnd);
 
     root.querySelectorAll('[data-a]').forEach((el) => {
       const code = 'T_' + el.dataset.a;

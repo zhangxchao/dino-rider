@@ -5,15 +5,24 @@ import { createTrack } from './track.js';
 import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars, Debris, Scorch, LightFlashes, Streaks } from './effects.js';
 import { Projectiles } from './projectiles.js';
 import { Player, computeStats } from './player.js';
-import { Enemy, Boss, Prop, buildEnemyModel, buildBossModel } from './enemy.js';
+import { Enemy, Boss, Prop, buildBossModel } from './enemy.js';
+import { buildEnvironment } from './envmap.js';
+import { Tutorial } from './tutorial.js';
+import { meta } from './meta.js';
 import { Hud } from './hud.js';
 import { input } from './input.js';
 import { save, persist } from './save.js';
-import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut } from './util.js';
+import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut, uploadRange, RIM } from './util.js';
 import { t } from './i18n.js';
 import { Hazards } from './hazards.js';
 import { setBendProfile, updateBend, resetBend, bendX, bendVec, curvature } from './bend.js';
 
+const NO_OPTS = Object.freeze({});
+const _white = new THREE.Color(1, 1, 1);
+const _aoeOpts = {};
+const _aoeDir = new THREE.Vector3();
+function clearOpts(o) { for (const k in o) delete o[k]; }
+let aoeDepth = 0;
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -227,6 +236,18 @@ export class Game {
     this.track = createTrack(this.biome, this.scene, { quality: this.quality, flat: [[bossZ - 40, bossZ + 140]] });
     setBendProfile(this.biome);
     updateBend(0, 1);
+    // 环境贴图（天空渐变 + 太阳），给所有标准材质加上环境光和高光反射
+    try {
+      this.envRT = buildEnvironment(app.renderer, this.track.skyCfg, this.track.lightCfg);
+      this.scene.environment = this.envRT.texture;
+      const envI = this.track.envI ?? 0.3;
+      this.scene.environmentIntensity = envI;
+      // 环境贴图本身带了天光的漫反射：半球光相应调暗，保持整体亮度和明暗对比
+      if (this.track.hemi) this.track.hemi.intensity *= 1 - envI * 0.7;
+      RIM.color.value.set(this.track.lightCfg.hemiSky).lerp(_white, 0.35);
+      RIM.strength.value = this.track.rimI ?? 0.3;
+      app.juice.setGrade(this.biome, this.track.skyCfg.sunDir, this.track.skyCfg.sunColor);
+    } catch { this.envRT = null; }
     this.world = this.track;
     this.heightAt = (x, z) => this.track.heightAt(x, z);
     this.dustColor = DUST[this.biome] ?? 0xa09070;
@@ -260,6 +281,8 @@ export class Game {
     this.shake.enabled = save.settings.shake;
     this.projectiles = new Projectiles(this);
     this.enemies = [];
+    this.enemyPool = new Map();   // 按怪物类型回收的 Enemy（复用模型、材质、骨骼）
+    this.spawnQueue = [];         // 阵型分帧生成，避免一帧里建十几只怪
     this.pickups = [];
     this.gates = [];
     this.boss = null;
@@ -285,6 +308,8 @@ export class Game {
     this.viewH = window.innerHeight;
 
     this.hud = new Hud(app.hudRoot, app.fxLayer, { dino: this.dino, rider: this.rider, thumb: app.thumbs?.dino[this.dino.id], touch: input.isTouch, endless: this.endless });
+    this.tutorial = new Tutorial(this, input.isTouch);
+    meta.onNotify = (msg) => { this.toast(msg); this.audio.play('star', { volume: 0.5 }); };
 
     this.state = 'intro';
     this.stateT = 0;
@@ -462,10 +487,7 @@ export class Game {
     } else {
       for (let i = 0; i < n; i++) spots.push({ x: rand(-W, W), z: ev.z + rand(-4, 5), t: type });
     }
-    for (const s of spots) {
-      const e = this.spawnEnemy(s.t, s.x, s.z, mul, true);
-      if (s.elite) { e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
-    }
+    for (const s of spots) { s.mul = mul; this.spawnQueue.push(s); }
   }
 
   // ------------------------------------------------------------------
@@ -508,12 +530,13 @@ export class Game {
       while (this.route.length && this.route[0].z <= p.pos.z + SPAWN_AHEAD) this.spawnEvent(this.route.shift());
       if (!this.endless && this.level.spiders) this.updateSpiders(dt);
     }
+    if (this.spawnQueue.length) this.drainSpawnQueue(6);
 
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       e.update(dt);
       if (e.removed) {
-        e.dispose();
+        this.recycleEnemy(e);
         this.enemies.splice(i, 1);
         if (e === this.boss && this.state !== 'bossDown' && this.state !== 'win') this.boss = null;
       }
@@ -530,7 +553,13 @@ export class Game {
     this.updatePickups(dt);
     this.updateFlow(dt);
 
-    if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) { this.combo = 0; this.comboTier = 0; } }
+    if (this.comboT > 0) {
+      this.comboT -= dt;
+      if (this.comboT <= 0) {
+        if (this.combo >= 10 && this.player.alive && !this.finished) this.hud.comboLost(this.combo);
+        this.combo = 0; this.comboTier = 0;
+      }
+    }
     if (this.perfectCd > 0) this.perfectCd -= realDt;
     this.fx.sparks.update(dt);
     this.fx.dust.update(dt);
@@ -545,9 +574,12 @@ export class Game {
     updateBend(p.pos.z, 1);
     this.updateCamera(realDt);
     this.shake.apply(this.camera, realDt);
+    // 先把镜头矩阵（含本帧震动）算好，飘字和准星的屏幕投影才和画面对得上，不会慢一帧、跟着震动抖
+    this.camera.updateMatrixWorld();
     this.renderBatches();
     this.text.update(realDt, this.camera, this.viewW, this.viewH);
     this.hud.update(this, realDt);
+    this.tutorial.update(realDt);
   }
 
   updateFlow() {
@@ -588,6 +620,7 @@ export class Game {
     for (const e of this.enemies) if (e.alive && !e.isBoss) this.killEnemy(e, true);
     this.projectiles.list.filter((pr) => pr.owner === 'enemy').forEach((pr) => { pr.life = 0; });
     this.route.length = 0;
+    this.spawnQueue.length = 0;
     this.hazards.clearZones();
     this.tele.clear();
     this.boss = new Boss(this, type, 0, p.pos.z + 30, { hp: mul.hp * this.diff.boss * BALANCE.bossHp, dmg: mul.dmg * this.diff.bossDmg * BALANCE.bossDmg });
@@ -613,6 +646,8 @@ export class Game {
     this.audio.play('bossDie');
     this.stats.bosses++;
     this.bossCount++;
+    meta.track('boss');
+    input.buzz([80, 60, 120], 0);
     this.hitstopT = 0;
     for (let i = 0; i < 16; i++) this.spawnPickup('coin', boss.pos, Math.round(boss.maxHp / 600) + 1);
     for (const e of this.enemies) if (e !== boss && e.alive) this.killEnemy(e, true);
@@ -655,7 +690,11 @@ export class Game {
       const coinsGained = this.stats.coins;
       const reward = Math.round(this.level.reward * (0.6 + 0.2 * stars) * this.diff.coins);
       const firstClear = !save.cleared && this.levelIdx === LEVELS.length - 1;
-      save.coins += coinsGained + reward;
+      // 第一次通关这一关：额外奖励一半关卡奖励
+      const firstBonus = (save.stars[this.levelIdx] || 0) === 0 ? Math.round(reward * 0.5) : 0;
+      const prevBest = save.bestTime[this.levelIdx] || 0;
+      const newBest = prevBest > 0 && this.time < prevBest;
+      save.coins += coinsGained + reward + firstBonus;
       save.stars[this.levelIdx] = Math.max(save.stars[this.levelIdx] || 0, stars);
       save.unlocked = Math.min(LEVELS.length, Math.max(save.unlocked, this.levelIdx + 2));
       if (!save.bestTime[this.levelIdx] || this.time < save.bestTime[this.levelIdx]) save.bestTime[this.levelIdx] = Math.round(this.time);
@@ -664,11 +703,13 @@ export class Game {
       save.stats.wins++;
       save.dinoWins[this.dino.id] = (save.dinoWins[this.dino.id] || 0) + 1;
       if (this.levelIdx === LEVELS.length - 1) save.cleared = true;
+      this.trackRunEnd(true);
       persist();
       this.app.onResult({
         win: true, stars, hpR, killRate, time: this.time, coins: coinsGained, reward, kills: this.stats.kills,
         maxCombo: this.stats.maxCombo, score: Math.round(this.stats.score), dmg: Math.round(this.stats.dmgDealt),
         weaponLv: this.player.weapon.level, levelIdx: this.levelIdx, firstClear, final: this.levelIdx === LEVELS.length - 1, difficulty: this.diffId,
+        firstBonus, newBest, prevBest,
       });
     });
   }
@@ -691,6 +732,7 @@ export class Game {
       save.stats.bosses += this.stats.bosses;
       let newBest = false;
       if (this.endless && dist > save.endlessBest) { save.endlessBest = dist; newBest = true; }
+      this.trackRunEnd(false);
       persist();
       this.app.onResult({
         win: false, endless: this.endless, dist, newBest, time: this.time, coins: this.stats.coins,
@@ -713,13 +755,14 @@ export class Game {
       this.fx.sparks.spawn(pp.x + Math.cos(a) * R, pp.y + 0.3 + k * 1.5, pp.z + Math.sin(a) * R,
         -Math.sin(a) * 3.5, 5 + k * 6, Math.cos(a) * 3.5, 0.9 + k * 0.4, 0.9, 0.1, 0x7fe8ff, k > 0.5 ? 0xffffff : 0x46a0ff, 1, -2, 1.5);
     }
-    this.fx.rings.pillar(pp, { r: R, h: 10, life: 0.7, color: 0x7fe8ff, opacity: 0.5 });
+    this.fx.rings.pillar(pp, { r: R, h: 8, life: 0.6, color: 0x7fe8ff, opacity: 0.22 });
     this.juice.flash(0x7fe8ff, 0.18);
     this.juice.bloom(0.35);
   }
 
   onGate(kind, panel) {
     const opt = GATES[kind];
+    meta.track('gate');
     this.player.applyGate(kind);
     if (kind === 'gamble') this.after(0.35, () => this.rollGamble());
     this.stats.gates++;
@@ -738,7 +781,7 @@ export class Game {
   /** 丛林：剧毒小蛛不断从树上垂丝落到前方路上 */
   updateSpiders(dt) {
     const p = this.player;
-    if (p.pos.z < 70 || p.pos.z > this.length - 50) return;
+    if (p.pos.z < 70 || p.pos.z > this.length - 50 || this.tutorial.calm) return;
     this.spiderT = (this.spiderT ?? 0) - dt;
     if (this.spiderT > 0) return;
     this.spiderT = rand(3.4, 5.2) / this.diff.count;
@@ -756,16 +799,43 @@ export class Game {
     }
   }
 
+  /** 每帧按预算生成：对象池里有现成的就很便宜，现建一只模型要贵得多（每帧最多现建 1 只） */
+  drainSpawnQueue(budget) {
+    const q = this.spawnQueue;
+    let n = 0;
+    while (n < q.length && budget > 0) {
+      const s = q[n];
+      const pooled = this.enemyPool.get(s.t)?.length > 0;
+      if (!pooled && budget < 4 && n > 0) break;
+      budget -= pooled ? 1 : 4;
+      n++;
+      const e = this.spawnEnemy(s.t, s.x, s.z, s.mul, true);
+      if (s.elite) { e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
+    }
+    if (n) q.splice(0, n);
+  }
+
+  recycleEnemy(e) {
+    if (e.isBoss || e.isProp || e.noPool || e.treasure) { e.dispose(); return; }
+    // 骨骼矩阵放在共享图集里（共 2048 根），池子里闲置的怪也占着位置：限制总量，给首领 / 宝宝留余量
+    if (e.boneN === undefined) { let n = 0; e.root.traverse((o) => { if (o.isSkinnedMesh) n += o.skeleton.bones.length; }); e.boneN = n; }
+    let list = this.enemyPool.get(e.type);
+    if (!list) this.enemyPool.set(e.type, (list = []));
+    if (list.length < 16 && (this.poolBones || 0) + e.boneN <= 700) { e.release(); list.push(e); this.poolBones = (this.poolBones || 0) + e.boneN; } else e.dispose();
+  }
+
   spawnEnemy(type, x, z, mul, counted = false) {
     const rh = this.track.roadHalf - 1;
     x = clamp(x, -rh, rh);
-    const e = new Enemy(this, type, x, z, mul || this.mulAt(z));
+    const pool = this.enemyPool.get(type);
+    let e;
+    if (pool && pool.length) { e = pool.pop(); this.poolBones -= e.boneN; e.reset(x, z, mul || this.mulAt(z)); } else e = new Enemy(this, type, x, z, mul || this.mulAt(z));
     this.enemies.push(e);
     if (counted) this.stats.spawned++;
     return e;
   }
 
-  damageEnemy(e, dmg, o = {}) {
+  damageEnemy(e, dmg, o = NO_OPTS) {
     if (!e.alive) return 0;
     if (e.isBoss && (e.invulnT > 0 || e.state !== 'fight' || e.anim.burrow > 0.5)) {
       if (o.source !== 'dot' && Math.random() < 0.2) { e.getCenter(_v); _v.y += e.halfHeight; this.text.add(_v, t('float.immune'), 'info', 0.6); }
@@ -786,7 +856,7 @@ export class Game {
         this.checkComboTier();
       }
       if (e.isBoss) this.addFever(d / e.maxHp * 70);
-      e.applyStatus({ ...o, dotBase: d });
+      e.applyStatus(o, d);
     }
     if (o.source !== 'ram' || e.hp > 0) {
       e.getCenter(_v);
@@ -840,6 +910,8 @@ export class Game {
 
   onRageStart() {
     const p = this.player;
+    meta.track('ult');
+    input.buzz([30, 40, 60], 0);
     this.feverReady = false;
     this.slowmoT = Math.max(this.slowmoT, 0.45);
     this.showBanner(t('banner.rage'), t('banner.rageSub'), false, 1300);
@@ -887,6 +959,8 @@ export class Game {
       return;
     }
     this.addFever(7);
+    meta.track('perfect');
+    input.buzz(15, 200);
     this.slowmoT = Math.max(this.slowmoT, 0.18);
     this.juice.flash(0x60e0ff, 0.18);
     this.juice.aberr(0.6);
@@ -1005,6 +1079,8 @@ export class Game {
     if (silent) return;
     if (!e.isProp) {
       this.stats.kills++;
+      meta.track('kill');
+      if (e.elite) meta.track('elite');
       this.onKillFx(e);
       this.addFever(e.elite ? 5 : 0.7);
       this.stats.score += (e.def.score || 10) * (1 + Math.min(this.combo, 50) * 0.02);
@@ -1040,7 +1116,11 @@ export class Game {
       if (_dir.lengthSq() < 1e-4) _dir.set(0, 0, 1);
       _dir.normalize();
       const crit = Math.random() < this.player.stats.crit;
-      this.damageEnemy(e, dmg * (crit ? 1.8 : 1), { ...o, crit, dir: _dir.clone() });
+      // 复用同一个参数对象（damageEnemy / applyStatus 只在调用期间读它）；击杀连锁引发的嵌套范围伤害另建对象
+      const oo = aoeDepth++ ? { ...o } : Object.assign(_aoeOpts, o);
+      oo.crit = crit; oo.dir = aoeDepth > 1 ? _dir.clone() : _aoeDir.copy(_dir);
+      this.damageEnemy(e, dmg * (crit ? 1.8 : 1), oo);
+      if (--aoeDepth === 0) clearOpts(_aoeOpts);
       n++;
     }
     return n;
@@ -1051,7 +1131,10 @@ export class Game {
     for (const e of this.enemies) {
       if (!e.targetable || e.pos.z < z0 || e.pos.z > z1 + e.radius || Math.abs(e.pos.x) > halfW) continue;
       const crit = Math.random() < this.player.stats.crit;
-      this.damageEnemy(e, dmg * (crit ? 1.8 : 1), { ...o, crit, dir: new THREE.Vector3(0, 0, 1) });
+      const oo = aoeDepth++ ? { ...o } : Object.assign(_aoeOpts, o);
+      oo.crit = crit; oo.dir = aoeDepth > 1 ? new THREE.Vector3(0, 0, 1) : _aoeDir.set(0, 0, 1);
+      this.damageEnemy(e, dmg * (crit ? 1.8 : 1), oo);
+      if (--aoeDepth === 0) clearOpts(_aoeOpts);
       n++;
     }
     return n;
@@ -1194,6 +1277,7 @@ export class Game {
         const v = Math.floor(this.coinFrac);
         this.coinFrac -= v;
         this.stats.coins += v;
+        if (v) meta.track('coin', v);
         this.audio.play('coin', { volume: 0.3, pitch: rand(0.95, 1.15) });
         break;
       }
@@ -1328,7 +1412,7 @@ export class Game {
       cm.setMatrixAt(n++, _m);
     }
     cm.count = n;
-    cm.instanceMatrix.needsUpdate = true;
+    uploadRange(cm.instanceMatrix, n);
   }
 
   /** 开局前预编译本关会出现的怪物 / 首领 / 弹体的着色器，避免第一次出现时卡顿 */
@@ -1337,8 +1421,13 @@ export class Game {
     const tmp = new THREE.Group();
     tmp.position.set(0, this.heightAt(0, 25), 25);
     const types = new Set(this.endless ? ENDLESS_POOL : [...Object.keys(this.level.pool), this.level.elite, ...BOSSES[this.level.boss].summon, ...(this.level.spiders ? ['spiderling'] : [])]);
-    // 同时预热"合并静态零件"的缓存，首次刷怪不再需要合并
-    for (const t of types) { try { tmp.add(buildEnemyModel(t).root); } catch { /* ignore */ } }
+    // 同时预热"合并静态零件"的缓存，并预先建好几只放进对象池：跑图时刷怪直接复用，不用现建模型
+    const warmEnemies = [];
+    const main = new Set(this.endless ? ENDLESS_POOL : Object.keys(this.level.pool));
+    for (const t of types) {
+      const n = main.has(t) ? (this.endless ? 6 : 10) : 3;
+      for (let k = 0; k < n; k++) { try { warmEnemies.push(new Enemy(this, t, 0, 25 + k * 0.01)); } catch { /* ignore */ } }
+    }
     const bossTypes = this.endless ? Object.keys(BOSSES) : [this.level.boss];
     for (const b of bossTypes) { try { tmp.add(buildBossModel(b).root); } catch { /* ignore */ } }
     for (const side of [THREE.FrontSide, THREE.DoubleSide]) tmp.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, side })));
@@ -1399,6 +1488,9 @@ export class Game {
     this.player.shield.visible = false;
     this.tele.remove(tele);
     this.scene.remove(tmp);
+    for (const e of warmEnemies) this.recycleEnemy(e);
+    // 预建的恐龙宝宝要留着用：先从临时组里拿出来，别把它们的骨骼也释放了
+    for (const b of this.hazards.babyPool || []) tmp.remove(b.model.root);
     // 归还预热模型占用的骨骼（图集里的位置 / 独立骨骼贴图）
     tmp.traverse((o) => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); });
     // 注意：不要 dispose 这些材质——three.js 会随材质一起删除着色器程序，预编译就白做了
@@ -1419,6 +1511,14 @@ export class Game {
     }, hold);
   }
 
+  /** 一局结束：上报跑了多远、最高连击、胜利（困难胜利另算），再检查成就 */
+  trackRunEnd(win) {
+    meta.track('dist', Math.round(this.player.pos.z));
+    meta.track('combo', this.stats.maxCombo);
+    if (win) { meta.track('win'); if (this.diffId === 'hard') meta.track('hardWin'); }
+    meta.checkAchievements();
+  }
+
   toast(msg) {
     const box = this.app.toastEl;
     const d = document.createElement('div');
@@ -1435,6 +1535,10 @@ export class Game {
     this.app.toastEl.innerHTML = '';
     for (const e of this.enemies) e.dispose();
     this.enemies.length = 0;
+    for (const list of this.enemyPool.values()) for (const e of list) e.dispose();
+    this.enemyPool.clear();
+    this.poolBones = 0;
+    this.spawnQueue.length = 0;
     for (const gt of this.gates) gt.dispose();
     this.gates.length = 0;
     for (const pk of this.pickups) if (pk.mesh) this.scene.remove(pk.mesh);
@@ -1457,8 +1561,14 @@ export class Game {
     this.audio.setMusicRate(1);
     this.tele.dispose();
     this.text.clear();
+    this.tutorial.dispose();
+    meta.onNotify = null;
+    if (!this.finished && this.player) meta.track('dist', Math.round(this.player.pos.z));
+    persist();   // 中途退出也保住每日任务 / 成就进度
     this.hud.dispose();
     this.track.dispose();
+    if (this.envRT) { this.scene.environment = null; this.envRT.dispose(); this.envRT = null; }
+    this.app.juice.setGrade('menu');
     resetBend();
   }
 }

@@ -16,7 +16,12 @@ function defaults() {
     endlessBest: 0,
     stats: { kills: 0, bosses: 0, plays: 0, wins: 0 },
     dinoWins: {},                      // 每只恐龙的胜场
-    settings: { music: 0.55, sfx: 0.8, quality: 'high', sensitivity: 1, shake: false, invertY: false, touch: 'auto', autoRes: true, showFps: false, fx: 'medium', difficulty: 'medium' },
+    tutorialDone: false,               // 新手引导是否完成
+    tutUlt: false,                     // 是否提示过觉醒
+    life: {},                          // 累计统计（成就用）：perfect / ult / gate / coin / bestCombo …
+    achv: {},                          // 成就状态：id -> 'done' | 'claimed'
+    daily: null,                       // 每日任务 { date, list }
+    settings: { music: 0.55, sfx: 0.8, quality: 'high', sensitivity: 1, shake: false, invertY: false, touch: 'auto', autoRes: true, showFps: false, fx: 'medium', difficulty: 'medium', vibrate: true, reduceMotion: false, mute: false },
   };
 }
 
@@ -34,6 +39,9 @@ function load() {
       stats: { ...d.stats, ...(s.stats || {}) },
       settings: { ...d.settings, ...(s.settings || {}) },
       dinoWins: { ...(s.dinoWins || {}) },
+      // 老玩家（玩过至少一局）不再弹新手引导
+      tutorialDone: s.tutorialDone ?? ((s.stats && s.stats.plays > 0) || false),
+      tutUlt: s.tutUlt ?? ((s.stats && s.stats.plays > 2) || false),
       // 新增关卡后：已经通关原最后一关的老存档，自动解锁新关卡
       unlocked: Math.min(LEVELS.length, Math.max(s.unlocked || 1, ...LEVELS.map((_, i) => ((s.stars && s.stars[i]) > 0 ? i + 2 : 1)))),
     };

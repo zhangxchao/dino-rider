@@ -4,6 +4,7 @@ import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
 import { t, LANGS, getLang, setLang } from './i18n.js';
+import { meta, MISSIONS, ACHIEVEMENTS } from './meta.js';
 
 const BIOME_EMOJI = { jungle: '🌴', desert: '🏜️', frost: '❄️', swamp: '🍄', volcano: '🌋', shadow: '🏰', hive: '🦗' };
 const BIOME_BG = {
@@ -33,6 +34,20 @@ function el(html) {
   const d = document.createElement('div');
   d.innerHTML = html.trim();
   return d.firstElementChild;
+}
+
+// 结算数字从 0 滚动到最终值（先慢后快再慢，0.9 秒）
+function countUp(root) {
+  const els = [...root.querySelectorAll('[data-count]')];
+  if (!els.length) return;
+  const t0 = performance.now() + 250;
+  const step = (now) => {
+    const k = Math.min(1, Math.max(0, (now - t0) / 900));
+    const e = 1 - Math.pow(1 - k, 3);
+    for (const el of els) el.textContent = el.dataset.pre + Math.round(+el.dataset.count * e).toLocaleString();
+    if (k < 1 && root.isConnected !== false) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 export class UI {
@@ -84,6 +99,7 @@ export class UI {
           <button class="btn" data-act="levels"><span class="ico">⚔️</span>${t('title.start')}</button>
           <button class="btn ghost" data-act="select"><span class="ico">🦖</span>${t('title.select')}</button>
           <button class="btn ghost" data-act="shop"><span class="ico">🛠️</span>${t('title.shop')}</button>
+          <button class="btn ghost" data-act="missions"><span class="ico">🎯</span>${t('title.missions')}${meta.claimable ? `<i class="badge">${meta.claimable}</i>` : ''}</button>
           <button class="btn ghost" data-act="settings"><span class="ico">⚙️</span>${t('title.settings')}</button>
           <button class="btn ghost" data-act="help"><span class="ico">📖</span>${t('title.help')}</button>
         </div>
@@ -301,6 +317,66 @@ export class UI {
   }
 
   // ------------------------------------------------------------------
+  // ------------------------------------------------------------------
+  build_missions() {
+    const n = el(`
+      <div>
+        <div class="topbar">
+          <button class="btn ghost small" data-back>${t('common.back')}</button>
+          <h2>${t('missions.title')}</h2>
+          <div class="spacer"></div>
+          ${this.coinPill()}
+        </div>
+        <div class="missions panel"></div>
+      </div>`);
+    const box = n.querySelector('.missions');
+    const burst = (btn, amount) => {
+      const r = btn.getBoundingClientRect();
+      const f = document.createElement('div');
+      f.className = 'coin-float';
+      f.textContent = t('missions.got', { n: amount });
+      f.style.left = (r.left + r.width / 2) + 'px'; f.style.top = r.top + 'px';
+      document.body.appendChild(f);
+      setTimeout(() => f.remove(), 1100);
+      this.app.audio.play('coin', { volume: 0.6, pitch: 0.9 });
+      setTimeout(() => this.app.audio.play('star', { volume: 0.4 }), 120);
+    };
+    const render = () => {
+      n.querySelector('.coin-pill span').textContent = save.coins;
+      meta.checkAchievements();
+      const D = meta.daily;
+      const now = new Date(), mid = new Date(now); mid.setHours(24, 0, 0, 0);
+      const left = Math.max(0, mid - now) / 60000;
+      const bar = (p, g) => `<div class="mbar"><i style="width:${Math.min(100, p / g * 100).toFixed(1)}%"></i></div>`;
+      const btn = (state, key, reward) => state === 'claimed' ? `<span class="m-claimed">✓ ${t('missions.claimed')}</span>`
+        : state === 'ready' ? `<button class="btn small" data-claim="${key}"><i class="coin-ico"></i> ${reward}</button>`
+        : `<span class="m-reward"><i class="coin-ico"></i> ${reward}</span>`;
+      const doneN = ACHIEVEMENTS.filter((a) => save.achv[a.id]).length;
+      box.innerHTML = `
+        <div class="m-head"><h3>📅 ${t('missions.daily')}</h3><span>${t('missions.reset', { h: Math.floor(left / 60), m: Math.floor(left % 60) })}</span></div>
+        <div class="m-daily">${D.list.map((m, i) => {
+          const tpl = MISSIONS.find((x) => x.id === m.id) || { icon: '🎯' };
+          const st = m.claimed ? 'claimed' : m.prog >= m.goal ? 'ready' : 'todo';
+          return `<div class="m-card ${st}"><div class="ic">${tpl.icon}</div><div class="main"><div class="tt">${meta.missionText(m)}</div>${bar(m.prog, m.goal)}<div class="pr">${Math.min(m.prog, m.goal).toLocaleString()} / ${m.goal.toLocaleString()}</div></div>${btn(st, 'm' + i, meta.missionReward(m))}</div>`;
+        }).join('')}</div>
+        <div class="m-head"><h3>🏅 ${t('missions.achv')}</h3><span>${t('missions.count', { n: doneN, total: ACHIEVEMENTS.length })}</span></div>
+        <div class="m-achv">${ACHIEVEMENTS.map((a) => {
+          const s = save.achv[a.id];
+          const st = s === 'claimed' ? 'claimed' : s === 'done' ? 'ready' : 'todo';
+          const v = Math.min(a.get(), a.goal);
+          return `<div class="a-card ${st}"><div class="ic">${a.icon}</div><div class="main"><div class="tt">${t(`meta.a.${a.id}.name`)}</div><div class="ds">${t(`meta.a.${a.id}.desc`)}</div>${st === 'todo' ? bar(v, a.goal) : ''}</div>${btn(st, 'a' + a.id, a.reward)}</div>`;
+        }).join('')}</div>`;
+      box.querySelectorAll('[data-claim]').forEach((b) => b.addEventListener('click', () => {
+        const k = b.dataset.claim;
+        const got = k[0] === 'm' ? meta.claimMission(+k.slice(1)) : meta.claimAchievement(k.slice(1));
+        if (got) { burst(b, got); render(); }
+      }));
+    };
+    render();
+    n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));
+    return n;
+  }
+
   build_shop() {
     const n = el(`
       <div>
@@ -373,11 +449,15 @@ export class UI {
           ${from === 'title' ? `<div class="set-row"><label>${t('settings.difficulty')}</label><div class="seg" data-k="difficulty">${DIFFICULTY_IDS.map((v) => `<button data-v="${v}" class="${(s.difficulty || 'medium') === v ? 'on' : ''}">${t('diff.' + v)}</button>`).join('')}</div></div>` : ''}
           <div class="set-row"><label>${t('settings.music')}</label><input type="range" min="0" max="1" step="0.05" value="${s.music}" data-k="music"></div>
           <div class="set-row"><label>${t('settings.sfx')}</label><input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-k="sfx"></div>
+          <div class="set-row"><label>${t('settings.mute')}</label><div class="seg" data-k="mute"><button data-v="1" class="${s.mute ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.mute ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.quality')}</label><div class="seg" data-k="quality"><button data-v="high" class="${s.quality === 'high' ? 'on' : ''}">${t('settings.qualityHigh')}</button><button data-v="low" class="${s.quality === 'low' ? 'on' : ''}">${t('settings.qualityLow')}</button></div></div>
           <div class="set-row"><label>${t('settings.fx')}</label><div class="seg" data-k="fx">${['full', 'medium', 'low'].map((v) => `<button data-v="${v}" class="${(s.fx || 'medium') === v ? 'on' : ''}">${t('settings.fx.' + v)}</button>`).join('')}</div></div>
           <div class="set-row"><label>${t('settings.autoRes')}</label><div class="seg" data-k="autoRes"><button data-v="1" class="${s.autoRes !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.autoRes === false ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.fps')}</label><div class="seg" data-k="showFps"><button data-v="1" class="${s.showFps ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.showFps ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.shake')}</label><div class="seg" data-k="shake"><button data-v="1" class="${s.shake ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.shake ? 'on' : ''}">${t('common.off')}</button></div></div>
+          <div class="set-row"><label>${t('settings.reduceMotion')}</label><div class="seg" data-k="reduceMotion"><button data-v="1" class="${s.reduceMotion ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.reduceMotion ? 'on' : ''}">${t('common.off')}</button></div></div>
+          ${this.app.isTouch ? `<div class="set-row"><label>${t('settings.vibrate')}</label><div class="seg" data-k="vibrate"><button data-v="1" class="${s.vibrate !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.vibrate === false ? 'on' : ''}">${t('common.off')}</button></div></div>` : ''}
+          ${from === 'title' ? `<div class="set-row"><label>${t('settings.tutorial')}</label><button class="btn ghost small" data-tut>${save.tutorialDone ? t('settings.tutorialBtn') : t('settings.tutorialOn')}</button></div>` : ''}
           ${from === 'title' ? `<div class="set-row"><label>${t('settings.reset')}</label><button class="btn danger small" data-reset>${t('settings.resetBtn')}</button></div>` : ''}
           <div class="row-btns"><button class="btn" data-back>${t('settings.done')}</button></div>
         </div>
@@ -400,6 +480,8 @@ export class UI {
       this.app.applySettings();
       persist();
     })));
+    const tut = n.querySelector('[data-tut]');
+    if (tut) tut.addEventListener('click', () => { save.tutorialDone = false; save.tutUlt = false; persist(); tut.textContent = t('settings.tutorialOn'); });
     const reset = n.querySelector('[data-reset]');
     if (reset) {
       let armed = false;
@@ -446,12 +528,22 @@ export class UI {
 
   // ------------------------------------------------------------------
   build_pause() {
+    const g = this.app.game;
+    const st = g ? `
+          <div class="pause-stats">
+            <div><b>${Math.round(g.player.pos.z)}</b><span>${t('pause.dist')}</span></div>
+            <div><b>${g.stats.kills}</b><span>${t('result.kills')}</span></div>
+            <div><b>${g.stats.maxCombo}</b><span>${t('result.combo')}</span></div>
+            <div><b class="gold">${g.stats.coins}</b><span>${t('pause.coins')}</span></div>
+          </div>
+          ${meta.daily.list.map((m) => `<div class="pause-m ${m.prog >= m.goal ? 'ok' : ''}">${m.prog >= m.goal ? '✓' : '🎯'} ${meta.missionText(m)} <em>${Math.min(m.prog, m.goal).toLocaleString()}/${m.goal.toLocaleString()}</em></div>`).join('')}` : '';
     const n = el(`
       <div>
         <div class="overlay-dim"></div>
-        <div class="center-panel panel" style="width:min(420px,92vw)">
+        <div class="center-panel panel" style="width:min(440px,92vw)">
           <h2>${t('pause.title')}</h2>
-          <div style="display:flex;flex-direction:column;gap:12px">
+          ${st}
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
             <button class="btn" data-a="resume">${t('pause.resume')}</button>
             <button class="btn ghost" data-a="restart">${t('pause.restart')}</button>
             <button class="btn ghost" data-a="settings">${t('pause.settings')}</button>
@@ -460,8 +552,20 @@ export class UI {
           </div>
         </div>
       </div>`);
+    // 重新开始 / 退出会丢掉这一局：要再点一次确认
+    const armed = new Set();
+    const confirm = (b, a) => {
+      if (armed.has(a)) return true;
+      armed.add(a);
+      b.dataset.label = b.textContent;
+      b.textContent = t('pause.confirm');
+      b.classList.add('armed');
+      setTimeout(() => { armed.delete(a); b.textContent = b.dataset.label; b.classList.remove('armed'); }, 2500);
+      return false;
+    };
     n.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
       const a = b.dataset.a;
+      if ((a === 'restart' || a === 'quit') && !confirm(b, a)) return;
       if (a === 'resume') this.app.resume();
       else if (a === 'restart') this.app.restart();
       else if (a === 'settings') this.show('settings', { from: 'pause' });
@@ -474,19 +578,30 @@ export class UI {
   // ------------------------------------------------------------------
   build_result(r) {
     const hasNext = r.win && !r.final && r.levelIdx + 1 < LEVELS.length;
+    // 工坊里现在买得起几项升级；一项都买不起时算出还差多少
+    const costs = UPGRADES.filter((u) => (save.upgrades[u.id] || 0) < u.max).map((u) => upgradeCost(u, save.upgrades[u.id] || 0));
+    const affordable = costs.filter((c) => c <= save.coins).length;
+    const need = costs.length && !affordable ? Math.min(...costs) - save.coins : 0;
+    const cnt = (v, pre = '') => `<span data-count="${v}" data-pre="${pre}">${pre}0</span>`;
+    const scoreRow = r.score != null ? `
+        <div class="res-score"><div class="k">${t('result.score')}</div><div class="v">${cnt(r.score)}</div>
+          ${r.dmg ? `<div class="dm">${t('result.dmg')} ${cnt(r.dmg)}</div>` : ''}</div>` : '';
     let body;
     if (r.win) {
       body = `
+        ${r.newBest ? `<div class="stamp">${t('result.newRecord')}</div>` : ''}
         <h2 style="color:#ffe27a">${t('result.win')}${r.difficulty ? ` <span class="diff-tag ${r.difficulty}">${t('diff.' + r.difficulty)}</span>` : ''}</h2>
         <div class="big-stars">${[0, 1, 2].map((k) => `<span class="${k < r.stars ? 'on' : ''}" style="animation-delay:${0.2 + k * 0.25}s">★</span>`).join('')}</div>
-        <div class="result-grid">
-          <div class="cell"><div class="k">${t('result.time')}</div><div class="v">${formatTime(r.time)}</div></div>
-          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${r.kills}</div></div>
-          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${r.maxCombo}</div></div>
+        ${scoreRow}
+        <div class="result-grid three">
+          <div class="cell"><div class="k">${t('result.time')}</div><div class="v">${formatTime(r.time)}</div>${r.prevBest ? `<div class="sub">${t('result.best', { t: formatTime(r.newBest ? r.time : r.prevBest) })}</div>` : ''}</div>
+          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${cnt(r.kills)}</div></div>
+          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${cnt(r.maxCombo)}</div></div>
           <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
-          <div class="cell"><div class="k">${t('result.coinsPicked')}</div><div class="v gold">+${r.coins}</div></div>
-          <div class="cell"><div class="k">${t('result.reward')}</div><div class="v gold">+${r.reward}</div></div>
+          <div class="cell"><div class="k">${t('result.coinsPicked')}</div><div class="v gold">${cnt(r.coins, '+')}</div></div>
+          <div class="cell"><div class="k">${t('result.reward')}</div><div class="v gold">${cnt(r.reward, '+')}</div></div>
         </div>
+        ${r.firstBonus ? `<div class="first-bonus">${t('result.firstClear', { n: r.firstBonus })}</div>` : ''}
         <div class="star-reqs">
           <div class="ok">${t('result.starClear')}</div>
           <div class="${r.hpR >= 0.5 ? 'ok' : ''}">${t('result.starHp', { n: Math.round(r.hpR * 100) })}</div>
@@ -496,12 +611,14 @@ export class UI {
       body = `
         <h2 style="color:#ff8080">${r.endless ? t('result.endlessOver') : t('result.lose')}</h2>
         ${r.endless ? `<div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:12px">${t('result.dist', { n: r.dist })}${r.newBest ? ` <span style="color:var(--gold)">${t('result.newBest')}</span>` : ''}</div>` : `<p style="text-align:center;color:var(--muted);margin-bottom:12px">${r.bossReached ? t('result.bossReached') : t('result.progress', { n: Math.round(r.progress * 100) })}${t('result.tryUpgrade')}${r.difficulty && r.difficulty !== 'easy' ? t('result.tryEasy') : ''}</p>`}
+        ${scoreRow}
         <div class="result-grid">
           <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
-          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${r.kills}</div></div>
-          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${r.maxCombo}</div></div>
-          <div class="cell"><div class="k">${t('result.coinsGot')}</div><div class="v gold">+${r.coins}</div></div>
-        </div>`;
+          <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${cnt(r.kills)}</div></div>
+          <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${cnt(r.maxCombo)}</div></div>
+          <div class="cell"><div class="k">${t('result.coinsGot')}</div><div class="v gold">${cnt(r.coins, '+')}</div></div>
+        </div>
+        ${need > 0 ? `<div class="need-coins">${t('result.needCoins', { n: need })}</div>` : ''}`;
     }
     const n = el(`
       <div>
@@ -512,7 +629,7 @@ export class UI {
             ${r.final && r.win ? `<button class="btn" data-a="ending">${t('result.ending')}</button>` : ''}
             ${hasNext ? `<button class="btn" data-a="next">${t('result.next')}</button>` : ''}
             <button class="btn ${hasNext || (r.final && r.win) ? 'ghost' : ''}" data-a="retry">↻ ${r.win ? t('result.replay') : t('result.retry')}</button>
-            ${!r.win ? `<button class="btn ghost" data-a="shop">${t('result.shop')}</button>` : ''}
+            ${affordable ? `<button class="btn ghost shop-hot" data-a="shop">${t('result.shop')}<i class="badge">${affordable}</i></button>` : !r.win ? `<button class="btn ghost" data-a="shop">${t('result.shop')}</button>` : ''}
             <button class="btn ghost" data-a="menu">${t('result.menu')}</button>
           </div>
         </div>
@@ -526,6 +643,7 @@ export class UI {
       else this.app.exitToMenu();
     }));
     if (r.win) setTimeout(() => this.app.audio.play('star'), 250);
+    countUp(n);
     return n;
   }
 

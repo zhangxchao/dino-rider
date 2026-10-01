@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { addSharedUniforms } from './bend.js';
 
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
@@ -7,6 +8,15 @@ export const rand = (a, b) => a + Math.random() * (b - a);
 export const randInt = (a, b) => Math.floor(rand(a, b + 1));
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 export const damp = (a, b, lambda, dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
+
+/** 只把前 n 个元素标记为需要上传到 GPU（默认会整块上传整个缓冲，哪怕只用了几个）；n 为 0 时什么也不传 */
+export function uploadRange(attr, n) {
+  if (!attr) return;
+  attr.clearUpdateRanges();
+  if (n <= 0) return;
+  attr.addUpdateRange(0, n * attr.itemSize);
+  attr.needsUpdate = true;
+}
 
 export function angleDiff(a, b) {
   let d = (b - a) % (Math.PI * 2);
@@ -39,7 +49,25 @@ const WHITE = new THREE.Color(1, 1, 1);
  * 为模型开启阴影，并收集材质用于受击闪白。
  * 返回 { setFlash(amount 0..1, color?) }
  */
-export function prepareModel(root, { cast = true, receive = false } = {}) {
+// 角色边缘光（菲涅尔）：轮廓一圈亮边，让恐龙 / 怪物在雾和背景里更醒目。颜色随生态天光设置
+// 用材质 defines 的 USE_RIM 开关（defines 会算进着色器缓存键，不会和别的材质错用同一个程序）
+export const RIM = { color: { value: new THREE.Color(0xd8ecff) }, strength: { value: 0.3 } };
+addSharedUniforms({ uRimColor: RIM.color, uRimStrength: RIM.strength });
+if (!THREE.ShaderChunk.opaque_fragment.includes('USE_RIM')) {
+  THREE.ShaderChunk.lights_pars_begin = '#ifdef USE_RIM\nuniform vec3 uRimColor;\nuniform float uRimStrength;\n#endif\n' + THREE.ShaderChunk.lights_pars_begin;
+  THREE.ShaderChunk.opaque_fragment = `#ifdef USE_RIM
+  { float rimF = 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 );
+    outgoingLight += uRimColor * ( rimF * rimF * rimF * uRimStrength ); }
+  #endif
+` + THREE.ShaderChunk.opaque_fragment;
+}
+function addRim(m) {
+  if (!m.isMeshStandardMaterial || (m.defines && 'USE_RIM' in m.defines)) return;
+  m.defines = { ...(m.defines || {}), USE_RIM: '' };
+  m.needsUpdate = true;
+}
+
+export function prepareModel(root, { cast = true, receive = false, rim = true } = {}) {
   const mats = [];
   const seen = new Set();
   root.traverse((o) => {
@@ -48,7 +76,9 @@ export function prepareModel(root, { cast = true, receive = false } = {}) {
       o.receiveShadow = receive;
       const list = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of list) {
-        if (!m || seen.has(m) || !m.emissive) continue;
+        if (!m || seen.has(m)) continue;
+        if (rim) addRim(m);
+        if (!m.emissive) continue;
         seen.add(m);
         mats.push({ m, e: m.emissive.clone(), i: m.emissiveIntensity ?? 1 });
       }

@@ -15,6 +15,15 @@ export const WEAPON_ICON = {
 };
 
 const _v = new THREE.Vector3();
+// 重新播放 CSS 动画：下一帧再加回类名，而不是读 offsetWidth（那会强制整页同步重排）
+function replay(el, cls) {
+  el.classList.remove(cls);
+  requestAnimationFrame(() => el.classList.add(cls));
+}
+const BUMP = [{ transform: 'scale(1.35)' }, { transform: 'scale(1)' }];
+const BUMP_OPT = { duration: 180, easing: 'ease-out' };
+const PULSE = [{ transform: 'scale(1.14)' }, { transform: 'scale(1)' }];
+const PULSE_OPT = { duration: 160, easing: 'ease-out' };
 
 export class Hud {
   constructor(root, fxLayer, { dino, rider, thumb, touch, endless }) {
@@ -62,7 +71,18 @@ export class Hud {
       <div class="hud-hints">
         ${t('hud.hints')}
       </div>`;
-    if (touch) root.querySelector('.hud-hints').classList.add('hidden');
+    root.classList.toggle('touch', !!touch);
+    // 触屏：技能冷却和狂热进度直接画在可点的触屏按钮上（原来的技能卡被按钮挡住了）
+    this.tb = null;
+    if (touch) {
+      root.querySelector('.hud-hints').classList.add('hidden');
+      const tr = document.getElementById('touch');
+      const sk = tr && tr.querySelector('.tbtn.skill'), ul = tr && tr.querySelector('.tbtn.ult');
+      if (sk && ul) {
+        sk.querySelector('.ico').textContent = SKILL_ICON[dino.skill.type] || '✨';
+        this.tb = { skill: sk, cd: sk.querySelector('.tcd'), ct: sk.querySelector('.tct'), ult: ul, fill: ul.querySelector('.tfill') };
+      }
+    }
     const $ = (s) => root.querySelector(s);
     this.el = {
       flash: $('.dmg-flash'), hp: $('.bar-fill.hp'), ghost: $('.bar-fill.ghost'), hpText: $('.bar-text'),
@@ -82,6 +102,14 @@ export class Hud {
     this.lvlTimer = null;
   }
 
+  pulse(el, key) {
+    const now = performance.now();
+    this.pulseT = this.pulseT || {};
+    if (!el.animate || now - (this.pulseT[key] || 0) < 140) return;
+    this.pulseT[key] = now;
+    el.animate(PULSE, PULSE_OPT);
+  }
+
   set(key, val, fn) {
     if (this.cache[key] === val) return;
     this.cache[key] = val;
@@ -99,17 +127,22 @@ export class Hud {
     const el = this.el.comboTier;
     this.el.combo.dataset.tier = tier;
     el.textContent = name;
-    el.classList.remove('pop');
-    void el.offsetWidth;
-    el.classList.add('pop');
+    replay(el, 'pop');
+  }
+
+  /** 连击中断：在连击数位置飘一行灰色提示 */
+  comboLost(n) {
+    const d = document.createElement('div');
+    d.className = 'combo-lost';
+    d.textContent = t('hud.comboLost', { n });
+    this.root.appendChild(d);
+    setTimeout(() => d.remove(), 1300);
   }
 
   levelUp(lv, name) {
     const el = this.el.lvlup;
     el.innerHTML = `<div class="a">${t('hud.levelUp')}</div><div class="b">Lv.${lv}${lv >= WEAPON_MAX ? ' MAX' : ''} · ${name}</div>`;
-    el.classList.remove('show');
-    void el.offsetWidth;
-    el.classList.add('show');
+    replay(el, 'show');
     clearTimeout(this.lvlTimer);
     this.lvlTimer = setTimeout(() => el.classList.remove('show'), 1800);
   }
@@ -175,11 +208,16 @@ export class Hud {
     // 技能
     const scd = p.def.skill.cd * st.cdMul;
     const sr = Math.max(0, p.skillCd / scd);
+    const tb = this.tb;
     this.set('scd', Math.round(sr * 100), () => {
       this.el.skillCd.style.setProperty('--p', (sr * 100).toFixed(0) + '%');
       this.el.skill.classList.toggle('ready', sr <= 0);
+      if (tb) { tb.cd.style.setProperty('--p', (sr * 100).toFixed(0) + '%'); tb.skill.classList.toggle('ready', sr <= 0); }
     });
-    this.set('scdt', p.skillCd > 0 ? Math.ceil(p.skillCd) : 0, (v) => { this.el.skillCdt.textContent = v > 0 ? v : ''; });
+    this.set('scdt', p.skillCd > 0 ? Math.ceil(p.skillCd) : 0, (v) => {
+      this.el.skillCdt.textContent = v > 0 ? v : '';
+      if (tb) tb.ct.textContent = v > 0 ? v : '';
+    });
 
     // 路线进度
     if (!this.endless) {
@@ -195,8 +233,9 @@ export class Hud {
       this.set('dist', Math.floor(p.pos.z), (v) => { this.el.dist.innerHTML = t('hud.dist', { n: v }); });
     }
 
-    this.set('coins', game.stats.coins, (v) => { this.el.coins.textContent = v; });
-    this.set('kills', game.stats.kills, (v) => { this.el.kills.textContent = v; });
+    // 数字变化时对应的小胶囊轻轻跳一下（Web Animations，不触发重排）
+    this.set('coins', game.stats.coins, (v) => { this.el.coins.textContent = v; this.pulse(this.el.coins.parentElement, 'c'); });
+    this.set('kills', game.stats.kills, (v) => { this.el.kills.textContent = v; this.pulse(this.el.kills.parentElement, 'k'); });
     this.set('time', Math.floor(game.time), () => { this.el.time.textContent = formatTime(game.time); });
 
     const rage = game.player.buffs.rage;
@@ -205,6 +244,11 @@ export class Hud {
       this.el.feverFill.style.height = fv.toFixed(1) + '%';
       this.el.fever.classList.toggle('ready', rage <= 0 && game.fever >= 100);
       this.el.fever.classList.toggle('active', rage > 0);
+      if (tb) {
+        tb.fill.style.height = fv.toFixed(1) + '%';
+        tb.ult.classList.toggle('ready', rage <= 0 && game.fever >= 100);
+        tb.ult.classList.toggle('active', rage > 0);
+      }
     });
 
     const c = game.combo;
@@ -212,7 +256,7 @@ export class Hud {
     this.set('combo', c, (v) => {
       this.el.combo.classList.toggle('show', v >= 5);
       this.el.comboN.textContent = v;
-      if (v > this.lastCombo) { this.el.combo.classList.remove('bump'); void this.el.combo.offsetWidth; this.el.combo.classList.add('bump'); }
+      if (v > this.lastCombo && this.el.comboN.animate) this.el.comboN.animate(BUMP, BUMP_OPT);
       this.lastCombo = v;
     });
 
@@ -224,7 +268,10 @@ export class Hud {
         this.bossEl.ghost.style.width = (r * 100).toFixed(1) + '%';
         this.bossEl.text.textContent = `${Math.ceil(b.hp)} / ${b.maxHp}`;
       });
-      this.set('bph', b.phase, (v) => { this.bossEl.phase.textContent = b.phases > 1 ? t('hud.phase', { n: v, max: b.phases }) : ''; });
+      this.set('bph', b.phase, (v) => {
+        this.bossEl.phase.textContent = b.phases > 1 ? t('hud.phase', { n: v, max: b.phases }) : '';
+        if (v > 1) replay(this.bossEl.phase.parentElement, 'phase-up');
+      });
     }
 
     // 自动瞄准标记
@@ -232,15 +279,19 @@ export class Hud {
     if (aim && game.state !== 'win') {
       bendVec(aim.getCenter(_v)).project(game.camera);
       if (_v.z < 1) {
-        this.reticle.style.display = 'block';
-        this.reticle.style.left = ((_v.x * 0.5 + 0.5) * game.viewW).toFixed(0) + 'px';
-        this.reticle.style.top = ((-_v.y * 0.5 + 0.5) * game.viewH).toFixed(0) + 'px';
-      } else this.reticle.style.display = 'none';
-    } else this.reticle.style.display = 'none';
+        // 用独立的 translate 属性定位（不触发重排，也不和旋转动画的 transform 冲突）
+        this.set('ret', 1, () => { this.reticle.style.display = 'block'; });
+        this.reticle.style.translate = `${((_v.x * 0.5 + 0.5) * game.viewW).toFixed(0)}px ${((-_v.y * 0.5 + 0.5) * game.viewH).toFixed(0)}px`;
+      } else this.set('ret', 0, () => { this.reticle.style.display = 'none'; });
+    } else this.set('ret', 0, () => { this.reticle.style.display = 'none'; });
   }
 
   dispose() {
     clearTimeout(this.lvlTimer);
+    if (this.tb) {
+      this.tb.skill.classList.remove('ready'); this.tb.ult.classList.remove('ready', 'active');
+      this.tb.fill.style.height = '0%'; this.tb.ct.textContent = ''; this.tb.cd.style.setProperty('--p', '0%');
+    }
     this.root.innerHTML = '';
     this.root.classList.remove('low-hp');
     this.reticle.remove();

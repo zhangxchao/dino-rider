@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import {
   BIOMES, W, clamp, lerp, smooth, mulberry32, hashStr, hash3, makeNoise, fbm, ridged,
-  T, part, merge, jitter, gradientY, decoMaterial, makeSprite, waterMaterial, bannerMaterial, lavaMaterial, skyMaterial,
+  T, part, merge, jitter, gradientY, decoMaterial, windMaterial, makeSprite, waterMaterial, bannerMaterial, lavaMaterial, skyMaterial,
   geoRock, geoCapRock, geoBroadleaf, geoPalm, geoFern, geoFlower, geoGrass, geoSaguaro, geoPricklyPear, geoMesa, geoRibcage,
   geoSkull, geoShrub, geoPine, geoIceCluster, geoIceSpire, geoDrift, geoDeadTree, geoMushStem, geoMushCap, geoReeds, geoLily,
   geoShardCluster, geoPillar, geoWall, geoSpire, geoBannerPole, buildDistantVolcano, buildCitadel,
@@ -127,9 +127,18 @@ class GeoBuf {
 // ---------------------------------------------------------------------
 //  环形槽位装饰：每种装饰 = 近处(投影) + 远处(不投影) 两个 InstancedMesh
 // ---------------------------------------------------------------------
+// 会随风摆动的装饰（用共享装饰材质的这些种类自动换成风摆材质）
+const WIND_SOFT = new Set(['grass', 'dryGrass', 'flowers', 'ferns', 'reeds', 'shrubs']);
+const WIND_TREE = new Set(['trees', 'palms', 'pines', 'darkTrees']);
 class Deco {
   constructor(ctx, name, geo, mat, capNear, capFar, { split = 30, receive = true } = {}) {
     this.name = name;
+    if (mat === ctx.decoMat && (WIND_SOFT.has(name) || WIND_TREE.has(name))) {
+      const soft = WIND_SOFT.has(name);
+      const k = soft ? 'windSoft' : 'windTree';
+      if (!ctx[k]) { ctx[k] = soft ? windMaterial(ctx, { amp: 0.14, key: 'soft' }) : windMaterial(ctx, { amp: 0.035, minY: 1.6, key: 'tree' }); ctx.extraMats.push(ctx[k]); }
+      mat = ctx[k];
+    }
     this.cap = [capNear | 0, capFar | 0];
     this.split = split;
     this.meshes = this.cap.map((cap, k) => {
@@ -931,15 +940,29 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
     const ax = Math.abs(x);
     return base(z) + (ax <= FLAT ? roadDip : sideFn(x, z, ax));
   };
+  // 地形网格每一行（z = j·DZ）各列顶点的高度：带噪声，算一次缓存起来
+  // （heightAt 每帧要被怪物 / 拾取物 / 特效调用上千次，原来每次都现算 4 个顶点）
+  const rowCache = new Map();
+  const rowH = (j) => {
+    let r = rowCache.get(j);
+    if (r) return r;
+    r = new Float32Array(NX);
+    const z = j * DZ;
+    for (let i = 0; i < NX; i++) r[i] = tH(XS[i], z);
+    rowCache.set(j, r);
+    if (rowCache.size > 480) rowCache.delete(rowCache.keys().next().value); // 最早缓存的行（通常已在身后）
+    return r;
+  };
   // 与地形网格三角剖分完全一致的高度查询
   const heightAt = (x, z) => {
     if (x >= -FLAT && x <= FLAT) return base(z);
     if (!(x > -XMAX)) x = -XMAX + 1e-6; else if (x >= XMAX) x = XMAX - 1e-6;
     const i = colIndex(x);
     const j = Math.floor(z / DZ);
-    const xa = XS[i], xb = XS[i + 1], za = j * DZ, zb = za + DZ;
+    const xa = XS[i], xb = XS[i + 1], za = j * DZ;
     const fx = (x - xa) / (xb - xa), fz = (z - za) / DZ;
-    const h00 = tH(xa, za), h10 = tH(xb, za), h01 = tH(xa, zb), h11 = tH(xb, zb);
+    const ra = rowH(j), rb = rowH(j + 1);
+    const h00 = ra[i], h10 = ra[i + 1], h01 = rb[i], h11 = rb[i + 1];
     if (fz >= fx) return h00 + (h11 - h01) * fx + (h01 - h00) * fz;
     return h00 + (h10 - h00) * fx + (h11 - h10) * fz;
   };
@@ -971,7 +994,8 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
   scene.fog = cfg.fog.density ? new THREE.FogExp2(horizon.getHex(), cfg.fog.density) : new THREE.Fog(horizon.getHex(), cfg.fog.near, Math.min(cfg.fog.far, 250));
   scene.background = horizon.clone();
   const L = cfg.light;
-  root.add(new THREE.HemisphereLight(L.hemiSky, L.hemiGround, L.hemi));
+  const hemi = new THREE.HemisphereLight(L.hemiSky, L.hemiGround, L.hemi);
+  root.add(hemi);
   if (L.ambI) root.add(new THREE.AmbientLight(L.amb, L.ambI));
   const sunDir = new THREE.Vector3(...s.sunDir).normalize();
   const sun = new THREE.DirectionalLight(L.sun, L.sunI);
@@ -1043,42 +1067,47 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
   }
 
   // —— 地形块 ——
-  function buildTerrain(c) {
+  // 地形网格分两半建（rA..rB 行），两帧各做一半；最后一半做完才生成几何体
+  let terr = null;
+  function buildTerrain(c, rA = 0, rB = ROWS) {
     const j0 = c * ROWS;
-    const H = new Float32Array((ROWS + 1) * NX);
-    for (let r = 0; r <= ROWS; r++) {
-      const z = (j0 + r) * DZ;
-      for (let i = 0; i < NX; i++) H[r * NX + i] = tH(XS[i], z);
-    }
     const tris = ROWS * (NX - 1) * 2;
-    const pos = new Float32Array(tris * 9), cols = new Float32Array(tris * 9);
-    let o = 0;
+    if (!terr || terr.c !== c || rA === 0) terr = { c, pos: new Float32Array(tris * 9), cols: new Float32Array(tris * 9), nrm: new Float32Array(tris * 9) };
+    const { pos, cols, nrm } = terr;
+    let o = rA * (NX - 1) * 2 * 9, bMid = 0;
     const put = (ax, ay, az, bx, by, bz, cx, cy, cz, rnd) => {
       const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
       const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      const nyn = ny / Math.hypot(nx, ny, nz);
+      const inv = 1 / Math.hypot(nx, ny, nz);
       const mx = (ax + bx + cx) / 3, mz = (az + bz + cz) / 3;
-      groundColor(_c, mx, (ay + by + cy) / 3 - base(mz), mz, nyn, rnd, Math.abs(mx));
+      groundColor(_c, mx, (ay + by + cy) / 3 - bMid, mz, ny * inv, rnd, Math.abs(mx));
       pos[o] = ax; pos[o + 1] = ay; pos[o + 2] = az;
       pos[o + 3] = bx; pos[o + 4] = by; pos[o + 5] = bz;
       pos[o + 6] = cx; pos[o + 7] = cy; pos[o + 8] = cz;
-      for (let k = 0; k < 9; k += 3) { cols[o + k] = _c.r; cols[o + k + 1] = _c.g; cols[o + k + 2] = _c.b; }
+      // 平面着色：法线直接写面法线（省掉 computeVertexNormals 再算一遍）
+      for (let k = 0; k < 9; k += 3) {
+        cols[o + k] = _c.r; cols[o + k + 1] = _c.g; cols[o + k + 2] = _c.b;
+        nrm[o + k] = nx * inv; nrm[o + k + 1] = ny * inv; nrm[o + k + 2] = nz * inv;
+      }
       o += 9;
     };
-    for (let r = 0; r < ROWS; r++) {
+    for (let r = rA; r < rB; r++) {
       const z0 = (j0 + r) * DZ, z1 = z0 + DZ;
+      const ra = rowH(j0 + r), rb = rowH(j0 + r + 1);
+      bMid = base(z0 + DZ * 0.5);
       for (let i = 0; i < NX - 1; i++) {
         const x0 = XS[i], x1 = XS[i + 1];
-        const k = r * NX + i;
-        const h00 = H[k], h10 = H[k + 1], h01 = H[k + NX], h11 = H[k + NX + 1];
+        const h00 = ra[i], h10 = ra[i + 1], h01 = rb[i], h11 = rb[i + 1];
         put(x0, h00, z0, x0, h01, z1, x1, h11, z1, hash3(i, j0 + r, 1, seed));
         put(x0, h00, z0, x1, h11, z1, x1, h10, z0, hash3(i, j0 + r, 2, seed));
       }
     }
+    if (rB < ROWS) return null;
+    terr = null;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    g.computeVertexNormals();
+    g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
     g.computeBoundingSphere();
     return g;
   }
@@ -1125,16 +1154,56 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
 
   const chunks = new Map();
   const genTimes = [];
-  function gen(c) {
+  // 生成一块分成几步、分摊到连续几帧：地形 → 道路 / 水面 → 装饰（每帧两组）
+  // 新块在前方几百米外、藏在雾里，晚几帧才补齐看不出来，但不会一帧卡十几毫秒
+  let job = null;
+  const stepMax = [];
+  function gen(c, all = false) {
+    if (!job || job.c !== c) job = { c, step: 0, t: 0 };
     const t0 = performance.now();
     const slot = ((c % SLOTS) + SLOTS) % SLOTS;
     const sm = slotMeshes[slot];
-    if (sm.chunk !== null && sm.chunk !== c) chunks.delete(sm.chunk);
     const z0 = c * CHUNK, z1 = z0 + CHUNK;
-    const rand = mulberry32((seed ^ Math.imul(c + 7919, 2654435761)) >>> 0);
-
+    const DECO_PER_STEP = 2;
+    do {
+      const ts = performance.now();
+      const st = job.step++;
+      if (st === 0) {
+        if (sm.chunk !== null && sm.chunk !== c) { chunks.delete(sm.chunk); for (const dd of decos) dd.d.write(slot, null); }
+        sm.chunk = null;
+        buildTerrain(c, 0, ROWS >> 1);
+      } else if (st === 1) {
+        genTerrain(c, sm);
+      } else if (st === 2) {
+        genRoad(c, sm);
+        job.P = makePlacer(ctx, mulberry32((seed ^ Math.imul(c + 7919, 2654435761)) >>> 0), z0, z1);
+        job.P.landmarks = landmarksIn(z0, z1);
+      } else {
+        const i0 = (st - 3) * DECO_PER_STEP;
+        for (let i = i0; i < Math.min(decos.length, i0 + DECO_PER_STEP); i++) decos[i].d.write(slot, decos[i].place(job.P));
+        stepMax[Math.min(st, 9)] = Math.max(stepMax[Math.min(st, 9)] || 0, performance.now() - ts);
+        if (i0 + DECO_PER_STEP >= decos.length) {
+          sm.chunk = c;
+          chunks.set(c, slot);
+          job.t += performance.now() - t0;
+          genTimes.push(job.t);
+          if (genTimes.length > 400) genTimes.shift();
+          job = null;
+          return;
+        }
+      }
+      stepMax[Math.min(st, 9)] = Math.max(stepMax[Math.min(st, 9)] || 0, performance.now() - ts);
+    } while (all);
+    job.t += performance.now() - t0;
+  }
+  function genTerrain(c, sm) {
     sm.terrain.geometry.dispose();
-    sm.terrain.geometry = buildTerrain(c);
+    sm.terrain.geometry = buildTerrain(c, ROWS >> 1, ROWS);
+    sm.terrain.visible = true;
+    padBounds(sm.terrain);
+  }
+  function genRoad(c, sm) {
+    const z0 = c * CHUNK, z1 = z0 + CHUNK;
     const gb = new GeoBuf(), gl = new GeoBuf();
     tb.road(ctx, gb, gl, z0, z1);
     sm.road.geometry.dispose();
@@ -1147,22 +1216,13 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
       sm.water.geometry = buildSurface(c);
       sm.water.visible = true;
     }
-    sm.terrain.visible = true;
     sm.road.visible = true;
-    // 弯道在顶点着色器里横向平移，包围球加大一圈留出余量（身后 / 视野外的块仍能正常剔除）
-    for (const m of [sm.terrain, sm.road, sm.glow, sm.water]) {
-      const bs = m && m.geometry.boundingSphere;
-      if (bs && !m.geometry.userData.bendPad) { bs.radius += BEND_PAD; m.geometry.userData.bendPad = true; }
-    }
-
-    const P = makePlacer(ctx, rand, z0, z1);
-    P.landmarks = landmarksIn(z0, z1);
-    for (const dd of decos) dd.d.write(slot, dd.place(P));
-
-    sm.chunk = c;
-    chunks.set(c, slot);
-    genTimes.push(performance.now() - t0);
-    if (genTimes.length > 400) genTimes.shift();
+    for (const m of [sm.road, sm.glow, sm.water]) if (m) padBounds(m);
+  }
+  // 弯道在顶点着色器里横向平移，包围球加大一圈留出余量（身后 / 视野外的块仍能正常剔除）
+  function padBounds(m) {
+    const bs = m.geometry.boundingSphere;
+    if (bs && !m.geometry.userData.bendPad) { bs.radius += BEND_PAD; m.geometry.userData.bendPad = true; }
   }
 
   function release(c) {
@@ -1185,7 +1245,7 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
   // 初始窗口同步生成
   {
     const [a, b] = range(startZ);
-    for (let c = a; c <= b; c++) gen(c);
+    for (let c = a; c <= b; c++) gen(c, true);
     followSun(new THREE.Vector3(0, base(startZ), startZ));
   }
 
@@ -1206,8 +1266,12 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
     roadHalf: ROAD_HALF,
     heightAt,
     baseAt: base,
-    addFlat,           // 首领战场压平（只影响尚未生成的地形块）
+    addFlat: (a, b) => { addFlat(a, b); rowCache.clear(); }, // 首领战场压平（只影响尚未生成的地形块）
     sun,
+    skyCfg: cfg.sky,
+    hemi,
+    lightCfg: cfg.light,
+    envI: cfg.envI,
     fogColor: horizon.clone(),
     update(dt, t, focus) {
       if (disposed) return;
@@ -1220,13 +1284,15 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
       for (const u of ctx.updaters) u(dt, t, f);
       // 流式生成：每次最多 1 块
       const [a, b] = range(f.z);
-      for (const c of [...chunks.keys()]) if (c < a || c > b) release(c);
-      for (let c = a; c <= b; c++) if (!chunks.has(c)) { gen(c); break; }
+      for (const c of chunks.keys()) if (c < a || c > b) release(c);  // Map 迭代中删除当前项是安全的
+      if (job && (job.c < a || job.c > b)) job = null;
+      if (job) gen(job.c);
+      else for (let c = a; c <= b; c++) if (!chunks.has(c)) { gen(c); break; }
     },
     debug() {
       let draws = 0;
       root.traverse((o) => { if ((o.isMesh || o.isPoints || o.isSprite) && o.visible) draws++; });
-      return { chunks: chunks.size, objects: root.children.length, draws, genMax: Math.max(...genTimes), genAvg: genTimes.reduce((a, b) => a + b, 0) / genTimes.length, keys: [...chunks.keys()] };
+      return { chunks: chunks.size, objects: root.children.length, draws, genMax: Math.max(...genTimes), stepMax: stepMax.map((v) => +(v || 0).toFixed(2)), genAvg: genTimes.reduce((a, b) => a + b, 0) / genTimes.length, keys: [...chunks.keys()] };
     },
     dispose() {
       if (disposed) return;

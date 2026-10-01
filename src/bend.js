@@ -50,6 +50,8 @@ THREE.ShaderChunk.worldpos_vertex = THREE.ShaderChunk.worldpos_vertex.replace(
   'worldPosition = modelMatrix * worldPosition;', 'worldPosition = bendWorld( modelMatrix * worldPosition );');
 
 export function attachBend(shader) { Object.assign(shader.uniforms, U); }
+/** 追加全局共享 uniform（所有材质编译时都会挂上；没用到的着色器会忽略） */
+export function addSharedUniforms(obj) { Object.assign(U, obj); }
 // 所有材质默认在编译前挂上共享 uniform（改写了 onBeforeCompile 的材质需手动调用 attachBend）
 THREE.Material.prototype.onBeforeCompile = function (shader) { attachBend(shader); };
 

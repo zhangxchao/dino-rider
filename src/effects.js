@@ -1,6 +1,7 @@
 // 视觉特效：GPU 粒子、冲击波环、光柱、地面预警、护盾、伤害飘字
 import * as THREE from 'three';
 import { bendVec } from './bend.js';
+import { uploadRange } from './util.js';
 
 const _c = new THREE.Color();
 const _v = new THREE.Vector3();
@@ -181,10 +182,8 @@ export class Particles {
     }
     const g = this.geo;
     g.setDrawRange(0, this.count);
-    g.attributes.position.needsUpdate = true;
-    g.attributes.color.needsUpdate = true;
-    g.attributes.size.needsUpdate = true;
-    g.attributes.alpha.needsUpdate = true;
+    const A = g.attributes;
+    uploadRange(A.position, this.count); uploadRange(A.color, this.count); uploadRange(A.size, this.count); uploadRange(A.alpha, this.count);
   }
 
   _copy(from, to) {
@@ -257,7 +256,7 @@ export class Rings {
   pillar(pos, { r = 1.2, h = 12, life = 0.8, color = 0x88ccff, opacity = 0.7 } = {}) {
     const m = this._get('pillar');
     m.position.copy(pos);
-    m.material.color.set(color).multiplyScalar(2);
+    m.material.color.set(color).multiplyScalar(1.5);
     m.scale.set(r, h, r);
     this.items.push({ m, t: 0, life, r0: r, r1: r * 0.2, opacity, kind: 'pillar', h });
     return m;
@@ -552,14 +551,15 @@ export function applyCameraFade(root, uniform) {
       if (!(m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) continue;
       done.add(m);
       const prev = m.onBeforeCompile;
+      const keyBefore = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
       m.onBeforeCompile = (shader, renderer) => {
-        if (prev) prev(shader, renderer);
+        if (prev) prev.call(m, shader, renderer);
         shader.uniforms.uCamFade = uniform;
         shader.fragmentShader = 'uniform float uCamFade;\n' + shader.fragmentShader.replace(
           '#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + CAMFADE_GLSL);
       };
-      const prevKey = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => '';
-      m.customProgramCacheKey = () => prevKey() + '|camfade';
+      // 缓存键要在替换 onBeforeCompile 之前取（默认键就是它的源码）
+      m.customProgramCacheKey = () => keyBefore + '|camfade';
       m.needsUpdate = true;
     }
   });
@@ -610,7 +610,7 @@ export class BlobShadows {
   }
   end() {
     this.mesh.count = this.n;
-    this.mesh.instanceMatrix.needsUpdate = true;
+    uploadRange(this.mesh.instanceMatrix, this.n);
   }
   dispose() {
     this.mesh.parent && this.mesh.parent.remove(this.mesh);
@@ -656,9 +656,9 @@ export class Bars {
   }
   end() {
     this.bg.count = this.fg.count = this.n;
-    this.bg.instanceMatrix.needsUpdate = true;
-    this.fg.instanceMatrix.needsUpdate = true;
-    this.fg.instanceColor.needsUpdate = true;
+    uploadRange(this.bg.instanceMatrix, this.n);
+    uploadRange(this.fg.instanceMatrix, this.n);
+    uploadRange(this.fg.instanceColor, this.n);
   }
   dispose() {
     for (const m of [this.bg, this.fg]) { m.parent && m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); }
@@ -725,8 +725,8 @@ export class Debris {
       n++;
     }
     m.count = n;
-    m.instanceMatrix.needsUpdate = true;
-    m.instanceColor.needsUpdate = true;
+    uploadRange(m.instanceMatrix, n);
+    uploadRange(m.instanceColor, n);
   }
   clear() { this.items.length = 0; this.mesh.count = 0; }
   dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.mesh.dispose(); }
@@ -796,8 +796,8 @@ export class Scorch {
       n++;
     }
     this.mesh.count = n;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.fade.needsUpdate = true;
+    uploadRange(this.mesh.instanceMatrix, n);
+    uploadRange(this.fade, n);
   }
   clear() { this.items.length = 0; this.mesh.count = 0; }
   dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.mesh.geometry.dispose(); this.mesh.dispose(); }
@@ -873,8 +873,8 @@ export class Streaks {
   }
   end() {
     this.mesh.count = this.n;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    uploadRange(this.mesh.instanceMatrix, this.n);
+    uploadRange(this.mesh.instanceColor, this.n);
   }
   dispose() { this.scene.remove(this.mesh); this.mesh.material.dispose(); this.tex.dispose(); this.mesh.dispose(); }
 }

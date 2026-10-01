@@ -1,6 +1,7 @@
 // 弹道系统：骑手武器 / 恐龙技能弹 / 怪物与首领弹幕
 import * as THREE from 'three';
 import { FX } from './effects.js';
+import { uploadRange } from './util.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -161,7 +162,7 @@ class Batch {
     this.n++;
   }
   end() {
-    for (const im of this.layers) { im.count = this.n; im.instanceMatrix.needsUpdate = true; }
+    for (const im of this.layers) { im.count = this.n; uploadRange(im.instanceMatrix, this.n); }
   }
   dispose() {
     for (const im of this.layers) { im.parent && im.parent.remove(im); im.geometry.dispose(); }
@@ -173,6 +174,8 @@ export class Projectiles {
     this.game = game;
     this.list = [];
     this.batches = new Map();
+    this.pool = [];     // 回收的弹体对象（高射速时每秒要生成上百发，复用避免频繁垃圾回收）
+    this.dying = [];    // 本帧死亡的弹体：帧末再放回池子，防止同一帧里被重新拿去用
   }
 
   _batch(kind, color, extra) {
@@ -223,16 +226,15 @@ export class Projectiles {
    *      aoe, slow, slowTime, burn, poison, knock, stun, gravity, crit, color, width, source }
    */
   spawn(o) {
-    const p = {
-      kind: o.kind, owner: o.owner || 'player', source: o.source || 'rider',
-      pos: o.pos.clone(), vel: o.dir.clone().normalize().multiplyScalar(o.speed), speed: o.speed,
-      dmg: o.dmg, radius: o.radius ?? 0.5, life: o.life ?? 2.5, pierce: o.pierce ?? 0, bounce: o.bounce ?? 0,
-      homing: o.homing ?? 0, target: o.target || null, aoe: o.aoe ?? 0, slow: o.slow ?? 0, slowTime: o.slowTime ?? 0,
-      burn: o.burn ?? 0, poison: o.poison ?? 0, knock: o.knock ?? 2, stun: o.stun ?? 0, gravity: o.gravity ?? 0,
-      crit: !!o.crit, color: o.color, hit: new Set(), trailAcc: 0, spinT: 0, dead: false,
-      trail: TRAILS[o.kind], explodeOnExpire: !!o.explodeOnExpire, groundHit: o.groundHit !== false,
-      hover: o.hover ?? null, sweepW: o.sweepW ?? 0,
-    };
+    const p = this.pool.pop() || { pos: new THREE.Vector3(), vel: new THREE.Vector3(), hit: new Set() };
+    p.kind = o.kind; p.owner = o.owner || 'player'; p.source = o.source || 'rider';
+    p.pos.copy(o.pos); p.vel.copy(o.dir).normalize().multiplyScalar(o.speed); p.speed = o.speed;
+    p.dmg = o.dmg; p.radius = o.radius ?? 0.5; p.life = o.life ?? 2.5; p.pierce = o.pierce ?? 0; p.bounce = o.bounce ?? 0;
+    p.homing = o.homing ?? 0; p.target = o.target || null; p.aoe = o.aoe ?? 0; p.slow = o.slow ?? 0; p.slowTime = o.slowTime ?? 0;
+    p.burn = o.burn ?? 0; p.poison = o.poison ?? 0; p.knock = o.knock ?? 2; p.stun = o.stun ?? 0; p.gravity = o.gravity ?? 0;
+    p.crit = !!o.crit; p.color = o.color; p.hit.clear(); p.trailAcc = 0; p.spinT = 0; p.dead = false;
+    p.trail = TRAILS[o.kind]; p.explodeOnExpire = !!o.explodeOnExpire; p.groundHit = o.groundHit !== false;
+    p.hover = o.hover ?? null; p.sweepW = o.sweepW ?? 0; p.grazed = false;
     if (o.inherit) p.vel.add(o.inherit);
     p.batch = this._batch(o.kind, o.kind === 'orb' || o.kind === 'borb' ? o.color : undefined, o.kind === 'wave' || o.kind === 'scythewave' ? (o.width || 5) : undefined);
     p.scale = o.scale || 1;
@@ -347,6 +349,10 @@ export class Projectiles {
       }
     }
     this._render();
+    if (this.dying.length) {
+      for (const d of this.dying) { d.hit.clear(); if (this.pool.length < 400) this.pool.push(d); }
+      this.dying.length = 0;
+    }
   }
 
   // 返回 true 表示弹体销毁
@@ -423,10 +429,15 @@ export class Projectiles {
     }
   }
 
+  // 与末尾交换删除（倒序遍历时末尾元素已经处理过，不会漏也不会重复）
   _kill(i) {
-    const p = this.list[i];
+    const L = this.list;
+    const p = L[i];
     p.dead = true;
-    this.list.splice(i, 1);
+    p.target = null;
+    const last = L.pop();
+    if (i < L.length) L[i] = last;
+    this.dying.push(p);
   }
 
   clear() {

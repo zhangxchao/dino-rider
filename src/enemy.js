@@ -72,15 +72,27 @@ const LATERAL = { wolf: 3.2, bat: 2.6, goblin: 1.6, slime: 1.2, skeleton: 1.4, s
 // ---------------------------------------------------------------------
 export class Enemy {
   constructor(game, type, x, z, mul = { hp: 1, dmg: 1 }) {
+    // 一次性：模型、材质、骨骼（怪物被移除后回收进对象池，下次出生直接 reset 复用）
     this.game = game;
     this.type = type;
-    this.def = ENEMIES[type];
     this.isBoss = false;
     this.isProp = false;
     this.model = buildEnemyModel(type);
     this.root = this.model.root;
-    game.scene.add(this.root);
     this.flash = prepareModel(this.root, { cast: false });  // 怪物用圆形投影代替实时阴影
+    this.pos = new THREE.Vector3();
+    this.vel = new THREE.Vector3();
+    this.kb = new THREE.Vector3();
+    this.anim = { t: 0, move: 0, attack: -1, hurt: 0, dead: 0 };
+    this.reset(x, z, mul);
+  }
+
+  /** 每次出生：把所有运行时状态恢复成新怪物的样子 */
+  reset(x, z, mul = { hp: 1, dmg: 1 }) {
+    const game = this.game;
+    this.def = ENEMIES[this.type];
+    game.scene.add(this.root);
+    this.root.visible = true;
     this.radius = this.def.radius;
     this.height = this.model.size.height || 1.5;
     this.flying = !!this.def.flying;
@@ -92,10 +104,10 @@ export class Enemy {
     this.speed = this.def.speed * rand(0.9, 1.12);
     this.kind = this.flying ? 'flying' : this.def.ranged ? 'ranged' : 'melee';
     this.mass = Math.pow(this.radius, 1.5) * (this.type === 'golem' || this.type === 'yeti' || this.type === 'darkKnight' ? 1.8 : 1);
-    this.pos = new THREE.Vector3(x, game.heightAt(x, z), z);
+    this.pos.set(x, game.heightAt(x, z), z);
     this.homeX = x;
-    this.vel = new THREE.Vector3();
-    this.kb = new THREE.Vector3();
+    this.vel.set(0, 0, 0);
+    this.kb.set(0, 0, 0);
     this.lift = 0; this.vy = 0;
     this.heading = Math.PI;
     this.state = 'spawn';
@@ -116,32 +128,50 @@ export class Enemy {
     this.deadT = 0;
     this.phase = Math.random() * 10;
     this.teleCd = rand(1, 3);
-    this.anim = { t: Math.random() * 10, move: 0, attack: -1, hurt: 0, dead: 0 };
+    const A = this.anim;
+    A.t = Math.random() * 10; A.move = 0; A.attack = -1; A.hurt = 0; A.dead = 0;
     this.barW = Math.max(1, this.radius * 1.4);
     this.barT = 0;
     this.barTop = 2;
     this.stunFx = 0;
+    this.animSkip = 0; this.animDt = 0;
+    // 外部挂上的标记（精英、宝藏哥布林、完美闪避……）
+    this.elite = false; this.treasure = false; this.flee = 0; this.fleeT = 0; this.dodged = false; this.noPool = false;
+    this.mistT = 0; this.mistHit = false; this.mistNear = false;
+    this.dropping = false;
+    this.flash.setFlash(0);
+    this.root.rotation.set(0, Math.PI, 0);
+    this.root.position.copy(this.pos);
     this.root.scale.setScalar(0.01);
     if (this.def.drop) {
       // 从树上垂丝落下：出生即全尺寸，挂在高处慢慢降下来（下落途中就能被打）
       this.dropping = true;
       this.lift = this.def.drop;
       this.root.scale.setScalar(1);
-      this.thread = new THREE.Mesh(threadGeo, threadMat);
-      this.thread.position.y = 0.45;
-      this.thread.frustumCulled = false;
+      if (!this.thread) {
+        this.thread = new THREE.Mesh(threadGeo, threadMat);
+        this.thread.position.y = 0.45;
+        this.thread.frustumCulled = false;
+      }
       this.root.add(this.thread);
     }
+    return this;
+  }
+
+  /** 回收进对象池：从场景里拿掉但保留模型 */
+  release() {
+    if (this.thread) this.root.remove(this.thread);
+    this.game.scene.remove(this.root);
   }
 
   get targetable() { return this.alive && (this.state !== 'spawn' || this.dropping); }
   getCenter(out) { return out.set(this.pos.x, this.pos.y + (this.flying ? this.hoverY : this.height * 0.5) + this.lift, this.pos.z); }
 
-  applyStatus(o) {
+  applyStatus(o, dotBase = 0) {
     if (o.stun) this.stun = Math.max(this.stun, o.stun);
     if (o.slow) { this.slowMul = Math.min(this.slowMul, 1 - o.slow); this.slowT = Math.max(this.slowT, o.slowTime || 2); }
-    if (o.burn) { this.burnT = Math.max(this.burnT, o.burn); this.burnDps = Math.max(this.burnDps, o.dotBase * 0.35); }
-    if (o.poison) { this.poisonT = Math.max(this.poisonT, o.poison); this.poisonDps = Math.max(this.poisonDps, o.dotBase * 0.3); }
+    if (o.burn) { this.burnT = Math.max(this.burnT, o.burn); this.burnDps = Math.max(this.burnDps, dotBase * 0.35); }
+    if (o.poison) { this.poisonT = Math.max(this.poisonT, o.poison); this.poisonDps = Math.max(this.poisonDps, dotBase * 0.3); }
     if (o.dir && o.knock) {
       const k = o.knock / this.mass;
       this.kb.x += o.dir.x * k; this.kb.z += o.dir.z * k;
@@ -154,7 +184,7 @@ export class Enemy {
     this.state = 'dead';
     this.deadT = 0;
     this.atkT = -1;
-    if (this.thread) { this.root.remove(this.thread); this.thread = null; this.dropping = false; }
+    if (this.thread) { this.root.remove(this.thread); this.dropping = false; }
   }
 
   update(dt) {
@@ -182,7 +212,7 @@ export class Enemy {
       updateBar(this, dt, this.height + 0.5);
       if (k >= 1) {
         this.state = 'active'; this.dropping = false; this.lift = 0;
-        this.root.remove(this.thread); this.thread = null;
+        this.root.remove(this.thread);
         this.atkCd = rand(0.05, 0.35);
         g.fx.dust.burst(this.pos, { count: 6, speed: 2.5, life: 0.5, size: 0.6, sizeEnd: 1.4, color: g.dustColor, alpha: 0.4, flat: true, up: 1 });
       }
@@ -326,9 +356,11 @@ export class Enemy {
     this.anim.move = clamp(Math.hypot(this.vel.x, this.vel.z) / Math.max(1, this.def.speed * 0.6), 0, 1.5);
     this.anim.attack = this.atkT;
     this.anim.hurt = this.hurt;
-    this.model.update(dt, this.anim);
+    // 远处（雾里）或已被甩到身后的怪物：动画每 3 帧才更新一次姿势，看不出区别，省下骨骼计算
+    this.animDt += dt;
+    if ((dz < 60 && dz > -3) || ++this.animSkip % 3 === 0) { this.model.update(this.animDt, this.anim); this.animDt = 0; }
 
-    if (this.flashT > 0) this.flash.setFlash(this.flashT / 0.12);
+    if (this.flashT > 0) this.flash.setFlash(0.7 * this.flashT / 0.12);
     else if (this.slowT > 0) this.flash.setFlash(0.35, ICE_COL);
     else this.flash.setFlash(0);
     updateBar(this, dt, this.flying ? this.hoverY + 1.1 : this.height + 0.5);
@@ -391,6 +423,7 @@ export class Enemy {
 
   dispose() {
     if (this.thread) { this.root.remove(this.thread); this.thread = null; }
+    this.root.visible = true;
     this.game.scene.remove(this.root);
     disposeModel(this.root);
   }
@@ -448,7 +481,7 @@ export class Prop {
     this.root.position.copy(this.pos);
     this.root.rotation.y = Math.random() * Math.PI * 2;
     game.scene.add(this.root);
-    this.flash = prepareModel(this.root, { cast: false, receive: true });
+    this.flash = prepareModel(this.root, { cast: false, receive: true, rim: false });
     this.alive = true; this.removed = false; this.deadT = 0; this.state = 'active';
     this.hurt = 0; this.flashT = 0; this.collideCd = 0; this.stun = 0;
     this.barW = 1.6;
@@ -534,11 +567,11 @@ export class Boss {
   get targetable() { return this.alive && this.state === 'fight' && this.anim.burrow < 0.5; }
   getCenter(out) { return out.set(this.pos.x, this.pos.y + this.height * 0.45, this.pos.z); }
 
-  applyStatus(o) {
+  applyStatus(o, dotBase = 0) {
     if (o.stun) this.stun = Math.max(this.stun, o.stun * 0.2);
     if (o.slow) { this.slowMul = Math.min(this.slowMul, 1 - o.slow * 0.5); this.slowT = Math.max(this.slowT, (o.slowTime || 2) * 0.6); }
-    if (o.burn) { this.burnT = Math.max(this.burnT, o.burn); this.burnDps = Math.max(this.burnDps, o.dotBase * 0.35); }
-    if (o.poison) { this.poisonT = Math.max(this.poisonT, o.poison); this.poisonDps = Math.max(this.poisonDps, o.dotBase * 0.3); }
+    if (o.burn) { this.burnT = Math.max(this.burnT, o.burn); this.burnDps = Math.max(this.burnDps, dotBase * 0.35); }
+    if (o.poison) { this.poisonT = Math.max(this.poisonT, o.poison); this.poisonDps = Math.max(this.poisonDps, dotBase * 0.3); }
   }
 
   kill() { this.alive = false; this.state = 'dead'; this.deadT = 0; this.endPattern(); }
@@ -660,7 +693,7 @@ export class Boss {
     this.anim.pattern = this.pattern ? this.pattern.name : null;
     this.model.update(dt, this.anim);
 
-    if (this.flashT > 0) this.flash.setFlash(this.flashT / 0.12);
+    if (this.flashT > 0) this.flash.setFlash(0.7 * this.flashT / 0.12);
     else if (this.invulnT > 0) this.flash.setFlash(0.3 + 0.2 * Math.sin(this.anim.t * 20), _col.set(this.def.projColor));
     else this.flash.setFlash(0);
   }

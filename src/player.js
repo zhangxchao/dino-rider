@@ -1,5 +1,7 @@
 // 玩家（跑道模式）：恐龙自动前进，左右走位；骑手自动射击；武器随击杀升级
 import * as THREE from 'three';
+import { meta } from './meta.js';
+import { input } from './input.js';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
 import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE } from './data.js';
@@ -19,6 +21,7 @@ const GRAVITY = 32;
 const smoothstep01 = (x) => x * x * (3 - 2 * x);
 export const RAGE_TIME = 6;
 const RAGE_COL = new THREE.Color(0xffb020);
+const HURT_COL = new THREE.Color(1, 0.45, 0.4);
 const _rc = new THREE.Color();
 
 export function computeStats(dino, rider, up) {
@@ -343,7 +346,8 @@ export class Player {
     this.riderAnim.lean = this.lean;
     this.riderModel.update(dt, this.riderAnim);
 
-    if (this.flashT > 0) this.flash.setFlash(this.flashT / 0.15);
+    // 受击闪一下暖红色（原来是满强度纯白，被围攻时整只恐龙一直是白的，看不清）
+    if (this.flashT > 0) this.flash.setFlash(0.55 * this.flashT / 0.15, HURT_COL);
     else if (this.buffs.rage > 0) this.flash.setFlash(0.16 + 0.08 * Math.sin(this.anim.t * 14), RAGE_COL);
     else if (this.buffs.frenzy > 0) this.flash.setFlash(0.22 + 0.12 * Math.sin(this.anim.t * 12), FRENZY_COL);
     else if (this.buffs.sprint > 0 || (sk && sk.type === 'charge')) this.flash.setFlash(0.3, SPRINT_COL);
@@ -495,6 +499,7 @@ export class Player {
     const d = this.def.skill;
     const s = { type: d.type, t: 0, dur: 1, fired: false, hit: new Set(), count: 0, running };
     this.skillJuice(d.type);
+    meta.track('skill');
     switch (d.type) {
       case 'roar': s.dur = 1.2; break;
       case 'charge':
@@ -873,6 +878,7 @@ export class Player {
       g.audio.play(this.buffs.fortress > 0 || this.buffs.shield > 0 ? 'shieldHit' : 'playerHurt', { volume: 0.7 });
       g.shake.add(Math.min(0.3, 0.1 + dmg / this.stats.maxHp * 1.2));
       g.hud && g.hud.damageFlash();
+      input.buzz(amount > this.stats.maxHp * 0.12 ? 45 : 22, 150);
       const heavy = Math.min(1, dmg / this.stats.maxHp * 6);
       g.juice.flash(0xff2020, 0.08 + heavy * 0.2);
       g.juice.aberr(0.5 + heavy * 1.2);

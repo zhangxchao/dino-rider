@@ -862,7 +862,13 @@ export class Game {
       e.getCenter(_v);
       _v.y += e.halfHeight * 0.8 + 0.3;
       const cls = o.crit ? 'crit' : isDot ? (o.dotColor === 'poison' ? 'poison' : 'burn') : '';
-      this.text.add(_v, Math.round(d) + (o.crit ? '!' : ''), cls, isDot ? 0.6 : 0.8);
+      // 同一只怪 0.12 秒内的普通伤害只飘一个数字（把累计值写进去），高射速时不会叠成一团
+      if (!o.crit && e.numT !== undefined && this.time - e.numT < 0.12) e.numAcc += d;
+      else {
+        const v = d + (o.crit ? 0 : e.numAcc || 0);
+        e.numAcc = 0; e.numT = this.time;
+        this.text.add(_v, Math.round(v) + (o.crit ? '!' : ''), cls, isDot ? 0.5 : 0.6);
+      }
     }
     if (o.crit) {
       this.audio.play('crit', { volume: 0.45 });
@@ -1171,7 +1177,11 @@ export class Game {
     const d = Math.hypot(pos.x - this.player.pos.x, pos.z - this.player.pos.z);
     this.shake.add(amount * clamp(1.2 - d / 40, 0.15, 1) * 0.6);
   }
-  floatText(pos, text, cls = '', yOff = 2) { this.text.add(_v.set(pos.x, pos.y + yOff, pos.z), text, cls, 1.2); }
+  floatText(pos, text, cls = '', yOff = 2) {
+    // 玩家自己的状态提示（完美闪避、技能充能、多重击杀……）不再飘在恐龙头上挡住前方的路，改到左侧提示栏
+    if (pos === this.player.pos && (cls === 'info' || cls === 'crit')) { this.hud.notice(text, cls); return; }
+    this.text.add(_v.set(pos.x, pos.y + yOff, pos.z), text, cls, 1.2);
+  }
 
   separate() {
     const list = this.enemies;
@@ -1502,6 +1512,7 @@ export class Game {
   // ------------------------------------------------------------------
   showBanner(main, sub = '', red = false, hold = 2200) {
     const el = this.app.bannerEl;
+    hold *= 0.7;   // 横幅短一点，少挡视线
     clearTimeout(this.bannerTimer);
     el.classList.remove('out');
     el.innerHTML = `<div class="b-main${red ? ' red' : ''}">${main}</div>${sub ? `<div class="b-sub">${sub}</div>` : ''}`;
@@ -1525,8 +1536,8 @@ export class Game {
     d.className = 'toast-item';
     d.textContent = msg;
     box.appendChild(d);
-    while (box.children.length > 3) box.firstChild.remove();
-    setTimeout(() => d.remove(), 2700);
+    while (box.children.length > 2) box.firstChild.remove();
+    setTimeout(() => d.remove(), 1900);
   }
 
   dispose() {

@@ -344,6 +344,10 @@ export default {
     'pause.fsExit': '⛶ 退出全屏',
     'fs.hintIos': '想全屏玩？点 Safari 的 <b>分享</b> → <b>添加到主屏幕</b>，再从桌面的恐龙图标打开，就没有地址栏了',
     'fs.hintInApp': '在 App 里打开的网页没法全屏：点右上角菜单，选 <b>在 Safari / 浏览器中打开</b>',
+    'settings.dmgNum': '🔢 伤害数字',
+    'settings.dmgNum.all': '全部',
+    'settings.dmgNum.crit': '仅暴击',
+    'settings.dmgNum.off': '关闭',
     'touch.pause': '⏸ 暂停',
   },
 };

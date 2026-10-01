@@ -344,6 +344,10 @@ export default {
     'pause.fsExit': '⛶ フルスクリーン解除',
     'fs.hintIos': '全画面で遊ぶには Safari の <b>共有</b> → <b>ホーム画面に追加</b>、ホームの恐竜アイコンから開いてね',
     'fs.hintInApp': 'アプリ内ブラウザでは全画面にできません：メニューから <b>Safari / ブラウザで開く</b>',
+    'settings.dmgNum': '🔢 ダメージ数字',
+    'settings.dmgNum.all': 'すべて',
+    'settings.dmgNum.crit': 'クリのみ',
+    'settings.dmgNum.off': 'オフ',
     'touch.pause': '⏸ 停止',
   },
 

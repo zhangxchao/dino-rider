@@ -52,14 +52,21 @@ class App {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1500);
 
-    // 后期合成的离屏缓冲开 4 倍多重采样（WebGL2）：高画质原来完全没有抗锯齿，边缘锯齿明显
-    const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
-      type: THREE.HalfFloatType,
-      samples: this.renderer.capabilities.isWebGL2 !== false ? 4 : 0,
-    });
+    // 手机 / 平板（粗指针 + 触屏）：像素多、显卡弱，后期效果按手机档位走
+    this.mobile = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
+    // 后期合成的离屏缓冲在桌面上开 4 倍多重采样。多重采样的半浮点缓冲需要 EXT_color_buffer_float，
+    // iOS Safari 上不一定支持——不支持时帧缓冲不完整，整个画面是黑的；手机像素密度高，本来也不太需要
+    const msaa = !this.mobile && this.renderer.capabilities.isWebGL2 !== false && this.renderer.extensions.has('EXT_color_buffer_float');
+    const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: msaa ? 4 : 0 });
     this.composer = new EffectComposer(this.renderer, rt);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.fbChecked = false;
     this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.45, 0.85);
+    if (this.mobile) {
+      // 手机上泛光的模糊链再降一半分辨率（泛光本来就是糊的，看不出区别）
+      const setSize = this.bloom.setSize.bind(this.bloom);
+      this.bloom.setSize = (w, h) => setSize(Math.max(2, w * 0.5), Math.max(2, h * 0.5));
+    }
     this.composer.addPass(this.bloom);
     this.juice = new Juice(this);
     this.juice.install(this.composer, 2);
@@ -115,9 +122,11 @@ class App {
     const rm = s.reduceMotion || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     document.documentElement.classList.toggle('reduce-motion', !!rm);
     const dpr = window.devicePixelRatio || 1;
-    this.maxPR = s.quality === 'high' ? Math.min(dpr, 2) : Math.min(dpr, 1);
-    this.minPR = s.quality === 'high' ? 0.75 : 0.6;
-    this.dyn.pr = Math.min(this.maxPR, s.quality === 'high' ? 1.25 : 1);
+    const hiQ = s.quality === 'high';
+    // 手机屏幕像素密度高（iPhone 为 3）：高画质最高 1.5 倍、从 1 倍起步，掉帧时可以一路降到 0.6
+    this.maxPR = hiQ ? Math.min(dpr, this.mobile ? 1.5 : 2) : Math.min(dpr, 1);
+    this.minPR = hiQ && !this.mobile ? 0.75 : 0.6;
+    this.dyn.pr = Math.min(this.maxPR, hiQ ? (this.mobile ? 1 : 1.25) : 1);
     this.dyn.good = 0; this.dyn.bad = 0;
     this.setPixelRatio(this.dyn.pr);
     this.useComposer = s.quality === 'high';
@@ -282,14 +291,36 @@ class App {
         this.showcase.update(dt);
       }
       this.juice.update(this.game && this.game.paused ? 0 : dt);
-      if (this.useComposer) this.composer.render(dt);
-      else this.renderer.render(this.scene, this.camera);
+      if (this.useComposer) {
+        this.composer.render(dt);
+        if (!this.fbChecked) this.checkComposer();
+      } else this.renderer.render(this.scene, this.camera);
       this.lastCalls = this.renderer.info.render.calls;
     } catch (e) {
       this.showError(e);
     }
     input.endFrame();
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /** 第一次走后期合成后检查离屏缓冲是否可用：不完整就关掉多重采样重建；还不行就直接画到屏幕 */
+  checkComposer() {
+    this.fbChecked = true;
+    const r = this.renderer, gl = r.getContext(), c = this.composer;
+    try {
+      const prev = r.getRenderTarget();
+      r.setRenderTarget(c.renderTarget1);
+      const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      r.setRenderTarget(prev);
+      if (ok) return;
+      if (c.renderTarget1.samples > 0) {
+        for (const t of [c.renderTarget1, c.renderTarget2]) { t.samples = 0; t.dispose(); }
+        c.setSize(window.innerWidth, window.innerHeight);
+        this.fbChecked = false; // 重建后再检查一次
+      } else {
+        this.useComposer = false;   // 连普通半浮点缓冲都不行：放弃后期，直接画到屏幕
+      }
+    } catch { /* ignore */ }
   }
 
   showError(e) {

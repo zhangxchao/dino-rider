@@ -5,6 +5,7 @@ import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
 import { t, LANGS, getLang, setLang } from './i18n.js';
 import { meta, MISSIONS, ACHIEVEMENTS } from './meta.js';
+import { canFullscreen, isFullscreen, isStandalone, isIPhone, isInAppBrowser, toggleFullscreen } from './fullscreen.js';
 
 const BIOME_EMOJI = { jungle: '🌴', desert: '🏜️', frost: '❄️', swamp: '🍄', volcano: '🌋', shadow: '🏰', hive: '🦗' };
 const BIOME_BG = {
@@ -81,6 +82,15 @@ export class UI {
     this.current = null;
   }
 
+  /** iPhone 不能网页全屏：提示「添加到主屏幕」；在 App 内置浏览器里则提示先用 Safari 打开 */
+  fsHint() {
+    if (!this.app.isTouch || isStandalone() || save.settings.fsHintClosed) return '';
+    if (!isIPhone() && canFullscreen() && !isInAppBrowser()) return '';
+    const key = isInAppBrowser() ? 'fs.hintInApp' : isIPhone() ? 'fs.hintIos' : '';
+    if (!key) return '';
+    return `<div class="fs-hint"><span>📱</span><div>${t(key)}</div><button class="btn ghost small">✕</button></div>`;
+  }
+
   coinPill() { return `<div class="coin-pill"><i class="coin-ico"></i> <span>${save.coins}</span></div>`; }
 
   // ------------------------------------------------------------------
@@ -111,12 +121,15 @@ export class UI {
         </div>
         <div style="position:absolute;right:4vw;top:22px">${this.coinPill()}</div>
         <button class="btn ghost small lang-btn" data-lang>🌐 ${LANGS.find((l) => l.id === getLang()).label}</button>
+        ${this.fsHint()}
       </div>`);
     n.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
       const a = b.dataset.act;
       if (a === 'settings') this.show('settings', { from: 'title' });
       else this.show(a);
     }));
+    const fh = n.querySelector('.fs-hint');
+    if (fh) fh.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); save.settings.fsHintClosed = true; persist(); fh.remove(); });
     n.querySelector('[data-lang]').addEventListener('click', () => {
       const i = LANGS.findIndex((l) => l.id === getLang());
       setLang(LANGS[(i + 1) % LANGS.length].id);
@@ -456,6 +469,7 @@ export class UI {
           <div class="set-row"><label>${t('settings.fps')}</label><div class="seg" data-k="showFps"><button data-v="1" class="${s.showFps ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.showFps ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.shake')}</label><div class="seg" data-k="shake"><button data-v="1" class="${s.shake ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.shake ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.reduceMotion')}</label><div class="seg" data-k="reduceMotion"><button data-v="1" class="${s.reduceMotion ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.reduceMotion ? 'on' : ''}">${t('common.off')}</button></div></div>
+          ${this.app.isTouch && canFullscreen() ? `<div class="set-row"><label>${t('settings.autoFs')}</label><div class="seg" data-k="autoFs"><button data-v="1" class="${s.autoFs !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.autoFs === false ? 'on' : ''}">${t('common.off')}</button></div></div>` : ''}
           ${this.app.isTouch ? `<div class="set-row"><label>${t('settings.vibrate')}</label><div class="seg" data-k="vibrate"><button data-v="1" class="${s.vibrate !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.vibrate === false ? 'on' : ''}">${t('common.off')}</button></div></div>` : ''}
           ${from === 'title' ? `<div class="set-row"><label>${t('settings.tutorial')}</label><button class="btn ghost small" data-tut>${save.tutorialDone ? t('settings.tutorialBtn') : t('settings.tutorialOn')}</button></div>` : ''}
           ${from === 'title' ? `<div class="set-row"><label>${t('settings.reset')}</label><button class="btn danger small" data-reset>${t('settings.resetBtn')}</button></div>` : ''}
@@ -546,6 +560,7 @@ export class UI {
           <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
             <button class="btn" data-a="resume">${t('pause.resume')}</button>
             <button class="btn ghost" data-a="restart">${t('pause.restart')}</button>
+            ${canFullscreen() && !isStandalone() ? `<button class="btn ghost" data-a="fs">${isFullscreen() ? t('pause.fsExit') : t('pause.fs')}</button>` : ''}
             <button class="btn ghost" data-a="settings">${t('pause.settings')}</button>
             <button class="btn ghost" data-a="help">${t('pause.help')}</button>
             <button class="btn danger" data-a="quit">${t('pause.quit')}</button>
@@ -568,6 +583,7 @@ export class UI {
       if ((a === 'restart' || a === 'quit') && !confirm(b, a)) return;
       if (a === 'resume') this.app.resume();
       else if (a === 'restart') this.app.restart();
+      else if (a === 'fs') { toggleFullscreen(); setTimeout(() => this.show('pause'), 300); }
       else if (a === 'settings') this.show('settings', { from: 'pause' });
       else if (a === 'help') this.show('help', { from: 'pause' });
       else if (a === 'quit') this.app.exitToMenu();

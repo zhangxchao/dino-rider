@@ -535,3 +535,41 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
   .lvlup .a { font-size: 21px; }
   .lvlup .b { font-size: 12px; }
 }
+
+/* ---------------- 全屏提示 + 刘海安全区 ---------------- */
+.fs-hint { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: min(560px, 70vw); padding: 8px 8px 8px 14px; border-radius: 14px; background: rgba(10,14,22,.86); border: 1px solid rgba(255,200,80,.5); font-size: 13px; line-height: 1.5; color: #fff; z-index: 5; animation: popIn .4s ease 1s both; }
+.fs-hint span { font-size: 22px; }
+.fs-hint b { color: var(--gold); }
+.fs-hint .btn { flex: none; padding: 4px 10px; }
+#hud, #touch { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
+.hud-player { left: calc(18px + env(safe-area-inset-left)); }
+.hud-right { right: calc(16px + env(safe-area-inset-right)); }
+#touch .joy { left: calc(24px + env(safe-area-inset-left)); }
+#touch .tbtn.skill { right: calc(24px + env(safe-area-inset-right)); }
+#touch .tbtn.jump, #touch .tbtn.ult { right: calc(124px + env(safe-area-inset-right)); }
+#touch .tpause { right: calc(12px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); }
+#s-title .menu { left: calc(6vw + env(safe-area-inset-left)); }
+@media (max-height: 500px) {
+  .hud-player { left: calc(10px + env(safe-area-inset-left)); }
+  #touch .joy { left: calc(16px + env(safe-area-inset-left)); }
+  #touch .tbtn.skill { right: calc(18px + env(safe-area-inset-right)); }
+  #touch .tbtn.jump, #touch .tbtn.ult { right: calc(106px + env(safe-area-inset-right)); }
+  .combo { right: calc(24px + env(safe-area-inset-right)); }
+}
+/* 横屏手机标题页：标题缩小、宣传语隐藏，菜单排成两列放在左下，提示条放到右下 */
+@media (max-height: 500px) {
+  #s-title .title-wrap { top: calc(10px + env(safe-area-inset-top)); left: calc(4vw + env(safe-area-inset-left)); }
+  #s-title .logo-big { font-size: 46px; }
+  #s-title .logo-sub { margin-top: 2px; font-size: 11px; letter-spacing: .3em; }
+  #s-title .tagline { display: none; }
+  #s-title .menu { left: calc(4vw + env(safe-area-inset-left)); bottom: calc(10px + env(safe-area-inset-bottom)); width: min(430px, 56vw); display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  #s-title .menu .btn { padding: 8px 10px; font-size: 14px; gap: 6px; }
+  #s-title .menu .btn .ico { font-size: 17px; width: 20px; }
+  #s-title .menu .btn:first-child { grid-column: 1 / -1; justify-content: center; font-size: 16px; }
+  #s-title .current { bottom: calc(10px + env(safe-area-inset-bottom)); right: calc(4vw + env(safe-area-inset-right)); }
+  #s-title .current .nm { font-size: 22px; }
+  #s-title .current .rd { font-size: 13px; }
+  #s-title .lang-btn { top: 68px; }
+  .fs-hint { left: auto; right: calc(10px + env(safe-area-inset-right)); bottom: auto; top: calc(112px + env(safe-area-inset-top)); transform: none; max-width: 38vw; font-size: 11.5px; animation: fadeIn .4s ease 1s both; }
+  .fs-hint span { font-size: 18px; }
+}

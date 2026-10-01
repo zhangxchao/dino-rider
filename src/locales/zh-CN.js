@@ -339,6 +339,11 @@ export default {
     'pause.dist': '已跑(米)',
     'pause.coins': '本局金币',
     'pause.confirm': '再点一次确认',
+    'settings.autoFs': '📱 自动全屏',
+    'pause.fs': '⛶ 全屏',
+    'pause.fsExit': '⛶ 退出全屏',
+    'fs.hintIos': '想全屏玩？点 Safari 的 <b>分享</b> → <b>添加到主屏幕</b>，再从桌面的恐龙图标打开，就没有地址栏了',
+    'fs.hintInApp': '在 App 里打开的网页没法全屏：点右上角菜单，选 <b>在 Safari / 浏览器中打开</b>',
     'touch.pause': '⏸ 暂停',
   },
 };

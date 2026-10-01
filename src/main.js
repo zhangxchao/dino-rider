@@ -1,5 +1,6 @@
 // 入口：渲染器 / 后期 / 场景状态机（加载 → 菜单 → 游戏）
 import * as THREE from 'three';
+import { enterFullscreen, isFullscreen, canFullscreen } from './fullscreen.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -103,6 +104,17 @@ class App {
     window.addEventListener('keydown', unlock);
     window.addEventListener('touchstart', unlock);
     window.addEventListener('resize', () => this.resize());
+    // 手机上任意一次点按就进入全屏并锁定横屏（全屏 API 只能在用户手势里调用；iPhone Safari 不支持，会静默跳过）
+    this.lastFsTry = 0;
+    window.addEventListener('pointerup', () => {
+      if (!input.isTouch || save.settings.autoFs === false || isFullscreen() || !canFullscreen()) return;
+      const now = performance.now();
+      if (now - this.lastFsTry < 1500) return;
+      this.lastFsTry = now;
+      enterFullscreen();
+    });
+    document.addEventListener('fullscreenchange', () => this.resize());
+    document.addEventListener('webkitfullscreenchange', () => this.resize());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.game && this.game.controlsActive) this.onPause();
     });

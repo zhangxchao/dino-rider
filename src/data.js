@@ -16,7 +16,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.3, riderScale: 1.0,
     features: ['bigHead', 'tinyArms', 'stripes'],
     colors: { main: 0x5f7a3a, belly: 0xd8c79a, accent: 0x34431f, extra: 0x8a5a2a, eye: 0xffc400 },
-    stats: { hp: 420, atk: 38, def: 0.2, speed: 9.5, reach: 2.6, atkRate: 0.85 },
+    stats: { hp: 320, atk: 38, def: 0.2, speed: 9.5, reach: 2.6, atkRate: 0.85 },
     attack: 'bite',
     skill: { type: 'roar', name: '霸王咆哮', desc: '震耳欲聋的咆哮，伤害前方整条道路上的敌人并眩晕 2.5 秒。', cd: 12, power: 1.5, radius: 14, stun: 2.5 },
   },

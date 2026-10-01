@@ -339,6 +339,11 @@ export default {
     'pause.dist': '距離(m)',
     'pause.coins': 'コイン',
     'pause.confirm': 'もう一度押して確定',
+    'settings.autoFs': '📱 自動フルスクリーン',
+    'pause.fs': '⛶ フルスクリーン',
+    'pause.fsExit': '⛶ フルスクリーン解除',
+    'fs.hintIos': '全画面で遊ぶには Safari の <b>共有</b> → <b>ホーム画面に追加</b>、ホームの恐竜アイコンから開いてね',
+    'fs.hintInApp': 'アプリ内ブラウザでは全画面にできません：メニューから <b>Safari / ブラウザで開く</b>',
     'touch.pause': '⏸ 停止',
   },
 

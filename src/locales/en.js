@@ -339,6 +339,11 @@ export default {
     'pause.dist': 'Distance (m)',
     'pause.coins': 'Coins',
     'pause.confirm': 'Tap again to confirm',
+    'settings.autoFs': '📱 Auto fullscreen',
+    'pause.fs': '⛶ Fullscreen',
+    'pause.fsExit': '⛶ Exit fullscreen',
+    'fs.hintIos': 'Want fullscreen? Tap Safari’s <b>Share</b> → <b>Add to Home Screen</b>, then open the dino icon — no address bar',
+    'fs.hintInApp': 'Pages opened inside apps can’t go fullscreen: use the menu to <b>Open in Safari / browser</b>',
     'touch.pause': '⏸ Pause',
   },
 

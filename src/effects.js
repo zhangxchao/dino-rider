@@ -16,7 +16,7 @@ const FX_LEVELS = {
   medium: { count: 0.6, size: 0.8, maxPx: 0.07, screen: 0.5, ring: 0.65, text: 14 },
   low:    { count: 0.35, size: 0.65, maxPx: 0.045, screen: 0.2, ring: 0.4, text: 6 },
 };
-export const FX = { ...FX_LEVELS.medium, level: 'medium' };
+export const FX = { ...FX_LEVELS.medium, level: 'medium', dmgNum: 'all' };
 const _particleSystems = new Set();
 export function setFxLevel(level) {
   const L = FX_LEVELS[level] || FX_LEVELS.medium;
@@ -466,6 +466,9 @@ export class FloatingText {
     this.pool = [];
   }
   add(worldPos, text, cls = '', life = 0.9) {
+    // 「伤害数字」设置：全部 / 仅暴击 / 关闭（玩家受伤、回血、提示文字始终显示）
+    const dmgLike = (cls === '' || cls === 'burn' || cls === 'poison' || cls === 'crit') && /^[0-9]/.test(text);
+    if (dmgLike && FX.dmgNum !== 'all' && (FX.dmgNum === 'off' || cls !== 'crit')) return;
     if (this.items.length > FX.text && (cls === '' || cls === 'burn' || cls === 'poison')) return;
     let el = this.pool.pop();
     if (!el) { el = document.createElement('div'); this.layer.appendChild(el); }

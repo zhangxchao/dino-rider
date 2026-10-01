@@ -465,6 +465,7 @@ export class UI {
           <div class="set-row"><label>${t('settings.mute')}</label><div class="seg" data-k="mute"><button data-v="1" class="${s.mute ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.mute ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.quality')}</label><div class="seg" data-k="quality"><button data-v="high" class="${s.quality === 'high' ? 'on' : ''}">${t('settings.qualityHigh')}</button><button data-v="low" class="${s.quality === 'low' ? 'on' : ''}">${t('settings.qualityLow')}</button></div></div>
           <div class="set-row"><label>${t('settings.fx')}</label><div class="seg" data-k="fx">${['full', 'medium', 'low'].map((v) => `<button data-v="${v}" class="${(s.fx || 'medium') === v ? 'on' : ''}">${t('settings.fx.' + v)}</button>`).join('')}</div></div>
+          <div class="set-row"><label>${t('settings.dmgNum')}</label><div class="seg" data-k="dmgNum">${['all', 'crit', 'off'].map((v) => `<button data-v="${v}" class="${(s.dmgNum || (this.app.mobile ? 'crit' : 'all')) === v ? 'on' : ''}">${t('settings.dmgNum.' + v)}</button>`).join('')}</div></div>
           <div class="set-row"><label>${t('settings.autoRes')}</label><div class="seg" data-k="autoRes"><button data-v="1" class="${s.autoRes !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.autoRes === false ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.fps')}</label><div class="seg" data-k="showFps"><button data-v="1" class="${s.showFps ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.showFps ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.shake')}</label><div class="seg" data-k="shake"><button data-v="1" class="${s.shake ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.shake ? 'on' : ''}">${t('common.off')}</button></div></div>
@@ -489,7 +490,7 @@ export class UI {
     n.querySelectorAll('.seg[data-k]').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       const k = seg.dataset.k;
       const v = b.dataset.v;
-      s[k] = k === 'quality' || k === 'fx' || k === 'difficulty' ? v : v === '1';
+      s[k] = k === 'quality' || k === 'fx' || k === 'difficulty' || k === 'dmgNum' ? v : v === '1';
       seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
       this.app.applySettings();
       persist();

@@ -1,6 +1,7 @@
 // 入口：渲染器 / 后期 / 场景状态机（加载 → 菜单 → 游戏）
 import * as THREE from 'three';
 import { enterFullscreen, isFullscreen, canFullscreen } from './fullscreen.js';
+import { FX } from './effects.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -143,6 +144,7 @@ class App {
     this.setPixelRatio(this.dyn.pr);
     this.useComposer = s.quality === 'high';
     setFxLevel(s.fx || 'medium');
+    FX.dmgNum = s.dmgNum || (this.mobile ? 'crit' : 'all');
     this.juice.motion = !!s.shake && !rm;
     input.vibrate = s.vibrate !== false;
     if (this.game) this.game.shake.enabled = s.shake;

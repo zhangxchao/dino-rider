@@ -344,6 +344,10 @@ export default {
     'pause.fsExit': '⛶ Exit fullscreen',
     'fs.hintIos': 'Want fullscreen? Tap Safari’s <b>Share</b> → <b>Add to Home Screen</b>, then open the dino icon — no address bar',
     'fs.hintInApp': 'Pages opened inside apps can’t go fullscreen: use the menu to <b>Open in Safari / browser</b>',
+    'settings.dmgNum': '🔢 Damage numbers',
+    'settings.dmgNum.all': 'All',
+    'settings.dmgNum.crit': 'Crits only',
+    'settings.dmgNum.off': 'Off',
     'touch.pause': '⏸ Pause',
   },
 

@@ -64,6 +64,7 @@ export class Hud {
       </div>
       <div class="combo"><div class="n">0</div><div class="l">${t('hud.combo')}</div><div class="tier"></div></div>
       <div class="lvlup"></div>
+      <div class="notices"></div>
       <div class="hud-skills">
         <div class="fever-gauge"><div class="lbl">${t('hud.fever')}</div><div class="tube"><div class="fill"></div></div><div class="key">R</div></div>
         <div class="skill-ico big skill"><div class="lbl">${dino.skill.name}</div>${SKILL_ICON[dino.skill.type] || '✨'}<div class="cd"></div><div class="cdt"></div><div class="key">Q</div></div>
@@ -128,6 +129,22 @@ export class Hud {
     this.el.combo.dataset.tier = tier;
     el.textContent = name;
     replay(el, 'pop');
+  }
+
+  /** 左侧提示栏：玩家状态类提示，最多 3 条，1.3 秒后淡出 */
+  notice(text, cls = 'info') {
+    const box = this.root.querySelector('.notices');
+    if (!box) return;
+    // 同样的提示短时间内重复出现：只刷新，不叠新的一行
+    const last = box.lastElementChild;
+    if (last && last.textContent === text && performance.now() - (+last.dataset.t || 0) < 900) { last.dataset.t = performance.now(); return; }
+    const d = document.createElement('div');
+    d.className = 'nt ' + cls;
+    d.textContent = text;
+    d.dataset.t = performance.now();
+    box.appendChild(d);
+    while (box.children.length > 3) box.firstElementChild.remove();
+    setTimeout(() => d.remove(), 1300);
   }
 
   /** 连击中断：在连击数位置飘一行灰色提示 */

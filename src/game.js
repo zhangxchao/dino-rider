@@ -233,7 +233,7 @@ export class Game {
     this.quality = save.settings.quality;
     // 首领战场压平：普通关卡在终点，无尽模式在每只首领出现处（后续由 addFlat 追加）
     const bossZ = this.endless ? ENDLESS_BOSS_EVERY : this.length;
-    this.track = createTrack(this.biome, this.scene, { quality: this.quality, flat: [[bossZ - 40, bossZ + 140]] });
+    this.track = createTrack(this.biome, this.scene, { quality: this.quality, mobile: app.mobile, flat: [[bossZ - 40, bossZ + 140]] });
     setBendProfile(this.biome);
     updateBend(0, 1);
     // 环境贴图（天空渐变 + 太阳），给所有标准材质加上环境光和高光反射

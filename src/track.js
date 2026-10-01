@@ -1001,7 +1001,7 @@ export function createTrack(biome = 'jungle', scene, opts = {}) {
   const sun = new THREE.DirectionalLight(L.sun, L.sunI);
   sun.name = 'sun';
   sun.castShadow = true;
-  const ms = hi ? 2048 : 1024;
+  const ms = hi && !opts.mobile ? 2048 : 1024;
   sun.shadow.mapSize.set(ms, ms);
   const sc = sun.shadow.camera;
   sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40;

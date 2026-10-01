@@ -204,7 +204,7 @@ export class Juice {
     // 常驻调色与太阳光束只在高画质、特效不是“精简”时开（这时整个 Pass 常开）
     const grade = FX.level !== 'low' ? 1 : 0;
     let rays = 0;
-    if (grade && this.sunDir && this.app.camera) {
+    if (grade && this.sunDir && this.app.camera && !this.app.mobile) {   // 太阳光束每像素 8 次采样，手机上不开
       const cam = this.app.camera;
       _sv.copy(this.sunDir).multiplyScalar(1000).add(cam.position).project(cam);
       const front = _sv.z < 1 && _sv.z > -1;

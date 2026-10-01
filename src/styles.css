@@ -502,3 +502,36 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 #s-title .menu .btn { padding-top: 11px; padding-bottom: 11px; }
 @media (max-height: 640px) { #s-title .menu { gap: 6px; bottom: 4vh; } #s-title .menu .btn { padding-top: 8px; padding-bottom: 8px; font-size: 15px; } }
 .set-row { padding: 9px 0; }
+
+/* ---------------- 横屏手机 HUD 防重叠（放在最后，保证覆盖前面的通用规则） ---------------- */
+@media (max-height: 500px) {
+  /* 路线进度条往右挪、变窄，避开左上角玩家面板 */
+  .hud-top { left: 57%; top: 6px; }
+  .hud-top .route { width: 26vw; }
+  .hud-top .route-dino { font-size: 18px; }
+  .hud-top .boss-bar { width: 40vw; }
+  /* 玩家面板限宽：buff 和强化门图标换行、缩小，不再把面板撑宽 */
+  .hud-player { max-width: 44vw; }
+  .hud-player .bar-outer { width: 140px; height: 13px; }
+  .hud-player .bar-text { font-size: 9px; }
+  .hud-player .gate-icons { max-width: 150px; max-height: 20px; overflow: hidden; gap: 3px; margin-top: 3px; font-size: 11px; }
+  .hud-player .gate-icons span { padding: 0 4px; }
+  .hud-player .buffs { max-width: 150px; flex-wrap: wrap; gap: 3px; margin-top: 3px; min-height: 0; }
+  .hud-player .buff { font-size: 10px; padding: 1px 6px; }
+  /* 连击放到技能 / 觉醒按钮上方 */
+  .combo { top: 26%; right: 24px; }
+  .combo .n { font-size: 34px; }
+  .combo .l { font-size: 11px; letter-spacing: .2em; }
+  .combo .tier { font-size: 14px; min-height: 18px; margin-top: 2px; }
+  .combo-lost { top: calc(26% + 64px); right: 16px; font-size: 12px; }
+  /* 伤害数字、横幅、升级提示缩小一些，别挡住半个屏幕 */
+  .dmg { font-size: 15px; }
+  .dmg.crit { font-size: 21px; }
+  .dmg.player { font-size: 17px; }
+  #banner { top: 26%; }
+  #banner .b-main { font-size: clamp(30px, 6vw, 52px); }
+  #banner .b-sub { font-size: 13px; margin-top: 4px; }
+  .lvlup { bottom: 30%; }
+  .lvlup .a { font-size: 21px; }
+  .lvlup .b { font-size: 12px; }
+}

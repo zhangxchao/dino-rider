@@ -11,7 +11,7 @@ export const SKILL_ICON = {
   dive: '☄️', sonic: '🎺', venom: '🧪', wave: '🌊', spikes: '🦔', sprint: '⚡',
 };
 export const WEAPON_ICON = {
-  spear: '🔱', arrow: '🏹', fireball: '🔥', laser: '💠', bullet: '🔫', shuriken: '✴️', missile: '🚀', ice: '❄️', rock: '🪨', cannon: '💣',
+  spear: '🔱', arrow: '🏹', fireball: '🔥', laser: '💠', bullet: '🔫', shuriken: '✴️', missile: '🚀', ice: '❄️', rock: '🪨', cannon: '💣', heart: '💖', slash: '⚔️',
 };
 
 const _v = new THREE.Vector3();

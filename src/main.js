@@ -64,8 +64,8 @@ class App {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.fbChecked = false;
     this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.45, 0.85);
-    if (this.mobile) {
-      // 手机上泛光的模糊链再降一半分辨率（泛光本来就是糊的，看不出区别）
+    {
+      // 泛光的模糊链降一半分辨率（泛光本来就是糊的，看不出区别，显存带宽省下一大截）
       const setSize = this.bloom.setSize.bind(this.bloom);
       this.bloom.setSize = (w, h) => setSize(Math.max(2, w * 0.5), Math.max(2, h * 0.5));
     }

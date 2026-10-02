@@ -43,6 +43,18 @@ const trap = (wt, wb, h, d) => G('tp' + k3(wt, wb, h, d), () => {
   g.computeVertexNormals();
   return g;
 });
+// 爱心：立在 XY 平面里，尖朝下，中心在原点
+const heart = (s, d) => G('ht' + k3(s, d), () => {
+  const sh = new THREE.Shape();
+  sh.moveTo(0, -0.9);
+  sh.bezierCurveTo(-0.35, -0.55, -1, -0.2, -1, 0.25);
+  sh.bezierCurveTo(-1, 0.7, -0.45, 0.95, 0, 0.55);
+  sh.bezierCurveTo(0.45, 0.95, 1, 0.7, 1, 0.25);
+  sh.bezierCurveTo(1, -0.2, 0.35, -0.55, 0, -0.9);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: d / s, bevelEnabled: false, curveSegments: 5 });
+  g.translate(0, 0, -d / s / 2).scale(s, s, s);
+  return g;
+});
 
 function shade(hex, f) {
   return new THREE.Color(hex).multiplyScalar(f).getHex();
@@ -627,6 +639,129 @@ const BUILDERS = {
     c.add(gun, torus(0.058, 0.014, 4, 10), gold, [0, 0.04, 0.06]);
     c.muzzle.position.set(0, 0.04, 0.34);
   },
+
+  // 淘气精灵布布：毛绒连体服、兜帽毛边框住小脸、两只高高的尖耳朵、九颗尖牙的坏笑
+  bubu(c, d) {
+    const C = d.colors;
+    const fur = c.mat(C.main, { roughness: 0.95 });
+    const furD = c.mat(shade(C.main, 0.86), { roughness: 0.95, double: true });
+    const cream = c.mat(C.accent, { roughness: 0.9 });
+    const face = c.mat(C.skin, { roughness: 0.85 });
+    const innerEar = c.mat(0xff9fb4, { roughness: 0.9 });
+    base(c, {
+      skin: face, eyes: false, blush: true, torso: fur, pelvis: fur, upperArm: fur, foreArm: fur, hand: cream,
+      thigh: fur, shin: fur, foot: cream, handScale: 1.2,
+    });
+    c.head.scale.setScalar(1.12);
+    // 兜帽 + 脸周一圈蓬松的毛边
+    c.shell(c.head, furD, 0.305, 0.3 * PI, 0.68 * PI, 2.1);
+    // 以脸的朝向 n 为轴，在偏开 a 弧度的一圈上排毛球
+    const ny = 0.08 / Math.hypot(0.08, 1), nz = 1 / Math.hypot(0.08, 1), a = 0.98;
+    for (let i = 0; i < 12; i++) {
+      const f = (i / 12) * TAU, sa = Math.sin(a), ca = Math.cos(a);
+      const x = sa * Math.cos(f), y = ca * ny + sa * Math.sin(f) * nz, z = ca * nz - sa * Math.sin(f) * ny;
+      c.add(c.head, ico(i % 2 ? 0.055 : 0.065), fur, [x * 0.3, y * 0.3, z * 0.3]);
+    }
+    // 又高又尖的耳朵（外侧毛绒、内侧粉色），奔跑时往后倒
+    for (const sg of [1, -1]) {
+      const ear = c.grp(c.head, [0.12 * sg, 0.2, -0.04], [0, 0, -0.22 * sg]);
+      c.add(ear, cone(0.09, 0.56, 7), fur, [0, 0.26, 0], null, [1, 1, 0.55]);
+      c.add(ear, cone(0.052, 0.38, 6), innerEar, [0, 0.21, 0.04], null, [1, 1, 0.35]);
+      c.flutter(ear, 'x', -0.05, -0.4, 0.1, 6, sg);
+    }
+    // 大圆眼睛 + 高光
+    const eyeMat = c.mat(0x15101a, { roughness: 0.2 });
+    const hl = c.mat(0xffffff, { emissive: 0xffffff, ei: 0.4 });
+    for (const sg of [1, -1]) {
+      c.add(c.head, sphere(0.062, 8, 6), eyeMat, [0.105 * sg, 0.035, 0.252], null, [1, 1.12, 0.45]);
+      c.add(c.head, sphere(0.02, 5, 4), hl, [0.105 * sg + 0.018, 0.06, 0.278]);
+    }
+    c.add(c.head, sphere(0.02, 5, 4), innerEar, [0, -0.04, 0.28]);
+    // 咧嘴坏笑：深色嘴巴 + 上排九颗尖牙
+    c.add(c.head, sphere(0.1, 10, 6), c.mat(0x5a1424), [0, -0.11, 0.235], [0.38, 0, 0], [1.05, 0.38, 0.35]);
+    const tooth = c.mat(0xfffaf2, { roughness: 0.4 });
+    for (let i = 0; i < 9; i++) {
+      const x = (i - 4) * 0.021;
+      const y = -0.094 + 0.02 * (x / 0.09) * (x / 0.09);
+      const z = Math.sqrt(0.28 * 0.28 - x * x - y * y) + 0.002;
+      c.add(c.head, cone(0.013, 0.042, 4), tooth, [x, y - 0.016, z], [PI + 0.37, 0, 0]);
+    }
+    // 奶油色肚皮 + 毛球小尾巴
+    c.add(c.upper, sphere(0.13, 8, 6), cream, [0, 0.19, 0.12], null, [1, 1.25, 0.5]);
+    c.add(c.rig, ico(0.075), cream, [0, 0.1, -0.21]);
+    // 手里捧着一颗发光的爱心（扔出去时隐藏）
+    const held = c.grp(c.weapon, [0, 0.05, 0.08]);
+    const hm = c.glow(d.weapon.color, 1.4);
+    c.add(held, heart(0.1, 0.06), hm);
+    c.pulse(hm, 1.3, 0.4, 5, 1.5);
+    c.muzzle.position.set(0, 0.05, 0.12);
+    c.cfg.held = held;
+  },
+
+  // 武士剑豪：漆黑兜、金色锹形、赤色铠甲与草摺、大袖、武士刀、背后的旗指物
+  samurai(c, d) {
+    const C = d.colors;
+    const red = c.mat(C.main, { metalness: 0.2, roughness: 0.4 });
+    const redD = c.mat(shade(C.main, 0.75), { metalness: 0.2, roughness: 0.45, double: true });
+    const black = c.mat(C.accent, { metalness: 0.3, roughness: 0.35, double: true });
+    const gold = c.mat(C.extra, { metalness: 0.8, roughness: 0.28 });
+    const hakama = c.mat(0x2a2e4a);
+    const skin = c.mat(C.skin);
+    const steel = c.mat(0xdfe8f0, { metalness: 0.9, roughness: 0.18, emissive: d.weapon.color, ei: 0.25 });
+    base(c, {
+      skin, torso: red, pelvis: hakama, upperArm: hakama, foreArm: black, hand: c.mat(0x2a2224),
+      thigh: hakama, shin: redD, foot: c.mat(0x1a1a1e),
+    });
+    // 胴：金色横条 + 胸前的家纹
+    for (const y of [0.1, 0.19, 0.28]) c.add(c.upper, torus(0.19 - y * 0.06, 0.012, 3, 12), gold, [0, y, 0], [PI / 2, 0, 0]);
+    c.add(c.upper, cyl(0.045, 0.045, 0.02, 10), gold, [0, 0.33, 0.165], [PI / 2 - 0.15, 0, 0]);
+    // 草摺：腰间垂下的护甲片
+    for (const a of [-2.0, -1.0, 1.0, 2.0, PI]) {
+      const pl = c.grp(c.rig, [Math.sin(a) * 0.2, 0.0, Math.cos(a) * 0.2], [0, a, 0]);
+      c.add(pl, trap(0.17, 0.21, 0.22, 0.03), red, [0, -0.1, 0], [0.28, 0, 0]);
+      c.add(pl, box(0.21, 0.02, 0.035), gold, [0, -0.205, 0.03], [0.28, 0, 0]);
+    }
+    // 大袖：肩上的方形护甲
+    for (const [side, sg] of [['R', -1], ['L', 1]]) {
+      const sode = c.grp(c.arms[side].shoulder, [0.08 * sg, -0.04, 0], [0, 0, 0.2 * sg]);
+      c.add(sode, box(0.035, 0.24, 0.22), red, [0, -0.06, 0]);
+      for (const y of [-0.01, -0.09]) c.add(sode, box(0.04, 0.012, 0.225), gold, [0, y, 0]);
+    }
+    // 兜：漆黑头盔 + 外翻的护颈 + 金色锹形 + 日轮前立
+    c.shell(c.head, black, 0.31, 0.3 * PI, 0.5 * PI, 1.9);
+    c.add(c.head, cyl(0.31, 0.44, 0.2, 12, true, 1.1, TAU - 2.2), redD, [0, -0.08, 0]);
+    c.add(c.head, torus(0.44, 0.014, 3, 16, TAU - 2.2), gold, [0, -0.18, 0], [PI / 2, 0, PI / 2 + 1.1]);
+    for (const sg of [1, -1]) {
+      c.add(c.head, box(0.035, 0.42, 0.012), gold, [0.12 * sg, 0.38, 0.25], [-0.25, 0, -0.42 * sg]);
+      c.add(c.head, box(0.07, 0.07, 0.03), black, [0.33 * sg, 0.02, 0.12], [0, 0.6 * sg, 0]);
+    }
+    c.add(c.head, cyl(0.07, 0.07, 0.02, 12), gold, [0, 0.22, 0.29], [PI / 2 - 0.3, 0, 0]);
+    c.add(c.head, cyl(0.04, 0.04, 0.024, 10), c.mat(0xe02a2a, { emissive: 0xe02a2a, ei: 0.3 }), [0, 0.22, 0.297], [PI / 2 - 0.3, 0, 0]);
+    // 剑眉 + 八字胡
+    const hairM = c.mat(0x1a1416);
+    for (const sg of [1, -1]) {
+      c.add(c.head, box(0.1, 0.028, 0.03), hairM, [0.095 * sg, 0.085, 0.255], [0, 0, 0.32 * sg]);
+      c.add(c.head, box(0.07, 0.02, 0.02), hairM, [0.045 * sg, -0.085, 0.265], [0, 0, -0.35 * sg]);
+    }
+    // 左腰的刀鞘（打刀 + 胁差）
+    c.add(c.rig, cyl(0.028, 0.028, 0.8, 6), black, [0.25, 0.08, -0.12], [PI / 2 - 0.35, 0, 0]);
+    c.add(c.rig, cyl(0.024, 0.024, 0.5, 6), black, [0.21, 0.1, -0.04], [PI / 2 - 0.25, 0, 0]);
+    c.add(c.rig, torus(0.034, 0.01, 3, 8), gold, [0.25, 0.216, 0.256], [-0.35, 0, 0]);
+    // 背后的旗指物（迎风飘扬）
+    c.add(c.upper, cyl(0.012, 0.012, 0.9, 4), c.mat(0x3a2a1a), [0, 0.7, -0.24]);
+    const flag = c.grp(c.upper, [0, 1.12, -0.24]);
+    c.add(flag, cyl(0.01, 0.01, 0.3, 4), c.mat(0x3a2a1a), [0, 0, 0], [0, 0, PI / 2]);
+    c.add(flag, box(0.28, 0.46, 0.012), redD, [0, -0.24, -0.008]);
+    c.add(flag, cyl(0.075, 0.075, 0.016, 12), gold, [0, -0.22, -0.016], [PI / 2, 0, 0]);
+    c.flutter(flag, 'x', 0.05, 0.5, 0.1, 6);
+    // 武士刀（刀身微弯，刃口泛着剑气的光）
+    const katana = c.grp(c.weapon);
+    c.add(katana, cyl(0.024, 0.024, 0.22, 6), c.mat(0x1e1a22), [0, 0, -0.05], [PI / 2, 0, 0]);
+    c.add(katana, cyl(0.065, 0.065, 0.018, 8), gold, [0, 0, 0.07], [PI / 2, 0, 0]);
+    c.add(katana, box(0.02, 0.05, 0.44), steel, [0, 0, 0.3]);
+    c.add(katana, box(0.02, 0.046, 0.44), steel, [0, 0.016, 0.72], [-0.07, 0, 0]);
+    c.muzzle.position.set(0, 0, 0.6);
+  },
 };
 
 // 未知骑手的兜底外观
@@ -642,7 +777,8 @@ BUILDERS.generic = (c, d) => {
 //  动作风格
 // ---------------------------------------------------------------------
 const STYLE = {
-  spear: 'throw', rock: 'throw', shuriken: 'throw',
+  spear: 'throw', rock: 'throw', shuriken: 'throw', heart: 'throw',
+  slash: 'slash',
   arrow: 'bow',
   fireball: 'cast', ice: 'cast',
   laser: 'gun', bullet: 'gun', missile: 'gun', cannon: 'gun',
@@ -654,8 +790,9 @@ const REST = {
   bow: { sx: -0.6, sz: -0.12, ex: -0.8, tilt: 0.0 },
   cast: { sx: -0.45, sz: -0.15, ex: -0.95, tilt: 0.12 },
   gun: { sx: -0.45, sz: -0.1, ex: -0.95, tilt: 0.3 },
+  slash: { sx: -0.75, sz: -0.3, ex: -1.25, tilt: -1.05 },  // 八相架势：刀竖在右肩旁
 };
-const CHEER_TILT = { throw: -1.2, bow: 0, cast: 0, gun: -1.1 };
+const CHEER_TILT = { throw: -1.2, bow: 0, cast: 0, gun: -1.1, slash: -1.5 };
 const L_REST = { sx: -0.55, sz: 0.15, ex: -0.9 };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -731,6 +868,20 @@ export function createRiderModel(def) {
         P.lsx = lerp(L_REST.sx, -1.45, aim); P.lsz = lerp(L_REST.sz, -0.45, aim);
         P.lex = lerp(L_REST.ex, -0.1, aim); P.lez = 2.3 * draw;
         P.aVis = p < 0.45 || p > 0.8;
+        break;
+      }
+      case 'slash': {
+        // 一刀斜劈：肩上的刀向左前下方斩落 → 收刀回到八相
+        if (p < 0.3) {
+          k = ease(p / 0.3);
+          P.rsx = lerp(R.sx, -1.55, k); P.rex = lerp(R.ex, -0.1, k); P.rsz = lerp(R.sz, 0.3, k);
+          P.tilt = lerp(R.tilt, 0.85, k); P.twist = lerp(-0.2, 0.45, k); P.leanX = 0.16 * k;
+        } else {
+          k = ease((p - 0.3) / 0.7);
+          P.rsx = lerp(-1.55, R.sx, k); P.rex = lerp(-0.1, R.ex, k); P.rsz = lerp(0.3, R.sz, k);
+          P.tilt = lerp(0.85, R.tilt, k); P.twist = lerp(0.45, 0, k); P.leanX = lerp(0.16, 0, k);
+        }
+        P.lsx = lerp(L_REST.sx, -0.9, Math.sin(p * PI));
         break;
       }
       case 'cast': {

@@ -12,7 +12,7 @@ import { meta } from './meta.js';
 import { Hud } from './hud.js';
 import { input } from './input.js';
 import { save, persist } from './save.js';
-import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut, uploadRange, RIM } from './util.js';
+import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut, uploadRange, setCount, RIM } from './util.js';
 import { t } from './i18n.js';
 import { Hazards } from './hazards.js';
 import { setBendProfile, updateBend, resetBend, bendX, bendVec, curvature } from './bend.js';
@@ -291,7 +291,7 @@ export class Game {
     const pm = PICKUP_MAKERS();
     this.coinMesh = new THREE.InstancedMesh(pm.coinGeo, pm.gold, 400);
     this.coinMesh.frustumCulled = false;
-    this.coinMesh.count = 0;
+    setCount(this.coinMesh, 0);
     this.scene.add(this.coinMesh);
 
     this.dino = DINOS.find((d) => d.id === opts.dinoId) || DINOS[0];
@@ -459,9 +459,9 @@ export class Game {
     let n = Math.round(5 + p * 6 + lvl * 0.6 + rand(0, 2));
     const big = ENEMIES[type].radius > 1.3;
     const ranged = !!ENEMIES[type].ranged;
-    n = Math.round(n * this.diff.count);
-    if (big) n = Math.max(3, Math.round(n * 0.5));
-    if (ranged) n = Math.max(3, Math.round(n * 0.6)); // 远程怪数量少一些
+    n = Math.max(2, Math.round(n * this.diff.count * BALANCE.pathCount));
+    if (big) n = Math.max(2, Math.round(n * 0.5));
+    if (ranged) n = Math.max(2, Math.round(n * 0.6)); // 远程怪数量少一些
     const shapes = ['row', 'row', 'column', 'v', 'cluster', 'cluster', 'flank', 'swarm', 'swarm'];
     let shape = pick(shapes);
     const eliteType = this.endless ? pick(['yeti', 'golem', 'darkKnight']) : this.level.elite;
@@ -470,7 +470,7 @@ export class Game {
     const W = rh - 1.5;
     if (elite) {
       spots.push({ x: rand(-3, 3), z: ev.z, t: eliteType, elite: true });
-      for (let i = 0; i < 3; i++) spots.push({ x: rand(-W, W), z: ev.z - rand(3, 6), t: type });
+      for (let i = 0; i < 2; i++) spots.push({ x: rand(-W, W), z: ev.z - rand(3, 6), t: type });
     } else if (shape === 'row') {
       for (let i = 0; i < n; i++) spots.push({ x: n === 1 ? 0 : -W + (2 * W) * i / (n - 1), z: ev.z + rand(-0.5, 0.5), t: type });
     } else if (shape === 'column') {
@@ -784,7 +784,7 @@ export class Game {
     if (p.pos.z < 70 || p.pos.z > this.length - 50 || this.tutorial.calm) return;
     this.spiderT = (this.spiderT ?? 0) - dt;
     if (this.spiderT > 0) return;
-    this.spiderT = rand(3.4, 5.2) / this.diff.count;
+    this.spiderT = rand(3.4, 5.2) / (this.diff.count * BALANCE.pathCount);
     if (!this.spiderWarned) {
       this.spiderWarned = true;
       this.showBanner(t('hazard.spider'), t('hazard.sub'), true, 1200);
@@ -832,6 +832,8 @@ export class Game {
     if (pool && pool.length) { e = pool.pop(); this.poolBones -= e.boneN; e.reset(x, z, mul || this.mulAt(z)); } else e = new Enemy(this, type, x, z, mul || this.mulAt(z));
     this.enemies.push(e);
     if (counted) this.stats.spawned++;
+    // 路上的怪物数量减半了，每只的奖励翻倍（首领召唤的小怪不算）
+    e.rewardMul = counted ? BALANCE.killReward : 1;
     return e;
   }
 
@@ -1088,26 +1090,28 @@ export class Game {
       meta.track('kill');
       if (e.elite) meta.track('elite');
       this.onKillFx(e);
-      this.addFever(e.elite ? 5 : 0.7);
+      this.addFever((e.elite ? 5 : 0.7) * (e.rewardMul || 1));
       this.stats.score += (e.def.score || 10) * (1 + Math.min(this.combo, 50) * 0.02);
       this.audio.play('enemyDie', { volume: 0.4, pitch: rand(0.85, 1.15) });
     } else {
       this.audio.play(e.type === 'chest' ? 'coin' : 'explosion', { volume: 0.6, pitch: e.type === 'chest' ? 0.8 : 1.4 });
       this.fx.dust.burst(_v, { count: 20, speed: 5, life: 0.8, size: 1, sizeEnd: 2, color: e.type === 'chest' ? 0x8a5a2a : this.rockColor, alpha: 0.7, up: 4, gravity: 10 });
     }
-    this.player.addXp(e.xp || 1);
+    const k = e.isProp ? 1 : e.rewardMul || 1;
+    this.player.addXp((e.xp || 1) * k);
     const coins = e.def.coins || 1;
-    const total = e.isProp ? coins : Math.max(1, Math.round(coins * 0.45));
+    const total = e.isProp ? coins : Math.max(1, Math.round(coins * 0.45 * k));
     const n = Math.min(e.isProp ? 8 : 2, total);
     for (let i = 0; i < n; i++) this.spawnPickup('coin', e.pos, Math.max(1, Math.round(total / n)));
     const r = Math.random();
     if (e.type === 'chest') { this.spawnPickup(r < 0.35 ? 'power' : r < 0.6 ? 'meat' : r < 0.8 ? 'egg' : 'bomb', e.pos); return; }
     if (e.treasure) { this.onGoblinCaught(e); return; }
-    if (r < 0.06) this.spawnPickup('meat', e.pos);
-    else if (r < 0.1) this.spawnPickup('crystal', e.pos);
-    else if (r < 0.12) this.spawnPickup('power', e.pos);
-    else if (r < 0.132) this.spawnPickup('magnet', e.pos);
-    else if (r < 0.142) this.spawnPickup('bomb', e.pos);
+    const d = r / k;
+    if (d < 0.06) this.spawnPickup('meat', e.pos);
+    else if (d < 0.1) this.spawnPickup('crystal', e.pos);
+    else if (d < 0.12) this.spawnPickup('power', e.pos);
+    else if (d < 0.132) this.spawnPickup('magnet', e.pos);
+    else if (d < 0.142) this.spawnPickup('bomb', e.pos);
   }
 
   aoe(center, radius, dmg, o = {}) {
@@ -1421,7 +1425,7 @@ export class Game {
       _m.compose(pk.pos, _q, _one);
       cm.setMatrixAt(n++, _m);
     }
-    cm.count = n;
+    setCount(cm, n);
     uploadRange(cm.instanceMatrix, n);
   }
 
@@ -1475,7 +1479,7 @@ export class Game {
     const inst = [this.shadows.mesh, this.bars.bg, this.bars.fg, this.coinMesh, this.fx.debris.mesh, this.fx.scorch.mesh, this.fx.streaks.mesh];
     this.player.afterimages?.spawn(0xffffff, 0.01, 0.05);
     for (const b of this.projectiles.batches.values()) inst.push(...b.layers);
-    for (const im of inst) { im.setMatrixAt(0, _m); im.count = 1; im.instanceMatrix.needsUpdate = true; }
+    for (const im of inst) { im.setMatrixAt(0, _m); setCount(im, 1); im.instanceMatrix.needsUpdate = true; }
     tmp.position.copy(at).addScaledVector(_v2, 6);
     tmp.updateMatrixWorld(true);
     this.fx.sparks.burst(at, { count: 4, life: 0.05 });
@@ -1494,7 +1498,7 @@ export class Game {
       }
     } catch { /* ignore */ }
     renderer.setRenderTarget(prevRT);
-    for (const im of inst) im.count = 0;
+    for (const im of inst) setCount(im, 0);
     this.player.shield.visible = false;
     this.tele.remove(tele);
     this.scene.remove(tmp);

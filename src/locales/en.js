@@ -405,6 +405,8 @@ export default {
       princess: { name: 'Ice Princess', desc: 'A princess from the far north whose ice magic freezes enemies.', bonusText: 'Regenerate 1.5 HP/s', weapon: { name: 'Ice Shard' } },
       caveman: { name: 'Grog the Caveman', desc: 'A super-strong tribal warrior who flattens enemies with thrown boulders.', bonusText: 'Melee damage +12%', weapon: { name: 'Boulder Toss' } },
       pirate: { name: 'Pirate Captain', desc: 'A captain who has sailed the seven seas, blasting everything with cannonballs.', bonusText: 'Coin income +25%', weapon: { name: 'Blast Cannon' } },
+      bubu: { name: 'Bubu the Imp', desc: 'A fluffy forest imp with tall pointy ears and a toothy grin, tossing hearts that chase and bounce between enemies.', bonusText: 'Crit rate +8%, coins +12%', weapon: { name: 'Mischief Hearts' } },
+      samurai: { name: 'Samurai', desc: 'A red-armored samurai whose katana unleashes crescent sword waves that cut through whole rows of enemies.', bonusText: 'Melee damage +10%, damage taken -5%', weapon: { name: 'Crescent Slash' } },
     },
     enemies: {
       slime: { name: 'Slime' }, goblin: { name: 'Goblin' }, bat: { name: 'Vampire Bat' }, spiderling: { name: 'Venom Spiderling' }, scorpion: { name: 'Giant Scorpion' },

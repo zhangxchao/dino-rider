@@ -273,6 +273,7 @@ export class Projectiles {
     p.crit = !!o.crit; p.color = o.color; p.hit.clear(); p.trailAcc = 0; p.spinT = 0; p.dead = false;
     p.trail = TRAILS[o.kind]; p.explodeOnExpire = !!o.explodeOnExpire; p.groundHit = o.groundHit !== false;
     p.hover = o.hover ?? null; p.sweepW = o.sweepW ?? 0; p.grazed = false;
+    p.fake = !!o.fake; // 纯表现用（首领抛出的蛛网 / 毒泥），伤害由落点结算
     if (o.inherit) p.vel.add(o.inherit);
     p.batch = this._batch(o.kind, o.kind === 'orb' || o.kind === 'borb' ? o.color : undefined, o.kind === 'wave' || o.kind === 'scythewave' ? (o.width || 5) : undefined);
     p.scale = o.scale || 1;
@@ -354,7 +355,7 @@ export class Projectiles {
           if (Math.abs(p.pos.y - _v2.y) > e.halfHeight + p.radius + 0.4) continue;
           if (this._hitEnemy(p, e)) { this._kill(i); break; }
         }
-      } else {
+      } else if (!p.fake) {
         const pl = game.player;
         if (pl.alive) {
           const dx = p.pos.x - pl.pos.x, dz = p.pos.z - pl.pos.z;

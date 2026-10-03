@@ -598,3 +598,4 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
   .notices { left: calc(10px + env(safe-area-inset-left)); top: 47%; }
   .notices .nt { font-size: 11.5px; padding: 2px 9px; }
 }
+.notices .nt.boss { color: #ff9a6a; }

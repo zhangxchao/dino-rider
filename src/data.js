@@ -522,3 +522,21 @@ export const UPGRADES = [
 export function upgradeCost(up, level) {
   return up.base + up.step * level;
 }
+
+// ---------------------------------------------------------------------
+//  全部实力：血量、攻击、减伤、速度、攻击距离、攻速、技能冷却（1/冷却）
+//  每项按全体最高值换算成百分比，7 项平均 → 0~100；前 8 名发奖杯（1 金、2~3 银、4~8 铜）
+// ---------------------------------------------------------------------
+const POWER_KEYS = [(d) => d.stats.hp, (d) => d.stats.atk, (d) => d.stats.def, (d) => d.stats.speed, (d) => d.stats.reach, (d) => d.stats.atkRate, (d) => 1 / d.skill.cd];
+const POWER_MAX = POWER_KEYS.map((f) => Math.max(...DINOS.map(f)));
+export function dinoPower(d) { return POWER_KEYS.reduce((a, f, i) => a + f(d) / POWER_MAX[i], 0) / POWER_KEYS.length * 100; }
+/** id → { rank, score, cup: 'gold' | 'silver' | 'bronze' | null } */
+export const DINO_RANK = (() => {
+  const out = {};
+  for (const d of DINOS) {
+    const sc = dinoPower(d);
+    const rank = 1 + DINOS.filter((x) => dinoPower(x) > sc + 1e-9).length;
+    out[d.id] = { rank, score: sc, cup: rank === 1 ? 'gold' : rank <= 3 ? 'silver' : rank <= 8 ? 'bronze' : null };
+  }
+  return out;
+})();

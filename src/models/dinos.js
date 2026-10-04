@@ -233,6 +233,15 @@ const SPECIES = {
   diplodocus: { hindH: 1.7, frontH: 1.5, hipX: 0.52, shX: 0.5, legR: 0.3, frontLegR: 0.27, bodyW: 0.8, bodyH: 0.75, bodyL: 1.6, bodyY: 0.3,
     neckN: 4, neckL: 2.8, neckR: 0.32, neckA: 0.28, neckCurve: -0.12, neckBaseY: 0.25, headStyle: 'sauro', headL: 0.65, headH: 0.28, headW: 0.3,
     headPitch: 0.2, tailN: 6, tailL: 3.8, tailR: 0.45, tailDrop: 0.05, saddleZ: 0.0 },
+  carcharodontosaurus: { hipX: 0.38, legR: 0.31, bodyW: 0.58, bodyH: 0.6, bodyL: 1.4, neckL: 0.6, neckR: 0.38,
+    headL: 1.4, headH: 0.58, headW: 0.5, tailL: 2.8, tailR: 0.47, armL: 0.45, armR: 0.08 },
+  yutyrannus: { hipX: 0.36, legR: 0.28, bodyW: 0.54, bodyH: 0.58, bodyL: 1.25, neckL: 0.6, neckR: 0.36, neckA: 0.5,
+    headL: 1.15, headH: 0.52, headW: 0.48, tailL: 2.5, tailR: 0.46, armL: 0.5, armR: 0.08 },
+  gigantoraptor: { hipH: 1.9, hipX: 0.3, legR: 0.24, bodyW: 0.52, bodyH: 0.56, bodyL: 1.0, bodyZ: 0.2, tilt: 0.25,
+    neckL: 1.2, neckR: 0.2, neckA: 1.0, neckA2: 0.35, headL: 0.6, headH: 0.36, headW: 0.32, headStyle: 'beak',
+    tailL: 1.9, tailR: 0.34, armL: 0.8, armR: 0.08 },
+  ceratosaurus: { hipH: 1.5, legR: 0.25, bodyW: 0.48, bodyH: 0.52, bodyL: 1.2, neckL: 0.7, neckR: 0.3, neckA: 0.55,
+    headL: 1.0, headH: 0.5, headW: 0.4, tailL: 2.7, tailR: 0.4, armL: 0.4, armR: 0.07 },
   pteranodon: {},
 };
 
@@ -386,6 +395,7 @@ function buildHead(ctx, head) {
       ctx.mouth = grp(head, 0, jy, L * 1.02);
       ctx.maxJaw = 0.75;
       if (F.has('browHorns')) for (const s of [-1, 1]) spike(head, [s * W * 0.34, H * 0.52, L * 0.38], [s * 0.2, 1, 0.3], H * 0.38, W * 0.08, M.extra, 4);
+      if (F.has('snoutHorn')) spike(head, [0, H * 0.3, L * 0.72], [0, 1, 0.3], H * 0.62, W * 0.13, M.horn, 5); // 角鼻龙的鼻角
       if (F.has('bullHorns')) for (const s of [-1, 1]) spike(head, [s * W * 0.36, H * 0.5, L * 0.2], [s, 0.75, 0.1], H * 0.8, W * 0.13, M.horn, 6);
       if (F.has('doubleCrest')) for (const s of [-1, 1]) msh(head, gCrest(), M.accent, s * W * 0.12, H * 0.3, L * 0.52, L * 0.34, H * 0.62, 0.03, 0, PI / 2, 0);
       if (F.has('neckFrill')) {

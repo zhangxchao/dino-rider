@@ -53,6 +53,7 @@ export default {
     'select.go': '确认出发 →',
     'select.attack': '攻击方式：{name}',
     'select.wins': '胜场 {n}',
+    'select.power': '全部实力 第 {n} 名',
     'stat.hp': '生命', 'stat.atk': '攻击', 'stat.def': '防御', 'stat.speed': '速度', 'stat.atkRate': '攻速', 'stat.reach': '范围',
     'select.skill': '技能：{name}',
     'select.cd': '冷却 {n}s',

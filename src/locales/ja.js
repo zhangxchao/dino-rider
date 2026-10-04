@@ -53,6 +53,7 @@ export default {
     'select.go': '出発する →',
     'select.attack': '攻撃：{name}',
     'select.wins': '勝利 {n}',
+    'select.power': '総合実力 {n} 位',
     'stat.hp': 'HP', 'stat.atk': '攻撃', 'stat.def': '防御', 'stat.speed': '速度', 'stat.atkRate': '攻撃速度', 'stat.reach': '射程',
     'select.skill': 'スキル：{name}',
     'select.cd': 'クールダウン {n}秒',

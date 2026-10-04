@@ -53,6 +53,7 @@ export default {
     'select.go': 'Let’s go →',
     'select.attack': 'Attack: {name}',
     'select.wins': 'Wins {n}',
+    'select.power': 'Overall power #{n}',
     'stat.hp': 'HP', 'stat.atk': 'ATK', 'stat.def': 'DEF', 'stat.speed': 'SPD', 'stat.atkRate': 'Rate', 'stat.reach': 'Reach',
     'select.skill': 'Skill: {name}',
     'select.cd': 'Cooldown {n}s',

@@ -1,5 +1,5 @@
 // 菜单界面：标题 / 选择坐骑 / 关卡 / 升级 / 设置 / 帮助 / 暂停 / 结算 / 结局
-import { DINOS, RIDERS, LEVELS, BOSSES, UPGRADES, upgradeCost, DIFFICULTIES, DIFFICULTY_IDS } from './data.js';
+import { DINOS, RIDERS, LEVELS, BOSSES, UPGRADES, upgradeCost, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK } from './data.js';
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
@@ -180,6 +180,7 @@ export class UI {
           ${d.en !== d.name ? `<div class="en">${d.en}</div>` : ''}
           <span class="era">${d.era}</span> <span class="era" style="background:rgba(79,201,255,.15);color:#8fdcff">${t('select.attack', { name: t('attack.' + d.attack) })}</span>
           ${wins ? `<span class="era" style="background:rgba(98,227,127,.15);color:#8ff0a0">${t('select.wins', { n: wins })}</span>` : ''}
+          <span class="era power ${DINO_RANK[d.id].cup || 'none'}">${DINO_RANK[d.id].cup ? `<span class="cup ${DINO_RANK[d.id].cup}">🏆</span> ` : ''}${t('select.power', { n: DINO_RANK[d.id].rank })}</span>
           <p>${d.desc}</p>
           <div style="margin-top:12px">
             ${bar(t('stat.hp'), s.hp, 330, s.hp)}
@@ -216,7 +217,8 @@ export class UI {
       if (this.tab === 'dino') {
         grid.innerHTML = DINOS.map((d) => `
           <div class="card ${d.id === save.dino ? 'active' : ''}" data-id="${d.id}">
-            ${save.dinoWins[d.id] ? `<span class="badge">🏆${save.dinoWins[d.id]}</span>` : ''}
+            ${DINO_RANK[d.id].cup ? `<span class="cup ${DINO_RANK[d.id].cup}" title="${t('select.power', { n: DINO_RANK[d.id].rank })}">🏆<b>${DINO_RANK[d.id].rank}</b></span>` : ''}
+            ${save.dinoWins[d.id] ? `<span class="badge">✔${save.dinoWins[d.id]}</span>` : ''}
             <img src="${thumbs.dino[d.id] || ''}" alt="">
             <div class="nm" title="${d.name}">${d.name}</div>
           </div>`).join('');

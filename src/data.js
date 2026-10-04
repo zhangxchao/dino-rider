@@ -328,8 +328,8 @@ export const ENEMIES = {
   mage:       { name: '暗影法师', hp: 90,  dmg: 14, speed: 4.5, radius: 0.8, atkCd: 2.4, score: 35, coins: 5, teleport: true, color: 0x6a2ab0,
                 ranged: { range: 26, speed: 24, kind: 'orb', color: 0xb04aff, homing: 1.5 } },
   // 剧毒小蛛：从树上垂丝落下，落地后原地蓄力喷毒雾——伤害按天灾算（15，同落石），不是普通小兵
-  spiderling: { name: '剧毒小蛛', hp: 45, dmg: 15, speed: 0, radius: 0.6, atkCd: 2.6, score: 14, coins: 2, color: 0x3a3a2a,
-                drop: 14, mist: { radius: 3.2, windup: 0.9, poison: 3 } },
+  spiderling: { name: '剧毒小蛛', hp: 45, dmg: 30, speed: 0, radius: 0.6, atkCd: 2.6, score: 14, coins: 2, color: 0x3a3a2a,
+                drop: 14, mist: { radius: 4.2, windup: 0.8, poison: 3 } },
   darkKnight: { name: '暗影骑士', hp: 220, dmg: 20, speed: 5.5, radius: 1.1, atkRange: 2.6, atkCd: 1.5, score: 50, coins: 7, color: 0x2a2a3a },
 };
 

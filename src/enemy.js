@@ -1200,11 +1200,12 @@ export class Boss {
       }
       case 'pounce': {
         // 毒牙扑杀：跃起扑向玩家，落地重击并留下毒液
-        P.windup = 0.95 * fast;
+        P.windup = 0.75 * fast;
         P.dur = P.windup + 1.1;
         P.sx = this.pos.x; P.sz = this.pos.z;
         P.tx = pl.pos.x; P.tz = pl.pos.z + 2;
-        P.teles.push(g.tele.add({ shape: 'circle', x: P.tx, z: P.tz, radius: 4.6, duration: P.windup, color: 0xff3030 }));
+        P.r = 6.8;
+        P.teles.push(g.tele.add({ shape: 'circle', x: P.tx, z: P.tz, radius: P.r, duration: P.windup, color: 0xff3030 }));
         g.audio.play('warning', { volume: 0.55 });
         return true;
       }
@@ -1344,10 +1345,10 @@ export class Boss {
             const d = Math.hypot(pl.pos.x - sp.x, pl.pos.z - sp.z);
             if (d < r + pl.radius * 0.4 && grounded()) {
               _dir.set(pl.pos.x - sp.x, 0, pl.pos.z - sp.z).normalize();
-              pl.takeDamage(this.dmg * (web ? 0.55 : 0.5), { dir: _dir, knock: 3, attacker: this, kind: 'aoe', poison: web ? 2 : 3, slow: web ? 0.9 : 0, slowTime: 2 });
+              pl.takeDamage(this.dmg * (web ? 1.1 : 0.5), { dir: _dir, knock: 3, attacker: this, kind: 'aoe', poison: web ? 2 : 3, slow: web ? 0.9 : 0, slowTime: 2 });
             } else if (d < r + 2) g.onPerfect(pl.pos);
             this.addZone(web
-              ? { x: sp.x, z: sp.z, r, life: 4, dps: 0.1, slow: 0.9, color: 0xe8f0e0, fx: 'web' }
+              ? { x: sp.x, z: sp.z, r, life: 4, dps: 0.2, slow: 0.9, color: 0xe8f0e0, fx: 'web' }
               : { x: sp.x, z: sp.z, r, life: 5, dps: 0.12, poison: 2, slow: 0.4, color: 0x5aa02a, fx: 'bog' });
             g.fx.sparks.burst(_v, { count: 16, speed: 6, life: 0.5, size: 0.9, color: web ? 0xffffff : 0x9cff3a, color2: web ? 0xc0c8b0 : 0x2a5a1a, up: 3 });
             g.fx.rings.ring(_v, { r0: 0.6, r1: r, life: 0.4, color: web ? 0xf0f8e8 : 0x7aff4a });
@@ -1373,12 +1374,19 @@ export class Boss {
           this.lift = 0;
           _v.set(P.tx, g.heightAt(P.tx, P.tz), P.tz);
           const d = Math.hypot(pl.pos.x - P.tx, pl.pos.z - P.tz);
-          if (d < 4.6 + pl.radius * 0.4 && grounded()) {
+          if (d < P.r + pl.radius * 0.4 && grounded()) {
             _dir.set(pl.pos.x - P.tx, 0, pl.pos.z - P.tz).normalize();
             pl.takeDamage(this.dmg * 1.35, { dir: _dir, knock: 12, attacker: this, kind: 'melee', poison: 3 });
-          } else if (d < 7) g.onPerfect(pl.pos);
-          this.addZone({ x: P.tx, z: P.tz, r: 3.6, life: 3, dps: 0.14, poison: 2, color: 0x9cff3a, fx: 'bog' });
-          g.fx.rings.ring(_v, { r0: 1, r1: 7, life: 0.5, color: 0x9cff3a });
+          } else if (d < P.r + 2.4) g.onPerfect(pl.pos);
+          this.addZone({ x: P.tx, z: P.tz, r: 5, life: 3.5, dps: 0.14, poison: 2, color: 0x9cff3a, fx: 'bog' });
+          // 落地震出一圈毒液弹，躲开大圈后还要再躲一次
+          const n = 10 + ph * 4;
+          for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2;
+            _dir.set(Math.sin(a), 0, Math.cos(a));
+            g.projectiles.spawn({ kind: 'borb', owner: 'enemy', pos: _v, dir: _dir, speed: 11, dmg: this.dmg * 0.45, radius: 0.7, life: 2.4, color: 0x9cff3a, hover: 1.3, scale: 0.85, poison: 2 });
+          }
+          g.fx.rings.ring(_v, { r0: 1, r1: P.r + 2, life: 0.5, color: 0x9cff3a });
           g.fx.dust.burst(_v, { count: 30, speed: 8, life: 1, size: 1.5, sizeEnd: 3.5, color: g.dustColor, alpha: 0.6, flat: true, drag: 2, up: 3 });
           g.fx.debris.burst(_v, { count: 10, speed: 8, up: 9, size: 0.4, color: g.rockColor ?? 0x4a3a2a });
           g.audio.play('stomp', { volume: 1, pitch: 0.75 });

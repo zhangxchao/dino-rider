@@ -11,10 +11,11 @@ const _v = new THREE.Vector3();
 //  count 粒子数量  size 粒子大小  maxPx 单个粒子最大屏幕尺寸（占画面高度比例）
 //  screen 全屏闪光 / 色差 / 径向模糊 / 泛光脉冲  ring 光环光柱透明度  text 普通伤害飘字上限
 // ---------------------------------------------------------------------
+// 粒子数量、光环光柱、全屏闪光整体再省三分之一（×2/3）
 const FX_LEVELS = {
-  full:   { count: 1, size: 1, maxPx: 0.16, screen: 1, ring: 1, text: 28 },
-  medium: { count: 0.6, size: 0.8, maxPx: 0.07, screen: 0.5, ring: 0.65, text: 14 },
-  low:    { count: 0.35, size: 0.65, maxPx: 0.045, screen: 0.2, ring: 0.4, text: 6 },
+  full:   { count: 0.67, size: 1, maxPx: 0.16, screen: 0.67, ring: 0.67, text: 28 },
+  medium: { count: 0.4, size: 0.8, maxPx: 0.07, screen: 0.33, ring: 0.43, text: 14 },
+  low:    { count: 0.23, size: 0.65, maxPx: 0.045, screen: 0.13, ring: 0.27, text: 6 },
 };
 export const FX = { ...FX_LEVELS.medium, level: 'medium', dmgNum: 'all' };
 const _particleSystems = new Set();

@@ -1,5 +1,5 @@
 // 菜单界面：标题 / 选择坐骑 / 关卡 / 升级 / 设置 / 帮助 / 暂停 / 结算 / 结局
-import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK } from './data.js';
+import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK, SKINS } from './data.js';
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
@@ -192,7 +192,39 @@ export class UI {
           <div class="skill-box">
             <div class="t">${SKILL_ICON[d.skill.type]} ${t('select.skill', { name: d.skill.name })}<small>${t('select.cd', { n: d.skill.cd })}</small></div>
             <div class="d">${d.skill.desc}</div>
+          </div>
+          <div class="skin-box">
+            <div class="t">🎨 ${t('skin.title')}<small>${t('skin.note')}</small></div>
+            <div class="skins">${SKINS.map((sk) => {
+              const owned = save.skins.includes(sk.id);
+              const on = (save.dinoSkin[d.id] || 'default') === sk.id;
+              const c = sk.colors ? [sk.colors.main, sk.colors.accent, sk.colors.belly] : [d.colors.main, d.colors.accent, d.colors.belly];
+              const hex = (v) => '#' + (v ?? 0x777777).toString(16).padStart(6, '0');
+              return `<button class="skin ${on ? 'on' : ''} ${owned ? '' : 'locked'}" data-skin="${sk.id}" title="${sk.name}">
+                <i style="background:linear-gradient(135deg, ${hex(c[0])} 0 45%, ${hex(c[1])} 45% 70%, ${hex(c[2])} 70%)"></i>
+                <b>${sk.name}</b><small>${owned ? (on ? t('skin.wearing') : t('skin.owned')) : `🔒 <i class="coin-ico"></i>${sk.price}`}</small></button>`;
+            }).join('')}</div>
+            <div class="skin-msg"></div>
           </div>`;
+        info.querySelectorAll('[data-skin]').forEach((b) => b.addEventListener('click', () => {
+          const sk = SKINS.find((x) => x.id === b.dataset.skin);
+          const msg = info.querySelector('.skin-msg');
+          if (!save.skins.includes(sk.id)) {
+            if (save.coins < sk.price) {
+              this.app.audio.play('error');
+              msg.textContent = t('skin.need', { n: sk.price - save.coins });
+              return;
+            }
+            save.coins -= sk.price;
+            save.skins.push(sk.id);
+            this.app.audio.play('buy');
+            n.querySelectorAll('.coin-pill span').forEach((x) => { x.textContent = save.coins; });
+          } else this.app.audio.play('select');
+          save.dinoSkin[d.id] = sk.id;
+          persist();
+          this.app.showcase?.setSelection(save.dino, save.rider, true);
+          renderInfo();
+        }));
       } else {
         const w = r.weapon;
         const dps = (w.dmg * (w.count || 1) / w.cd).toFixed(0);

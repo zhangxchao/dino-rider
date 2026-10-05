@@ -18,6 +18,8 @@ function defaults() {
     endlessBest: 0,
     stats: { kills: 0, bosses: 0, plays: 0, wins: 0 },
     dinoWins: {},                      // 每只恐龙的胜场
+    skins: ['default'],                // 已解锁的皮肤
+    dinoSkin: {},                      // 每只恐龙当前穿的皮肤
     tutorialDone: false,               // 新手引导是否完成
     tutUlt: false,                     // 是否提示过觉醒
     life: {},                          // 累计统计（成就用）：perfect / ult / gate / coin / bestCombo …
@@ -58,6 +60,8 @@ function load() {
       stats: { ...d.stats, ...(s.stats || {}) },
       settings: { ...d.settings, ...(s.settings || {}) },
       dinoWins: { ...(s.dinoWins || {}) },
+      skins: Array.from(new Set(['default', ...(s.skins || [])])),
+      dinoSkin: { ...(s.dinoSkin || {}) },
       // 老玩家（玩过至少一局）不再弹新手引导
       tutorialDone: s.tutorialDone ?? ((s.stats && s.stats.plays > 0) || false),
       tutUlt: s.tutUlt ?? ((s.stats && s.stats.plays > 2) || false),

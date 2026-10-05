@@ -610,3 +610,19 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .era.power.silver { background: rgba(210,220,235,.18); color: #e4ecf6; }
 .era.power.bronze { background: rgba(205,127,50,.22); color: #f0a868; }
 @media (max-height: 500px) { .card .cup { font-size: 11px; } .card .cup b { font-size: 9px; } }
+
+/* 皮肤选择 */
+.skin-box { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
+.skin-box .t { font-weight: 900; font-size: 14px; }
+.skin-box .t small { margin-left: 8px; color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.skins { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.skin { cursor: pointer; border: 2px solid transparent; border-radius: 10px; background: rgba(255,255,255,.06); color: #fff; padding: 5px 2px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; font: inherit; }
+.skin:hover { background: rgba(255,255,255,.12); }
+.skin.on { border-color: var(--accent); background: rgba(255,185,56,.14); }
+.skin.locked { opacity: .78; }
+.skin > i { width: 26px; height: 26px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
+.skin b { font-size: 12px; }
+.skin small { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.skin small .coin-ico { transform: scale(.75); }
+.skin-msg { min-height: 0; margin-top: 4px; font-size: 12px; color: #ff9a6a; }
+@media (max-height: 500px) { .skins { grid-template-columns: repeat(7, 1fr); gap: 4px; } .skin > i { width: 18px; height: 18px; } .skin b { font-size: 10px; } .skin small { font-size: 9px; } }

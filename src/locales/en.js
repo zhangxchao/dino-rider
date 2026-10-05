@@ -400,7 +400,7 @@ export default {
         skill: { name: 'Feather Tyrant Pounce', desc: 'Leap high (invincible in the air), then shred an area and release a shockwave on landing.' } },
       gigantoraptor: { name: 'Gigantoraptor', era: 'Late Cretaceous', desc: 'A giant beaked oviraptorosaur from Inner Mongolia — huge and surprisingly fast.',
         skill: { name: 'Giant Dash', desc: 'For 4 s, speed surges and you are invincible; afterimages burn enemies they touch.' } },
-      ceratosaurus: { name: 'Ceratosaurus', era: 'Late Jurassic', desc: 'A horn on its nose, two small horns over its eyes and bony scutes down its back.',
+      ceratosaurus: { name: 'Ceratosaurus', era: 'Late Jurassic', desc: 'A striking horn on its nose and bony scutes down its back — a fierce Jurassic hunter.',
         skill: { name: 'Horn Ram', desc: 'An invincible nose-horn charge that knocks away everything in its path; fires a shockwave in boss fights.' } },
     },
     riders: {

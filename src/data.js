@@ -242,9 +242,9 @@ export const DINOS = [
   },
   {
     id: 'ceratosaurus', name: '角鼻龙', en: 'Ceratosaurus', era: '侏罗纪晚期',
-    desc: '鼻子上长着一只尖角、眼睛上还有两只小角，背上一排骨质鳞甲。',
+    desc: '鼻子上长着一只醒目的尖角，背上一排骨质鳞甲，是侏罗纪的凶猛猎手。',
     body: 'theropod', scale: 1.0, riderScale: 0.95,
-    features: ['snoutHorn', 'browHorns', 'stripes'],
+    features: ['snoutHorn', 'stripes'],
     colors: { main: 0x7a5a3a, belly: 0xd8c4a0, accent: 0x3a2a1a, extra: 0xd8b040, eye: 0xffd24a },
     stats: { hp: 250, atk: 22, def: 0.14, speed: 11.5, reach: 2.3, atkRate: 1.15 },
     attack: 'horn',

@@ -543,3 +543,23 @@ export const DINO_RANK = (() => {
   }
   return out;
 })();
+
+// ---------------------------------------------------------------------
+//  皮肤：用金币解锁，只改外观（颜色 / 金属度 / 发光），数值完全不变
+//  买一次所有恐龙都能用；每只恐龙各自记住穿哪套（save.dinoSkin）
+// ---------------------------------------------------------------------
+export const SKINS = [
+  { id: 'default', name: '原色', price: 0, swatch: null },
+  { id: 'jade',    name: '翡翠', price: 300,  colors: { main: 0x2f9a6a, belly: 0xc8f0d8, accent: 0x14503a, extra: 0x9cffd0 } },
+  { id: 'ice',     name: '寒冰', price: 500,  colors: { main: 0x8ac8f0, belly: 0xeef8ff, accent: 0x2f5f94, extra: 0xffffff }, mat: { roughness: 0.4, metalness: 0.15 } },
+  { id: 'lava',    name: '熔岩', price: 800,  colors: { main: 0x2a1a16, belly: 0x5a2a1a, accent: 0xff5a14, extra: 0xffb030 }, mat: { glow: 0.9 } },
+  { id: 'shadow',  name: '暗影', price: 1000, colors: { main: 0x2a1a3a, belly: 0x5a3a7a, accent: 0xb04aff, extra: 0xe080ff }, mat: { glow: 0.8 } },
+  { id: 'silver',  name: '白银', price: 1200, colors: { main: 0xc8ccd6, belly: 0xeef0f4, accent: 0x6a7080, extra: 0xffffff }, mat: { metalness: 0.35, roughness: 0.32, sheen: 0.22 } },
+  { id: 'gold',    name: '黄金', price: 2000, colors: { main: 0xd8a830, belly: 0xf6e3a1, accent: 0x8a5a10, extra: 0xfff2c4 }, mat: { metalness: 0.35, roughness: 0.3, sheen: 0.3 } },
+];
+/** 换上皮肤后的外观定义（stats 等数值原样保留） */
+export function skinnedDef(def, skinId) {
+  const sk = SKINS.find((x) => x.id === skinId);
+  if (!sk || !sk.colors) return def;
+  return { ...def, colors: { ...def.colors, ...sk.colors }, skinMat: sk.mat || {} };
+}

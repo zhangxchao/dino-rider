@@ -1,6 +1,7 @@
 // 菜单背景：在真实地形上展示当前坐骑与骑手，镜头缓慢环绕
 import * as THREE from 'three';
-import { DINOS, RIDERS } from './data.js';
+import { DINOS, RIDERS, skinnedDef } from './data.js';
+import { save } from './save.js';
 import { createWorld } from './world.js';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
@@ -49,7 +50,7 @@ export class Showcase {
       this.model.root.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose()); });
     }
     this.def = dDef;
-    this.model = createDinoModel(dDef);
+    this.model = createDinoModel(skinnedDef(dDef, save.dinoSkin && save.dinoSkin[dDef.id]));
     this.rider = createRiderModel(rDef);
     this.rider.root.scale.setScalar(dDef.riderScale || 1);
     this.model.saddle.add(this.rider.root);

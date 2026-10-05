@@ -1,6 +1,6 @@
 // 多语言：界面文案 t(key, params) + 游戏数据（恐龙 / 骑手 / 怪物名等）的就地替换
 //   data.js 中的中文是原文；切换语言时把译文写回这些数据对象，其他模块照常读取 def.name 即可。
-import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, WEAPON_LEVELS, GATES, BIOME_NAMES, UPGRADES } from './data.js';
+import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, WEAPON_LEVELS, GATES, BIOME_NAMES, UPGRADES, SKINS } from './data.js';
 import { save, persist } from './save.js';
 import zh from './locales/zh-CN.js';
 import en from './locales/en.js';
@@ -16,7 +16,7 @@ const PACKS = { 'zh-CN': zh, en, ja };
 const byId = (arr) => Object.fromEntries(arr.filter(Boolean).map((x) => [x.id, x]));
 const DATA_TARGETS = {
   dinos: byId(DINOS), riders: byId(RIDERS), enemies: ENEMIES, bosses: BOSSES, levels: byId(LEVELS),
-  weaponLevels: WEAPON_LEVELS, gates: GATES, biomes: BIOME_NAMES, upgrades: byId(UPGRADES),
+  weaponLevels: WEAPON_LEVELS, gates: GATES, biomes: BIOME_NAMES, upgrades: byId(UPGRADES), skins: byId(SKINS),
 };
 
 // 按译文的结构从 data.js 读出中文原文，切回中文时用它还原

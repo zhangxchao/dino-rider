@@ -145,11 +145,17 @@ function makeMats(def) {
   const c = def.colors || {};
   const S = (color, o) => new THREE.MeshStandardMaterial(Object.assign({ color, flatShading: true, roughness: 0.82, metalness: 0 }, o));
   const eye = c.eye ?? 0xffcc00;
+  // 皮肤：主体可带金属光泽；熔岩 / 暗影的花纹会发光
+  const K = def.skinMat || {};
+  const body = K.metalness != null || K.roughness != null ? { metalness: K.metalness ?? 0, roughness: K.roughness ?? 0.82 } : undefined;
+  // 金属皮肤：场景里没有可反射的东西，加一点同色自发光让它保持亮丽
+  const shine = (col) => (body && K.sheen ? { ...body, emissive: col, emissiveIntensity: K.sheen } : body);
+  const glow = (col) => (K.glow ? { emissive: col, emissiveIntensity: K.glow } : undefined);
   return {
-    main: S(c.main ?? 0x777777),
-    belly: S(c.belly ?? 0xcccccc),
-    accent: S(c.accent ?? 0x444444),
-    extra: S(c.extra ?? 0x999999),
+    main: S(c.main ?? 0x777777, shine(c.main ?? 0x777777)),
+    belly: S(c.belly ?? 0xcccccc, shine(c.belly ?? 0xcccccc)),
+    accent: S(c.accent ?? 0x444444, glow(c.accent ?? 0x444444) || body),
+    extra: S(c.extra ?? 0x999999, glow(c.extra ?? 0x999999) || body),
     eye: S(eye, { emissive: eye, emissiveIntensity: 0.55, roughness: 0.3 }),
     pupil: S(0x0a0a0a, { roughness: 0.25 }),
     tooth: S(0xf4efe0, { roughness: 0.5 }),

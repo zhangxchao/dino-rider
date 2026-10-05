@@ -1,10 +1,11 @@
 // 玩家（跑道模式）：恐龙自动前进，左右走位；骑手自动射击；武器随击杀升级
 import * as THREE from 'three';
 import { meta } from './meta.js';
+import { save } from './save.js';
 import { input } from './input.js';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
-import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE } from './data.js';
+import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE, skinnedDef } from './data.js';
 import { clamp, damp, prepareModel, mergeStaticMeshes, rigidSkin } from './util.js';
 import { createShield, Afterimages } from './effects.js';
 import { t } from './i18n.js';
@@ -60,7 +61,7 @@ export class Player {
     this.riderDef = riderDef;
     this.stats = stats;
 
-    this.model = createDinoModel(dinoDef);
+    this.model = createDinoModel(skinnedDef(dinoDef, save.dinoSkin && save.dinoSkin[dinoDef.id]));
     this.riderModel = createRiderModel(riderDef);
     this.riderModel.root.scale.setScalar(dinoDef.riderScale || 1);
     this.model.saddle.add(this.riderModel.root);

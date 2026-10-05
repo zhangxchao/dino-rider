@@ -137,7 +137,7 @@ export default {
     'result.newBest': ' · New record!',
     'result.bossReached': 'You reached the boss — so close! ',
     'result.progress': 'You covered {n}% of the route. ',
-    'result.tryUpgrade': 'Visit the Workshop for upgrades, or try another dino?',
+    'result.tryUpgrade': 'Try a different dino or rider combo?',
     'result.tryEasy': ' You can also switch to Easy on the level screen.',
     'result.ending': '🎉 Watch Ending',
     'result.next': 'Next Stage →',

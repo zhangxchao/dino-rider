@@ -17,6 +17,8 @@ import { t } from './i18n.js';
 import { Hazards } from './hazards.js';
 import { setBendProfile, updateBend, resetBend, bendX, bendVec, curvature } from './bend.js';
 
+// 升级工坊已移除：恐龙数值以面板为准（只保留骑手加成和局内武器等级）
+const NO_UPGRADES = { hp: 0, atk: 0, def: 0, speed: 0, rider: 0, cdr: 0, magnet: 0 };
 const NO_OPTS = Object.freeze({});
 const _white = new THREE.Color(1, 1, 1);
 const _aoeOpts = {};
@@ -297,7 +299,7 @@ export class Game {
     this.dino = DINOS.find((d) => d.id === opts.dinoId) || DINOS[0];
     this.rider = RIDERS.find((r) => r.id === opts.riderId) || RIDERS[0];
     this.stats = { kills: 0, spawned: 0, coins: 0, dmgDealt: 0, dmgTaken: 0, maxCombo: 0, score: 0, skills: 0, bosses: 0, gates: 0 };
-    this.player = new Player(this, this.dino, this.rider, computeStats(this.dino, this.rider, save.upgrades));
+    this.player = new Player(this, this.dino, this.rider, computeStats(this.dino, this.rider, NO_UPGRADES));
     this.hazards = new Hazards(this);
     this.player.pos.set(0, this.heightAt(0, 0), 0);
 

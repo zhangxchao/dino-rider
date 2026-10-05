@@ -1,5 +1,5 @@
 // 本地存档（localStorage）
-import { LEVELS, UPGRADES } from './data.js';
+import { LEVELS, UPGRADES, upgradeCost } from './data.js';
 
 const KEY = 'dino-rider-save-v1';
 
@@ -8,6 +8,7 @@ function defaults() {
     coins: 0,
     unlocked: 1,                       // 已解锁关卡数
     levelOrder: 2,                     // 关卡顺序版本（2 = 由易到难）
+    upgradesRefunded: true,            // 升级工坊已移除（老存档读取时退还金币）
     stars: LEVELS.map(() => 0),
     bestTime: LEVELS.map(() => 0),
     upgrades: Object.fromEntries(UPGRADES.map((u) => [u.id, 0])),
@@ -41,6 +42,14 @@ function load() {
       s.unlocked = LEVELS.length;
     }
     s.levelOrder = 2;
+    // 升级工坊已移除：把买过的升级按原价全部退还成金币（只退一次）
+    if (!s.upgradesRefunded && s.upgrades) {
+      let refund = 0;
+      for (const u of UPGRADES) for (let lv = 0; lv < Math.min(u.max, s.upgrades[u.id] || 0); lv++) refund += upgradeCost(u, lv);
+      s.coins = (s.coins || 0) + refund;
+      s.upgrades = {};
+    }
+    s.upgradesRefunded = true;
     return {
       ...d, ...s,
       stars: LEVELS.map((_, i) => (s.stars && s.stars[i]) || 0),

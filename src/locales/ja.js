@@ -137,7 +137,7 @@ export default {
     'result.newBest': ' · 新記録！',
     'result.bossReached': 'ボスまであと一歩だった！',
     'result.progress': '道のりの {n}% を走破。',
-    'result.tryUpgrade': '強化工房でパワーアップするか、別の恐竜を試してみよう！',
+    'result.tryUpgrade': '別の恐竜や騎手の組み合わせを試してみよう！',
     'result.tryEasy': 'ステージ選択画面で「かんたん」に切り替えることもできます。',
     'result.ending': '🎉 エンディングを見る',
     'result.next': '次のステージ →',

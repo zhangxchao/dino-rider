@@ -46,7 +46,6 @@ export const ACHIEVEMENTS = [
   { id: 'endless6k', icon: '🌌', goal: 6000, reward: 700, get: () => save.endlessBest },
   { id: 'dinos5', icon: '🦕', goal: 5, reward: 250, get: () => Object.keys(save.dinoWins).length },
   { id: 'dinosAll', icon: '🦴', goal: DINOS.length, reward: 1200, get: () => Object.keys(save.dinoWins).length },
-  { id: 'upgrades20', icon: '🛠️', goal: 20, reward: 300, get: () => Object.values(save.upgrades).reduce((a, b) => a + b, 0) },
   { id: 'hardWin', icon: '😈', goal: 1, reward: 400, get: () => L('hardWin') },
   { id: 'rich', icon: '💰', goal: 20000, reward: 500, get: () => L('coin') },
 ];

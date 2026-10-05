@@ -137,7 +137,7 @@ export default {
     'result.newBest': ' · 新纪录！',
     'result.bossReached': '已经打到首领了，差一点点！',
     'result.progress': '跑完了 {n}% 的路程。',
-    'result.tryUpgrade': '去升级工坊强化一下，或者换一只恐龙试试？',
+    'result.tryUpgrade': '换一只恐龙或骑手组合再试试？',
     'result.tryEasy': '也可以在选关页面切换到「简单」难度。',
     'result.ending': '🎉 观看结局',
     'result.next': '下一关 →',

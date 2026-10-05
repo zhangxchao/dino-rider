@@ -1,5 +1,5 @@
 // 菜单界面：标题 / 选择坐骑 / 关卡 / 升级 / 设置 / 帮助 / 暂停 / 结算 / 结局
-import { DINOS, RIDERS, LEVELS, BOSSES, UPGRADES, upgradeCost, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK } from './data.js';
+import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK } from './data.js';
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
@@ -108,7 +108,6 @@ export class UI {
         <div class="menu">
           <button class="btn" data-act="levels"><span class="ico">⚔️</span>${t('title.start')}</button>
           <button class="btn ghost" data-act="select"><span class="ico">🦖</span>${t('title.select')}</button>
-          <button class="btn ghost" data-act="shop"><span class="ico">🛠️</span>${t('title.shop')}</button>
           <button class="btn ghost" data-act="missions"><span class="ico">🎯</span>${t('title.missions')}${meta.claimable ? `<i class="badge">${meta.claimable}</i>` : ''}</button>
           <button class="btn ghost" data-act="settings"><span class="ico">⚙️</span>${t('title.settings')}</button>
           <button class="btn ghost" data-act="help"><span class="ico">📖</span>${t('title.help')}</button>
@@ -391,66 +390,6 @@ export class UI {
     return n;
   }
 
-  build_shop() {
-    const n = el(`
-      <div>
-        <div class="topbar">
-          <button class="btn ghost small" data-back>${t('common.back')}</button>
-          <h2>${t('shop.title')}</h2>
-          <span style="color:var(--muted)">${t('shop.sub')}</span>
-          <div class="spacer"></div>
-          ${this.coinPill()}
-        </div>
-        <div class="list panel"></div>
-      </div>`);
-    const list = n.querySelector('.list');
-    const render = () => {
-      n.querySelector('.coin-pill span').textContent = save.coins;
-      list.innerHTML = UPGRADES.map((u) => {
-        const lv = save.upgrades[u.id] || 0;
-        const maxed = lv >= u.max;
-        const cost = upgradeCost(u, lv);
-        return `
-          <div class="up-row">
-            <div class="ico">${u.icon}</div>
-            <div class="main">
-              <div class="t">${u.name} <span style="color:var(--muted);font-size:13px">Lv.${lv}/${u.max}</span></div>
-              <div class="d">${u.desc}${t('shop.now', { v: this.upgradeNow(u, lv) })}</div>
-              <div class="pips">${Array.from({ length: u.max }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('')}</div>
-            </div>
-            <button class="btn small" data-id="${u.id}" ${maxed || save.coins < cost ? 'disabled' : ''}>${maxed ? t('shop.maxed') : `<i class="coin-ico"></i> ${cost}`}</button>
-          </div>`;
-      }).join('');
-      list.querySelectorAll('button[data-id]').forEach((b) => b.addEventListener('click', () => {
-        const u = UPGRADES.find((x) => x.id === b.dataset.id);
-        const lv = save.upgrades[u.id] || 0;
-        const cost = upgradeCost(u, lv);
-        if (lv >= u.max || save.coins < cost) { this.app.audio.play('error'); return; }
-        save.coins -= cost;
-        save.upgrades[u.id] = lv + 1;
-        persist();
-        this.app.audio.play('buy');
-        render();
-      }));
-    };
-    n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));
-    render();
-    return n;
-  }
-
-  upgradeNow(u, lv) {
-    switch (u.id) {
-      case 'hp': return `+${lv * 10}%`;
-      case 'atk': return `+${lv * 10}%`;
-      case 'def': return `-${lv * 4}%`;
-      case 'speed': return `+${lv * 5}%`;
-      case 'rider': return `+${lv * 12}%`;
-      case 'cdr': return `-${lv * 6}%`;
-      case 'magnet': return `+${lv * 25}%`;
-      default: return lv;
-    }
-  }
-
   // ------------------------------------------------------------------
   build_settings({ from = 'title' } = {}) {
     const s = save.settings;
@@ -596,10 +535,6 @@ export class UI {
   // ------------------------------------------------------------------
   build_result(r) {
     const hasNext = r.win && !r.final && r.levelIdx + 1 < LEVELS.length;
-    // 工坊里现在买得起几项升级；一项都买不起时算出还差多少
-    const costs = UPGRADES.filter((u) => (save.upgrades[u.id] || 0) < u.max).map((u) => upgradeCost(u, save.upgrades[u.id] || 0));
-    const affordable = costs.filter((c) => c <= save.coins).length;
-    const need = costs.length && !affordable ? Math.min(...costs) - save.coins : 0;
     const cnt = (v, pre = '') => `<span data-count="${v}" data-pre="${pre}">${pre}0</span>`;
     const scoreRow = r.score != null ? `
         <div class="res-score"><div class="k">${t('result.score')}</div><div class="v">${cnt(r.score)}</div>
@@ -636,7 +571,7 @@ export class UI {
           <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${cnt(r.maxCombo)}</div></div>
           <div class="cell"><div class="k">${t('result.coinsGot')}</div><div class="v gold">${cnt(r.coins, '+')}</div></div>
         </div>
-        ${need > 0 ? `<div class="need-coins">${t('result.needCoins', { n: need })}</div>` : ''}`;
+`;
     }
     const n = el(`
       <div>
@@ -647,7 +582,6 @@ export class UI {
             ${r.final && r.win ? `<button class="btn" data-a="ending">${t('result.ending')}</button>` : ''}
             ${hasNext ? `<button class="btn" data-a="next">${t('result.next')}</button>` : ''}
             <button class="btn ${hasNext || (r.final && r.win) ? 'ghost' : ''}" data-a="retry">↻ ${r.win ? t('result.replay') : t('result.retry')}</button>
-            ${affordable ? `<button class="btn ghost shop-hot" data-a="shop">${t('result.shop')}<i class="badge">${affordable}</i></button>` : !r.win ? `<button class="btn ghost" data-a="shop">${t('result.shop')}</button>` : ''}
             <button class="btn ghost" data-a="menu">${t('result.menu')}</button>
           </div>
         </div>
@@ -657,7 +591,6 @@ export class UI {
       if (a === 'next') this.app.startGame({ levelIdx: r.levelIdx + 1, dinoId: save.dino, riderId: save.rider });
       else if (a === 'retry') this.app.restart();
       else if (a === 'ending') this.app.exitToMenu('ending');
-      else if (a === 'shop') this.app.exitToMenu('shop');
       else this.app.exitToMenu();
     }));
     if (r.win) setTimeout(() => this.app.audio.play('star'), 250);

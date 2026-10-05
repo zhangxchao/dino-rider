@@ -14,7 +14,7 @@ export const DINOS = [
     id: 'trex', name: '霸王龙', en: 'Tyrannosaurus Rex', era: '白垩纪晚期',
     desc: '史上最著名的掠食者，巨大的头颅与恐怖咬合力，一口就能撕碎强敌。',
     body: 'theropod', scale: 1.3, riderScale: 1.0,
-    features: ['bigHead', 'tinyArms', 'stripes'],
+    features: ['bigHead', 'tinyArms', 'stripes', 'tyrantSkull'],
     colors: { main: 0x5f7a3a, belly: 0xd8c79a, accent: 0x34431f, extra: 0x8a5a2a, eye: 0xffc400 },
     stats: { hp: 320, atk: 38, def: 0.2, speed: 9.5, reach: 2.6, atkRate: 0.85 },
     attack: 'bite',

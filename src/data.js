@@ -379,7 +379,7 @@ export const ENEMIES = {
 // ---------------------------------------------------------------------
 export const BOSSES = {
   // patterns：三个招式；skills：招式名（出招时在侧边提示）；anim：新招式借用模型已有的动作
-  spider:     { name: '剧毒蛛后', title: '丛林之主',   hp: 4050, dmg: 16, speed: 6.5, radius: 3.2, height: 4,
+  spider:     { name: '剧毒蛛后', title: '丛林之主',   hp: 7000, dmg: 16, speed: 6.5, radius: 3.2, height: 4,
                 patterns: ['web', 'pounce', 'brood'], summon: ['spiderling'],
                 skills: { web: '蛛网陷阱', pounce: '毒牙扑杀', brood: '蛛卵孵化' },
                 anim: { web: 'volley', pounce: 'slam', brood: 'summon' }, projColor: 0x9cff3a, color: 0x3a2a4a },
@@ -412,27 +412,30 @@ export const BOSSES = {
 // ---------------------------------------------------------------------
 //  关卡 / 地形
 // ---------------------------------------------------------------------
+// 无尽模式首领出场顺序：按实测纯攻击（玩家每秒掉血）由弱到强，循环出场
+export const ENDLESS_BOSSES = ['sandworm', 'hydra', 'frostGiant', 'magmaGolem', 'overlord', 'spider', 'mantis'];
+
 export const LEVELS = [
-  { id: 0, name: '翠绿丛林', biome: 'jungle',  boss: 'spider',     length: 1150,
-    desc: '丛林深处危机四伏：剧毒小蛛从树上垂丝落下喷吐毒雾，怪物大军更凶更多，冲过去击败剧毒蛛后！',
-    pool: { goblin: 4, slime: 3, bat: 3 }, elite: 'golem', reward: 560, mul: 2.6, spiders: true },
-  { id: 1, name: '炽热沙海', biome: 'desert',  boss: 'sandworm',   length: 1250,
+  { id: 0, name: '炽热沙海', biome: 'desert',  boss: 'sandworm',   length: 1250,
     desc: '烈日下的古道，骷髅与巨蝎挡路，沙虫在沙丘下游走。',
     pool: { scorpion: 3, skeleton: 3, archer: 2, goblin: 2 }, elite: 'scorpion', reward: 180, mul: 1.25 },
-  { id: 2, name: '冰封雪原', biome: 'frost',   boss: 'frostGiant', length: 1350,
+  { id: 1, name: '冰封雪原', biome: 'frost',   boss: 'frostGiant', length: 1350,
     desc: '暴风雪中狼群成群扑来，冰霜巨人守在雪道尽头。',
     pool: { wolf: 6, bat: 2 }, elite: 'yeti', reward: 240, mul: 1.5 },
-  { id: 3, name: '迷雾沼泽', biome: 'swamp',   boss: 'hydra',      length: 1400,
+  { id: 2, name: '迷雾沼泽', biome: 'swamp',   boss: 'hydra',      length: 1400,
     desc: '踏过沼泽栈道，毒孢菇与鬼火潜伏在迷雾中。',
     pool: { slime: 3, mushroom: 3, wisp: 2, goblin: 2 }, elite: 'golem', reward: 300, mul: 1.8 },
-  { id: 4, name: '熔岩火山', biome: 'volcano', boss: 'magmaGolem', length: 1450,
+  { id: 3, name: '熔岩火山', biome: 'volcano', boss: 'magmaGolem', length: 1450,
     desc: '岩浆奔涌的火山大道，火焰小鬼漫天飞舞。',
     pool: { imp: 4, bat: 3, goblin: 2 }, elite: 'golem', reward: 380, mul: 2.1 },
-  { id: 5, name: '暗影要塞', biome: 'shadow',  boss: 'overlord',   length: 1550,
-    desc: '穿过暗影要塞的符文大道，打倒暗影魔王——但真正的威胁还藏在更深处……',
+  { id: 4, name: '暗影要塞', biome: 'shadow',  boss: 'overlord',   length: 1550,
+    desc: '穿过暗影要塞的符文大道，骷髅与暗影法师守在两旁，打倒盘踞于此的暗影魔王！',
     pool: { skeleton: 4, archer: 2, mage: 2, wisp: 2 }, elite: 'darkKnight', reward: 500, mul: 2.5 },
+  { id: 5, name: '翠绿丛林', biome: 'jungle',  boss: 'spider',     length: 1150,
+    desc: '丛林深处危机四伏：剧毒小蛛从树上垂丝落下喷吐毒雾，怪物大军更凶更多，冲过去击败剧毒蛛后！',
+    pool: { goblin: 4, slime: 3, bat: 3 }, elite: 'golem', reward: 560, mul: 2.6, spiders: true },
   { id: 6, name: '螳螂巢穴', biome: 'hive',    boss: 'mantis',     length: 1650,
-    desc: '暗影魔王倒下后，大地深处传来镰刃的摩擦声——闯进虫巢，斩落螳螂王！',
+    desc: '最终之战：大地深处传来镰刃的摩擦声——闯进暗红色的虫巢，斩落螳螂王！',
     pool: { scorpion: 3, bat: 3, mushroom: 2, skeleton: 2 }, elite: 'darkKnight', reward: 650, mul: 2.9 },
 ];
 

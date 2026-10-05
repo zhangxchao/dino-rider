@@ -7,6 +7,7 @@ function defaults() {
   return {
     coins: 0,
     unlocked: 1,                       // 已解锁关卡数
+    levelOrder: 2,                     // 关卡顺序版本（2 = 由易到难）
     stars: LEVELS.map(() => 0),
     bestTime: LEVELS.map(() => 0),
     upgrades: Object.fromEntries(UPGRADES.map((u) => [u.id, 0])),
@@ -31,6 +32,15 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return d;
     const s = JSON.parse(raw);
+    // 关卡改成由易到难的顺序后：把旧存档里按旧顺序记录的星数 / 最佳时间换到新位置
+    if ((s.levelOrder || 1) < 2) {
+      const OLD = ['jungle', 'desert', 'frost', 'swamp', 'volcano', 'shadow', 'hive'];
+      const remap = (arr) => (Array.isArray(arr) ? LEVELS.map((L) => arr[OLD.indexOf(L.biome)] || 0) : arr);
+      s.stars = remap(s.stars);
+      s.bestTime = remap(s.bestTime);
+      s.unlocked = LEVELS.length;
+    }
+    s.levelOrder = 2;
     return {
       ...d, ...s,
       stars: LEVELS.map((_, i) => (s.stars && s.stars[i]) || 0),

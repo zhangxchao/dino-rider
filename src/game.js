@@ -1,6 +1,6 @@
 // 一局游戏（跑道模式）：沿路线自动前进，怪物从前方涌来，终点首领战
 import * as THREE from 'three';
-import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, DIFFICULTIES, BALANCE } from './data.js';
+import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, DIFFICULTIES, BALANCE, ENDLESS_BOSSES } from './data.js';
 import { createTrack } from './track.js';
 import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars, Debris, Scorch, LightFlashes, Streaks } from './effects.js';
 import { Projectiles } from './projectiles.js';
@@ -598,7 +598,7 @@ export class Game {
       case 'run':
         if (!this.endless && p.pos.z >= this.length) this.startBoss(this.level.boss, { hp: 1, dmg: 1 });
         else if (this.endless && p.pos.z >= this.nextBossAt) {
-          const keys = Object.keys(BOSSES);
+          const keys = ENDLESS_BOSSES;
           const z = p.pos.z;
           this.startBoss(keys[this.bossCount % keys.length], { hp: 0.5 + z / 800 + Math.pow(z / 3000, 2), dmg: 0.8 + z / 3000 });
         }

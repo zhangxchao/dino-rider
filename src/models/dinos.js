@@ -189,8 +189,8 @@ const PTERO = {
 };
 
 const SPECIES = {
-  trex: { hipX: 0.4, legR: 0.33, bodyW: 0.62, bodyH: 0.64, bodyL: 1.3, neckL: 0.5, neckR: 0.42, neckA: 0.45, neckA2: 0.15,
-    headL: 1.32, headH: 0.64, headW: 0.62, tailL: 2.6, tailR: 0.5, armL: 0.32, armR: 0.07, claws: 2 },
+  trex: { hipX: 0.4, legR: 0.33, bodyW: 0.62, bodyH: 0.64, bodyL: 1.3, neckL: 0.5, neckR: 0.44, neckA: 0.45, neckA2: 0.15,
+    headL: 1.2, headH: 0.72, headW: 0.66, tailL: 2.6, tailR: 0.5, armL: 0.32, armR: 0.07, claws: 2 },
   giganotosaurus: { hipX: 0.38, legR: 0.31, bodyW: 0.58, bodyH: 0.62, bodyL: 1.42, neckL: 0.6, neckR: 0.38,
     headL: 1.45, headH: 0.56, headW: 0.5, tailL: 2.9, tailR: 0.48, armL: 0.42, armR: 0.08 },
   allosaurus: { headL: 1.05, headH: 0.48, headW: 0.42, armL: 0.62, tailL: 2.6 },
@@ -395,6 +395,16 @@ function buildHead(ctx, head) {
       ctx.mouth = grp(head, 0, jy, L * 1.02);
       ctx.maxJaw = 0.75;
       if (F.has('browHorns')) for (const s of [-1, 1]) spike(head, [s * W * 0.34, H * 0.52, L * 0.38], [s * 0.2, 1, 0.3], H * 0.38, W * 0.08, M.extra, 4);
+      if (F.has('tyrantSkull')) {
+        // 霸王龙头骨：后脑又高又宽，两侧咬肌鼓起（俯视呈 T 字），粗眉骨，吻部厚实
+        msh(head, gSph(), M.main, 0, H * 0.3, L * 0.12, W * 0.6, H * 0.5, L * 0.36);
+        for (const s of [-1, 1]) {
+          msh(head, gSph(), M.main, s * W * 0.34, H * 0.04, L * 0.16, W * 0.22, H * 0.34, L * 0.28);
+          msh(head, gSphLo(), M.accent, s * W * 0.34, H * 0.56, L * 0.36, W * 0.14, H * 0.08, L * 0.12);
+        }
+        seg(head, [0, H * 0.3, L * 0.3], [0, H * 0.14, L * 0.92], W * 0.3, W * 0.22, M.main, 6, 0.95);
+        msh(head, gSphLo(), M.main, 0, H * 0.04, L * 0.97, W * 0.25, H * 0.24, L * 0.08); // 钝鼻尖
+      }
       if (F.has('snoutHorn')) spike(head, [0, H * 0.3, L * 0.72], [0, 1, 0.3], H * 0.62, W * 0.13, M.horn, 5); // 角鼻龙的鼻角
       if (F.has('bullHorns')) for (const s of [-1, 1]) spike(head, [s * W * 0.36, H * 0.5, L * 0.2], [s, 0.75, 0.1], H * 0.8, W * 0.13, M.horn, 6);
       if (F.has('doubleCrest')) for (const s of [-1, 1]) msh(head, gCrest(), M.accent, s * W * 0.12, H * 0.3, L * 0.52, L * 0.34, H * 0.62, 0.03, 0, PI / 2, 0);

@@ -563,3 +563,6 @@ export function skinnedDef(def, skinId) {
   if (!sk || !sk.colors) return def;
   return { ...def, colors: { ...def.colors, ...sk.colors }, skinMat: sk.mat || {} };
 }
+
+// 宝石：商城 4000 金币一颗，先进宝石袋；镶嵌到某只恐龙身上，每颗 +2 攻击、+11 血，每只最多 5 颗
+export const GEM = { price: 4000, atk: 2, hp: 11, max: 5 };

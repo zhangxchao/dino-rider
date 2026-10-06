@@ -19,6 +19,8 @@ function defaults() {
     stats: { kills: 0, bosses: 0, plays: 0, wins: 0 },
     dinoWins: {},                      // 每只恐龙的胜场
     skins: ['default'],                // 已解锁的皮肤
+    gems: 0,                           // 宝石袋里还没镶嵌的宝石
+    dinoGems: {},                      // 每只恐龙镶嵌的宝石数
     dinoSkin: {},                      // 每只恐龙当前穿的皮肤
     tutorialDone: false,               // 新手引导是否完成
     tutUlt: false,                     // 是否提示过觉醒
@@ -62,6 +64,8 @@ function load() {
       dinoWins: { ...(s.dinoWins || {}) },
       skins: Array.from(new Set(['default', ...(s.skins || [])])),
       dinoSkin: { ...(s.dinoSkin || {}) },
+      gems: Math.max(0, s.gems | 0),
+      dinoGems: { ...(s.dinoGems || {}) },
       // 老玩家（玩过至少一局）不再弹新手引导
       tutorialDone: s.tutorialDone ?? ((s.stats && s.stats.plays > 0) || false),
       tutUlt: s.tutUlt ?? ((s.stats && s.stats.plays > 2) || false),

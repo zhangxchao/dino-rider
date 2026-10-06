@@ -299,7 +299,7 @@ export class Game {
     this.dino = DINOS.find((d) => d.id === opts.dinoId) || DINOS[0];
     this.rider = RIDERS.find((r) => r.id === opts.riderId) || RIDERS[0];
     this.stats = { kills: 0, spawned: 0, coins: 0, dmgDealt: 0, dmgTaken: 0, maxCombo: 0, score: 0, skills: 0, bosses: 0, gates: 0 };
-    this.player = new Player(this, this.dino, this.rider, computeStats(this.dino, this.rider, NO_UPGRADES));
+    this.player = new Player(this, this.dino, this.rider, computeStats(this.dino, this.rider, NO_UPGRADES, save.dinoGems && save.dinoGems[this.dino.id]));
     this.hazards = new Hazards(this);
     this.player.pos.set(0, this.heightAt(0, 0), 0);
 

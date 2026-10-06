@@ -1,5 +1,5 @@
 // 菜单界面：标题 / 选择坐骑 / 关卡 / 升级 / 设置 / 帮助 / 暂停 / 结算 / 结局
-import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK, SKINS } from './data.js';
+import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK, SKINS, GEM } from './data.js';
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
@@ -108,6 +108,7 @@ export class UI {
         <div class="menu">
           <button class="btn" data-act="levels"><span class="ico">⚔️</span>${t('title.start')}</button>
           <button class="btn ghost" data-act="select"><span class="ico">🦖</span>${t('title.select')}</button>
+          <button class="btn ghost" data-act="shop"><span class="ico">🛒</span>${t('title.mall')}</button>
           <button class="btn ghost" data-act="missions"><span class="ico">🎯</span>${t('title.missions')}${meta.claimable ? `<i class="badge">${meta.claimable}</i>` : ''}</button>
           <button class="btn ghost" data-act="settings"><span class="ico">⚙️</span>${t('title.settings')}</button>
           <button class="btn ghost" data-act="help"><span class="ico">📖</span>${t('title.help')}</button>
@@ -174,6 +175,7 @@ export class UI {
         const s = d.stats;
         const bar = (k, v, max, txt) => `<div class="stat-row"><span class="k">${k}</span><span class="bar"><i style="width:${Math.min(100, v / max * 100)}%"></i></span><span class="v">${txt}</span></div>`;
         const wins = save.dinoWins[d.id] || 0;
+        const gemN = save.dinoGems[d.id] || 0;
         info.innerHTML = `
           <h3>${d.name}</h3>
           ${d.en !== d.name ? `<div class="en">${d.en}</div>` : ''}
@@ -182,8 +184,8 @@ export class UI {
           <span class="era power ${DINO_RANK[d.id].cup || 'none'}">${DINO_RANK[d.id].cup ? `<span class="cup ${DINO_RANK[d.id].cup}">🏆</span> ` : ''}${t('select.power', { n: DINO_RANK[d.id].rank })}</span>
           <p>${d.desc}</p>
           <div style="margin-top:12px">
-            ${bar(t('stat.hp'), s.hp, 330, s.hp)}
-            ${bar(t('stat.atk'), s.atk, 38, s.atk)}
+            ${bar(t('stat.hp'), s.hp + gemN * GEM.hp, 330, gemN ? `${s.hp}<em class="gem-plus">+${gemN * GEM.hp}</em>` : s.hp)}
+            ${bar(t('stat.atk'), s.atk + gemN * GEM.atk, 38, gemN ? `${s.atk}<em class="gem-plus">+${gemN * GEM.atk}</em>` : s.atk)}
             ${bar(t('stat.def'), s.def, 0.45, Math.round(s.def * 100) + '%')}
             ${bar(t('stat.speed'), s.speed, 16, s.speed)}
             ${bar(t('stat.atkRate'), s.atkRate, 1.8, s.atkRate.toFixed(1))}
@@ -192,6 +194,15 @@ export class UI {
           <div class="skill-box">
             <div class="t">${SKILL_ICON[d.skill.type]} ${t('select.skill', { name: d.skill.name })}<small>${t('select.cd', { n: d.skill.cd })}</small></div>
             <div class="d">${d.skill.desc}</div>
+          </div>
+          <div class="gem-box">
+            <div class="t">💎 ${t('gem.title')} <b>${gemN}/${GEM.max}</b><small>${t('gem.each', { atk: GEM.atk, hp: GEM.hp })}</small></div>
+            <div class="gem-row">
+              <span class="gems">${Array.from({ length: GEM.max }, (_, k) => `<i class="${k < gemN ? 'on' : ''}">💎</i>`).join('')}</span>
+              <button class="btn small" data-gem="add" ${gemN >= GEM.max ? 'disabled' : ''}>＋ ${t('gem.add')}</button>
+              <button class="btn ghost small" data-gem="remove" ${gemN <= 0 ? 'disabled' : ''}>－ ${t('gem.remove')}</button>
+            </div>
+            <div class="gem-msg">${t('gem.bag', { n: save.gems })}</div>
           </div>
           <div class="skin-box">
             <div class="t">🎨 ${t('skin.title')}<small>${t('skin.note')}</small></div>
@@ -206,6 +217,21 @@ export class UI {
             }).join('')}</div>
             <div class="skin-msg"></div>
           </div>`;
+        info.querySelectorAll('[data-gem]').forEach((b) => b.addEventListener('click', () => {
+          const cur = save.dinoGems[d.id] || 0;
+          if (b.dataset.gem === 'add') {
+            if (cur >= GEM.max) return;
+            if (save.gems <= 0) { this.app.audio.play('error'); info.querySelector('.gem-msg').textContent = t('gem.empty'); return; }
+            save.gems--; save.dinoGems[d.id] = cur + 1;
+            this.app.audio.play('powerup', { volume: 0.6, pitch: 1.3 });
+          } else {
+            if (cur <= 0) return;
+            save.gems++; save.dinoGems[d.id] = cur - 1;
+            this.app.audio.play('select');
+          }
+          persist();
+          renderInfo();
+        }));
         info.querySelectorAll('[data-skin]').forEach((b) => b.addEventListener('click', () => {
           const sk = SKINS.find((x) => x.id === b.dataset.skin);
           const msg = info.querySelector('.skin-msg');
@@ -423,6 +449,63 @@ export class UI {
   }
 
   // ------------------------------------------------------------------
+  //  商城：宝石（进宝石袋，在选择坐骑界面镶嵌）+ 皮肤（只改外观）
+  // ------------------------------------------------------------------
+  build_shop() {
+    const n = el(`
+      <div>
+        <div class="topbar">
+          <button class="btn ghost small" data-back>${t('common.back')}</button>
+          <h2>🛒 ${t('mall.title')}</h2>
+          <div class="spacer"></div>
+          ${this.coinPill()}
+        </div>
+        <div class="list panel mall"></div>
+      </div>`);
+    const list = n.querySelector('.list');
+    const hex = (v) => '#' + (v ?? 0x777777).toString(16).padStart(6, '0');
+    const render = (msg = '') => {
+      n.querySelector('.coin-pill span').textContent = save.coins;
+      const placed = Object.values(save.dinoGems).reduce((a, b) => a + b, 0);
+      list.innerHTML = `
+        <h3 class="mall-h">💎 ${t('mall.gems')}</h3>
+        <div class="up-row">
+          <div class="ico">💎</div>
+          <div class="main">
+            <div class="t">${t('gem.name')} <span style="color:var(--muted);font-size:13px">${t('mall.bag', { n: save.gems, m: placed })}</span></div>
+            <div class="d">${t('mall.gemDesc', { atk: GEM.atk, hp: GEM.hp, max: GEM.max })}</div>
+          </div>
+          <button class="btn small" data-buy="gem" ${save.coins < GEM.price ? 'disabled' : ''}><i class="coin-ico"></i> ${GEM.price}</button>
+        </div>
+        <h3 class="mall-h">🎨 ${t('mall.skins')} <small>${t('skin.note')}</small></h3>
+        <div class="mall-skins">${SKINS.filter((sk) => sk.colors).map((sk) => {
+          const owned = save.skins.includes(sk.id);
+          return `<div class="mall-skin ${owned ? 'owned' : ''}">
+            <i style="background:linear-gradient(135deg, ${hex(sk.colors.main)} 0 45%, ${hex(sk.colors.accent)} 45% 70%, ${hex(sk.colors.belly)} 70%)"></i>
+            <b>${sk.name}</b>
+            ${owned ? `<span class="own">✔ ${t('skin.owned')}</span>` : `<button class="btn small" data-buy="${sk.id}" ${save.coins < sk.price ? 'disabled' : ''}><i class="coin-ico"></i> ${sk.price}</button>`}
+          </div>`;
+        }).join('')}</div>
+        <p class="mall-msg">${msg}</p>
+        <p style="color:var(--muted);font-size:12.5px">${t('mall.hint')}</p>`;
+      list.querySelectorAll('[data-buy]').forEach((b) => b.addEventListener('click', () => {
+        const id = b.dataset.buy;
+        const price = id === 'gem' ? GEM.price : SKINS.find((x) => x.id === id).price;
+        if (save.coins < price) { this.app.audio.play('error'); render(t('skin.need', { n: price - save.coins })); return; }
+        save.coins -= price;
+        if (id === 'gem') save.gems++;
+        else if (!save.skins.includes(id)) save.skins.push(id);
+        persist();
+        this.app.audio.play('buy');
+        render(id === 'gem' ? t('mall.gotGem', { n: save.gems }) : t('mall.gotSkin'));
+      }));
+    };
+    n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));
+    render();
+    return n;
+  }
+
+  // ------------------------------------------------------------------
   build_settings({ from = 'title' } = {}) {
     const s = save.settings;
     const n = el(`
@@ -614,6 +697,7 @@ export class UI {
             ${r.final && r.win ? `<button class="btn" data-a="ending">${t('result.ending')}</button>` : ''}
             ${hasNext ? `<button class="btn" data-a="next">${t('result.next')}</button>` : ''}
             <button class="btn ${hasNext || (r.final && r.win) ? 'ghost' : ''}" data-a="retry">↻ ${r.win ? t('result.replay') : t('result.retry')}</button>
+            ${save.coins >= GEM.price ? `<button class="btn ghost shop-hot" data-a="shop">🛒 ${t('title.mall')}</button>` : ''}
             <button class="btn ghost" data-a="menu">${t('result.menu')}</button>
           </div>
         </div>
@@ -623,6 +707,7 @@ export class UI {
       if (a === 'next') this.app.startGame({ levelIdx: r.levelIdx + 1, dinoId: save.dino, riderId: save.rider });
       else if (a === 'retry') this.app.restart();
       else if (a === 'ending') this.app.exitToMenu('ending');
+      else if (a === 'shop') this.app.exitToMenu('shop');
       else this.app.exitToMenu();
     }));
     if (r.win) setTimeout(() => this.app.audio.play('star'), 250);

@@ -5,7 +5,7 @@ import { save } from './save.js';
 import { input } from './input.js';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
-import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE, skinnedDef } from './data.js';
+import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE, skinnedDef, GEM } from './data.js';
 import { clamp, damp, prepareModel, mergeStaticMeshes, rigidSkin } from './util.js';
 import { createShield, Afterimages } from './effects.js';
 import { t } from './i18n.js';
@@ -25,13 +25,14 @@ const RAGE_COL = new THREE.Color(0xffb020);
 const HURT_COL = new THREE.Color(1, 0.45, 0.4);
 const _rc = new THREE.Color();
 
-export function computeStats(dino, rider, up) {
+export function computeStats(dino, rider, up, gems = 0) {
   const s = dino.stats;
   const b = rider.bonus || {};
-  const atk = s.atk * (1 + 0.1 * up.atk) * (1 + (b.atk || 0));
+  const g = Math.max(0, Math.min(GEM.max, gems || 0)); // 镶嵌的宝石：每颗 +2 攻击、+11 血
+  const atk = (s.atk + GEM.atk * g) * (1 + 0.1 * up.atk) * (1 + (b.atk || 0));
   const speed = s.speed * (1 + 0.05 * up.speed) * (1 + (b.speed || 0));
   return {
-    maxHp: Math.round(s.hp * (1 + 0.1 * up.hp) * (1 + (b.hp || 0))),
+    maxHp: Math.round((s.hp + GEM.hp * g) * (1 + 0.1 * up.hp) * (1 + (b.hp || 0))),
     atk,
     ram: atk * 2.5 + 20,                  // 冲撞伤害：血量低于它的怪物直接撞飞
     def: Math.min(0.8, 1 - (1 - s.def) * (1 - 0.04 * up.def) * (1 - (b.def || 0))),

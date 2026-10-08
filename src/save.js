@@ -1,5 +1,5 @@
 // 本地存档（localStorage）
-import { LEVELS, UPGRADES, upgradeCost } from './data.js';
+import { LEVELS, UPGRADES, upgradeCost, GEM, GEM_COLORS, emptyGemBag, gemColor } from './data.js';
 
 const KEY = 'dino-rider-save-v1';
 
@@ -19,8 +19,8 @@ function defaults() {
     stats: { kills: 0, bosses: 0, plays: 0, wins: 0 },
     dinoWins: {},                      // 每只恐龙的胜场
     skins: ['default'],                // 已解锁的皮肤
-    gems: 0,                           // 宝石袋里还没镶嵌的宝石
-    dinoGems: {},                      // 每只恐龙镶嵌的宝石数
+    gems: emptyGemBag(),               // 宝石袋：按颜色计数，还没镶嵌的
+    dinoGems: {},                      // 每只恐龙镶嵌的宝石颜色（数组，最多 5 颗）
     dinoSkin: {},                      // 每只恐龙当前穿的皮肤
     tutorialDone: false,               // 新手引导是否完成
     tutUlt: false,                     // 是否提示过觉醒
@@ -29,6 +29,21 @@ function defaults() {
     daily: null,                       // 每日任务 { date, list }
     settings: { music: 0.55, sfx: 0.8, quality: 'high', sensitivity: 1, shake: false, invertY: false, touch: 'auto', autoRes: true, showFps: false, fx: 'medium', difficulty: 'medium', vibrate: true, reduceMotion: false, mute: false },
   };
+}
+
+// 老存档里宝石是一颗普通的、不记颜色的计数。读档时改成蓝色，数量和已镶嵌的颗数都不变。
+function normalizeGems(s) {
+  const bag = emptyGemBag();
+  if (typeof s.gems === 'number') bag.blue = Math.max(0, s.gems | 0);
+  else if (s.gems && typeof s.gems === 'object') {
+    for (const c of GEM_COLORS) bag[c.id] = Math.max(0, s.gems[c.id] | 0);
+  }
+  const dinoGems = {};
+  for (const [id, v] of Object.entries(s.dinoGems || {})) {
+    if (Array.isArray(v)) dinoGems[id] = v.filter((x) => gemColor(x)).slice(0, GEM.max);
+    else dinoGems[id] = Array.from({ length: Math.max(0, Math.min(GEM.max, v | 0)) }, () => 'blue');
+  }
+  return { gems: bag, dinoGems };
 }
 
 function load() {
@@ -64,8 +79,7 @@ function load() {
       dinoWins: { ...(s.dinoWins || {}) },
       skins: Array.from(new Set(['default', ...(s.skins || [])])),
       dinoSkin: { ...(s.dinoSkin || {}) },
-      gems: Math.max(0, s.gems | 0),
-      dinoGems: { ...(s.dinoGems || {}) },
+      ...normalizeGems(s),
       // 老玩家（玩过至少一局）不再弹新手引导
       tutorialDone: s.tutorialDone ?? ((s.stats && s.stats.plays > 0) || false),
       tutUlt: s.tutUlt ?? ((s.stats && s.stats.plays > 2) || false),

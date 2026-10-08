@@ -1,5 +1,5 @@
 // 菜单界面：标题 / 选择坐骑 / 关卡 / 升级 / 设置 / 帮助 / 暂停 / 结算 / 结局
-import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK, SKINS, GEM } from './data.js';
+import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK, SKINS, GEM, GEM_COLORS, gemCount, gemBagTotal, gemColor } from './data.js';
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
@@ -175,7 +175,12 @@ export class UI {
         const s = d.stats;
         const bar = (k, v, max, txt) => `<div class="stat-row"><span class="k">${k}</span><span class="bar"><i style="width:${Math.min(100, v / max * 100)}%"></i></span><span class="v">${txt}</span></div>`;
         const wins = save.dinoWins[d.id] || 0;
-        const gemN = save.dinoGems[d.id] || 0;
+        const socketed = Array.isArray(save.dinoGems[d.id]) ? save.dinoGems[d.id] : [];
+        const gemN = gemCount(socketed);
+        const stone = (id, extra = '') => {
+          const c = id ? gemColor(id) : null;
+          return `<i class="gem-stone${c ? ' on' : ''}" ${c ? `style="--c:${c.hex}"` : ''} ${extra}></i>`;
+        };
         info.innerHTML = `
           <h3>${d.name}</h3>
           ${d.en !== d.name ? `<div class="en">${d.en}</div>` : ''}
@@ -198,11 +203,14 @@ export class UI {
           <div class="gem-box">
             <div class="t">💎 ${t('gem.title')} <b>${gemN}/${GEM.max}</b><small>${t('gem.each', { atk: GEM.atk, hp: GEM.hp })}</small></div>
             <div class="gem-row">
-              <span class="gems">${Array.from({ length: GEM.max }, (_, k) => `<i class="${k < gemN ? 'on' : ''}">💎</i>`).join('')}</span>
-              <button class="btn small" data-gem="add" ${gemN >= GEM.max ? 'disabled' : ''}>＋ ${t('gem.add')}</button>
+              <span class="gems">${Array.from({ length: GEM.max }, (_, k) => stone(socketed[k], socketed[k] ? `data-unsocket="${k}" title="${t('gem.remove')}"` : '')).join('')}</span>
               <button class="btn ghost small" data-gem="remove" ${gemN <= 0 ? 'disabled' : ''}>－ ${t('gem.remove')}</button>
             </div>
-            <div class="gem-msg">${t('gem.bag', { n: save.gems })}</div>
+            <div class="gem-picks">${GEM_COLORS.map((c) => {
+              const n = save.gems[c.id] || 0;
+              return `<button class="gem-pick" data-gem-add="${c.id}" ${gemN >= GEM.max || n <= 0 ? 'disabled' : ''} style="--c:${c.hex}">${stone(c.id)}<b>${t('gem.' + c.id)}</b><small>${n}</small></button>`;
+            }).join('')}</div>
+            <div class="gem-msg">${t('gem.bag', GEM_COLORS.reduce((o, c) => { o[c.id] = save.gems[c.id] || 0; return o; }, {}))}</div>
           </div>
           <div class="skin-box">
             <div class="t">🎨 ${t('skin.title')}<small>${t('skin.note')}</small></div>
@@ -217,21 +225,41 @@ export class UI {
             }).join('')}</div>
             <div class="skin-msg"></div>
           </div>`;
-        info.querySelectorAll('[data-gem]').forEach((b) => b.addEventListener('click', () => {
-          const cur = save.dinoGems[d.id] || 0;
-          if (b.dataset.gem === 'add') {
-            if (cur >= GEM.max) return;
-            if (save.gems <= 0) { this.app.audio.play('error'); info.querySelector('.gem-msg').textContent = t('gem.empty'); return; }
-            save.gems--; save.dinoGems[d.id] = cur + 1;
-            this.app.audio.play('powerup', { volume: 0.6, pitch: 1.3 });
-          } else {
-            if (cur <= 0) return;
-            save.gems++; save.dinoGems[d.id] = cur - 1;
-            this.app.audio.play('select');
-          }
+        const socketList = () => {
+          if (!Array.isArray(save.dinoGems[d.id])) save.dinoGems[d.id] = [];
+          return save.dinoGems[d.id];
+        };
+        const unsocketAt = (i) => {
+          const list = socketList();
+          if (i < 0 || i >= list.length) return false;
+          const color = list.splice(i, 1)[0];
+          if (gemColor(color)) save.gems[color] = (save.gems[color] || 0) + 1;
+          return true;
+        };
+        info.querySelectorAll('[data-unsocket]').forEach((el) => el.addEventListener('click', () => {
+          if (!unsocketAt(+el.dataset.unsocket)) return;
+          this.app.audio.play('select');
           persist();
           renderInfo();
         }));
+        info.querySelectorAll('[data-gem-add]').forEach((b) => b.addEventListener('click', () => {
+          const color = b.dataset.gemAdd;
+          const list = socketList();
+          if (list.length >= GEM.max) return;
+          if ((save.gems[color] || 0) <= 0) { this.app.audio.play('error'); info.querySelector('.gem-msg').textContent = t('gem.empty'); return; }
+          save.gems[color]--;
+          list.push(color);
+          this.app.audio.play('powerup', { volume: 0.6, pitch: 1.3 });
+          persist();
+          renderInfo();
+        }));
+        info.querySelector('[data-gem="remove"]')?.addEventListener('click', () => {
+          const list = socketList();
+          if (!unsocketAt(list.length - 1)) return;
+          this.app.audio.play('select');
+          persist();
+          renderInfo();
+        });
         info.querySelectorAll('[data-skin]').forEach((b) => b.addEventListener('click', () => {
           const sk = SKINS.find((x) => x.id === b.dataset.skin);
           const msg = info.querySelector('.skin-msg');
@@ -466,17 +494,20 @@ export class UI {
     const hex = (v) => '#' + (v ?? 0x777777).toString(16).padStart(6, '0');
     const render = (msg = '') => {
       n.querySelector('.coin-pill span').textContent = save.coins;
-      const placed = Object.values(save.dinoGems).reduce((a, b) => a + b, 0);
+      const placed = Object.values(save.dinoGems).reduce((a, b) => a + gemCount(b), 0);
+      const bagN = gemBagTotal(save.gems);
       list.innerHTML = `
         <h3 class="mall-h">💎 ${t('mall.gems')}</h3>
+        <p class="mall-gem-note">${t('mall.gemDesc', { atk: GEM.atk, hp: GEM.hp, max: GEM.max })} ${t('mall.bag', { n: bagN, m: placed })}</p>
+        ${GEM_COLORS.map((c) => `
         <div class="up-row">
-          <div class="ico">💎</div>
+          <div class="ico"><i class="gem-stone on lg" style="--c:${c.hex}"></i></div>
           <div class="main">
-            <div class="t">${t('gem.name')} <span style="color:var(--muted);font-size:13px">${t('mall.bag', { n: save.gems, m: placed })}</span></div>
-            <div class="d">${t('mall.gemDesc', { atk: GEM.atk, hp: GEM.hp, max: GEM.max })}</div>
+            <div class="t">${t('gem.' + c.id)} <span style="color:var(--muted);font-size:13px">${t('mall.colorBag', { n: save.gems[c.id] || 0 })}</span></div>
+            <div class="d">${t('gem.each', { atk: GEM.atk, hp: GEM.hp })}</div>
           </div>
-          <button class="btn small" data-buy="gem" ${save.coins < GEM.price ? 'disabled' : ''}><i class="coin-ico"></i> ${GEM.price}</button>
-        </div>
+          <button class="btn small" data-buy="gem:${c.id}" ${save.coins < GEM.price ? 'disabled' : ''}><i class="coin-ico"></i> ${GEM.price}</button>
+        </div>`).join('')}
         <h3 class="mall-h">🎨 ${t('mall.skins')} <small>${t('skin.note')}</small></h3>
         <div class="mall-skins">${SKINS.filter((sk) => sk.colors).map((sk) => {
           const owned = save.skins.includes(sk.id);
@@ -490,14 +521,16 @@ export class UI {
         <p style="color:var(--muted);font-size:12.5px">${t('mall.hint')}</p>`;
       list.querySelectorAll('[data-buy]').forEach((b) => b.addEventListener('click', () => {
         const id = b.dataset.buy;
-        const price = id === 'gem' ? GEM.price : SKINS.find((x) => x.id === id).price;
+        const gemId = id.startsWith('gem:') ? id.slice(4) : '';
+        const buyingGem = !!gemColor(gemId);
+        const price = buyingGem ? GEM.price : SKINS.find((x) => x.id === id).price;
         if (save.coins < price) { this.app.audio.play('error'); render(t('skin.need', { n: price - save.coins })); return; }
         save.coins -= price;
-        if (id === 'gem') save.gems++;
+        if (buyingGem) save.gems[gemId] = (save.gems[gemId] || 0) + 1;
         else if (!save.skins.includes(id)) save.skins.push(id);
         persist();
         this.app.audio.play('buy');
-        render(id === 'gem' ? t('mall.gotGem', { n: save.gems }) : t('mall.gotSkin'));
+        render(buyingGem ? t('mall.gotGem', { color: t('gem.' + gemId), n: gemBagTotal(save.gems) }) : t('mall.gotSkin'));
       }));
     };
     n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));

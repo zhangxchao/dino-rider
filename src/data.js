@@ -564,5 +564,27 @@ export function skinnedDef(def, skinId) {
   return { ...def, colors: { ...def.colors, ...sk.colors }, skinMat: sk.mat || {} };
 }
 
-// 宝石：商城 4000 金币一颗，先进宝石袋；镶嵌到某只恐龙身上，每颗 +2 攻击、+11 血，每只最多 5 颗
+// 宝石：粉 / 黄 / 绿 / 蓝 / 紫只是颜色不同。价格和效果都跟原先那颗普通宝石一样：
+// 4000 金币一颗，先进宝石袋；镶嵌后每颗 +2 攻击、+11 血，每只恐龙最多 5 颗（颜色随便混）
 export const GEM = { price: 4000, atk: 2, hp: 11, max: 5 };
+export const GEM_COLORS = [
+  { id: 'pink', hex: '#ff6eb4' },
+  { id: 'yellow', hex: '#ffd84a' },
+  { id: 'green', hex: '#5dde6a' },
+  { id: 'blue', hex: '#4fc9ff' },
+  { id: 'purple', hex: '#c084fc' },
+];
+export function emptyGemBag() {
+  return Object.fromEntries(GEM_COLORS.map((c) => [c.id, 0]));
+}
+export function gemColor(id) { return GEM_COLORS.find((c) => c.id === id) || null; }
+/** 镶嵌数量：新存档是颜色数组，老存档是数字 */
+export function gemCount(gems) {
+  const n = Array.isArray(gems) ? gems.length : (gems || 0);
+  return Math.max(0, Math.min(GEM.max, n | 0));
+}
+export function gemBagTotal(bag) {
+  if (typeof bag === 'number') return Math.max(0, bag | 0);
+  if (!bag || typeof bag !== 'object') return 0;
+  return GEM_COLORS.reduce((sum, c) => sum + Math.max(0, bag[c.id] | 0), 0);
+}

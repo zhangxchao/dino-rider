@@ -627,16 +627,26 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .skin-msg { min-height: 0; margin-top: 4px; font-size: 12px; color: #ff9a6a; }
 @media (max-height: 500px) { .skins { grid-template-columns: repeat(7, 1fr); gap: 4px; } .skin > i { width: 18px; height: 18px; } .skin b { font-size: 10px; } .skin small { font-size: 9px; } }
 
-/* 宝石镶嵌 */
+/* 宝石镶嵌：五种颜色外观不同，效果相同 */
 .gem-box { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(120,200,255,.06); border: 1px solid rgba(120,200,255,.22); }
 .gem-box .t { font-weight: 900; font-size: 14px; }
 .gem-box .t b { color: #8fdcff; margin-left: 4px; }
 .gem-box .t small { margin-left: 8px; color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.gem-stone { --c: #5a6570; display: inline-block; width: 13px; height: 13px; margin: 0 3px; vertical-align: -2px; background: linear-gradient(135deg, #fff 0%, var(--c) 42%, #1a1a1a 100%); transform: rotate(45deg); border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.gem-stone.on { box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 8px var(--c); cursor: pointer; }
+.gem-stone.lg { width: 26px; height: 26px; margin: 0; border-radius: 5px; cursor: default; }
 .gem-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.gem-row .gems { flex: 1; letter-spacing: 2px; }
-.gem-row .gems i { font-style: normal; font-size: 16px; filter: grayscale(1) opacity(.35); }
-.gem-row .gems i.on { filter: none; }
-.gem-msg { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.gem-row .gems { flex: 1; letter-spacing: 1px; }
+.gem-row .gems .gem-stone { opacity: .28; }
+.gem-row .gems .gem-stone.on { opacity: 1; }
+.gem-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.gem-pick { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 16%, transparent); color: inherit; font: inherit; font-weight: 800; font-size: 12px; cursor: pointer; }
+.gem-pick:disabled { opacity: .38; cursor: default; }
+.gem-pick small { color: var(--muted); font-weight: 700; }
+.gem-pick .gem-stone { margin: 0 2px 0 0; cursor: inherit; }
+.gem-msg { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.mall-gem-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 8px; }
+.up-row .ico .gem-stone { vertical-align: middle; }
 .gem-plus { font-style: normal; color: #8fdcff; font-size: 11px; margin-left: 2px; }
 .stat-row .v { width: auto; min-width: 42px; }
 /* 商城 */
@@ -648,4 +658,4 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .mall-skin b { font-size: 15px; }
 .mall-skin .own { color: #8ff0a0; font-size: 13px; font-weight: 800; }
 .mall-msg { min-height: 18px; color: #ffd84a; font-weight: 800; margin: 4px 0; }
-@media (max-height: 500px) { .mall-skins { grid-template-columns: repeat(6, 1fr); gap: 6px; } .mall-skin { padding: 6px 4px; } .mall-skin > i { width: 30px; height: 30px; } .gem-row .gems i { font-size: 13px; } }
+@media (max-height: 500px) { .mall-skins { grid-template-columns: repeat(6, 1fr); gap: 6px; } .mall-skin { padding: 6px 4px; } .mall-skin > i { width: 30px; height: 30px; } .gem-pick { padding: 2px 6px; font-size: 11px; } }

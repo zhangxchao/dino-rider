@@ -314,7 +314,7 @@ export class Projectiles {
       // 拖尾
       const tr = p.trail;
       if (tr) {
-        p.trailAcc += tr.rate * dt;
+        p.trailAcc += tr.rate * dt * FX.trail;
         const sys = tr.smoke ? fx.dust : fx.sparks;
         const col = tr.color ?? p.color ?? 0xffffff;
         while (p.trailAcc >= 1) {

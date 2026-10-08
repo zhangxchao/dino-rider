@@ -681,7 +681,7 @@ const W = {
     },
   }),
   mist: (ctx, count = 60, rgb = [0.78, 0.84, 0.72], opacity = 0.13) => addParticles(ctx, {
-    name: 'mist', count, size: 11, area: 48, yMin: 0.2, yMax: 3.2, opacity, renderOrder: 4,
+    name: 'mist', count: Math.max(4, Math.round(count * 0.5)), size: 8, area: 48, yMin: 0.2, yMax: 3.2, opacity: opacity * 0.5, renderOrder: 4,
     init(i, p, v, c) { c[i * 3] = rgb[0]; c[i * 3 + 1] = rgb[1]; c[i * 3 + 2] = rgb[2]; },
     step(i, k, dt, t, p, v, c, ph) {
       p[k] += (0.45 + Math.sin(t * 0.1 + ph[i]) * 0.3) * dt;
@@ -713,7 +713,7 @@ const W = {
     },
   }),
   ash: (ctx, count = 420) => addParticles(ctx, {
-    name: 'ash', count, size: 0.26, area: 40, yMin: 0, yMax: 22, opacity: 0.85,
+    name: 'ash', count: Math.max(4, Math.round(count * 0.5)), size: 0.22, area: 40, yMin: 0, yMax: 22, opacity: 0.42,
     init(i, p, v, c, ph, r) { v[i * 3 + 1] = -(0.35 + r() * 0.6); const b = 0.2 + r() * 0.18; c[i * 3] = b; c[i * 3 + 1] = b * 0.95; c[i * 3 + 2] = b * 0.92; },
     step(i, k, dt, t, p, v, c, ph) {
       p[k] += (Math.sin(t * 0.6 + ph[i]) * 0.5 + 0.5) * dt;
@@ -1695,7 +1695,7 @@ function buildDistantVolcano(ctx) {
   ctx.root.add(glow);
   const cx = VOLCANO.x, cy = base + top, cz = VOLCANO.z;
   // 烟柱
-  const SN = ctx.hi ? 150 : 80;
+  const SN = ctx.hi ? 75 : 40;
   const sp = new Float32Array(SN * 3), sc = new Float32Array(SN * 3), sv = new Float32Array(SN * 3);
   const r = mulberry32(913);
   const resetSmoke = (i, spread) => {
@@ -1709,7 +1709,7 @@ function buildDistantVolcano(ctx) {
   const smokeGeo = new THREE.BufferGeometry();
   smokeGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3).setUsage(THREE.DynamicDrawUsage));
   smokeGeo.setAttribute('color', new THREE.BufferAttribute(sc, 3));
-  const smoke = new THREE.Points(smokeGeo, new THREE.PointsMaterial({ size: 30, map: ctx.sprite, transparent: true, opacity: 0.6, depthWrite: false, vertexColors: true, fog: false }));
+  const smoke = new THREE.Points(smokeGeo, new THREE.PointsMaterial({ size: 22, map: ctx.sprite, transparent: true, opacity: 0.3, depthWrite: false, vertexColors: true, fog: false }));
   smoke.frustumCulled = false;
   smoke.name = 'volcanoSmoke';
   ctx.root.add(smoke);

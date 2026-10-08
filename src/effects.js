@@ -10,18 +10,19 @@ const _v = new THREE.Vector3();
 //  特效强度（设置：完整 / 适中 / 精简）
 //  count 粒子数量  size 粒子大小  maxPx 单个粒子最大屏幕尺寸（占画面高度比例）
 //  screen 全屏闪光 / 色差 / 径向模糊 / 泛光脉冲  ring 光环光柱透明度  text 普通伤害飘字上限
+//  smoke 烟雾 / 尘土（非加法混合）在数量之外再乘的透明度与尺寸
 // ---------------------------------------------------------------------
-// 粒子数量、光环光柱、全屏闪光整体再省三分之一（×2/3）
+// 粒子数量、光环光柱、全屏闪光再减半（×1/2）；烟雾类再压一档
 const FX_LEVELS = {
-  full:   { count: 0.67, size: 1, maxPx: 0.16, screen: 0.67, ring: 0.67, text: 28 },
-  medium: { count: 0.4, size: 0.8, maxPx: 0.07, screen: 0.33, ring: 0.43, text: 14 },
-  low:    { count: 0.23, size: 0.65, maxPx: 0.045, screen: 0.13, ring: 0.27, text: 6 },
+  full:   { count: 0.34, size: 1, maxPx: 0.16, screen: 0.34, ring: 0.34, text: 28, smoke: 0.5 },
+  medium: { count: 0.2, size: 0.8, maxPx: 0.07, screen: 0.17, ring: 0.22, text: 14, smoke: 0.5 },
+  low:    { count: 0.12, size: 0.65, maxPx: 0.045, screen: 0.07, ring: 0.14, text: 6, smoke: 0.5 },
 };
-export const FX = { ...FX_LEVELS.medium, level: 'medium', dmgNum: 'all' };
+export const FX = { ...FX_LEVELS.medium, level: 'medium', dmgNum: 'all', trail: 0.5 };
 const _particleSystems = new Set();
 export function setFxLevel(level) {
   const L = FX_LEVELS[level] || FX_LEVELS.medium;
-  Object.assign(FX, L, { level: FX_LEVELS[level] ? level : 'medium' });
+  Object.assign(FX, L, { level: FX_LEVELS[level] ? level : 'medium', trail: 0.5 });
   for (const ps of _particleSystems) ps._applyMax();
 }
 
@@ -64,6 +65,8 @@ export class Particles {
   constructor(scene, max = 2500, additive = true) {
     this.max = max;
     this.count = 0;
+    // 非加法混合的是烟、尘、毒雾：边缘更软，避免实心圆片糊住画面
+    this.smoke = !additive;
     const g = new THREE.BufferGeometry();
     this.pos = new Float32Array(max * 3);
     this.col = new Float32Array(max * 3);
@@ -77,7 +80,7 @@ export class Particles {
     this.geo = g;
     this.mat = new THREE.ShaderMaterial({
       vertexShader: PARTICLE_VS, fragmentShader: PARTICLE_FS,
-      uniforms: { uScale: { value: 600 }, uMaxPx: { value: 80 }, uSoft: { value: additive ? 1 : 0.25 }, uBoost: { value: additive ? 2.2 : 1 } },
+      uniforms: { uScale: { value: 600 }, uMaxPx: { value: 80 }, uSoft: { value: additive ? 1 : 0.72 }, uBoost: { value: additive ? 2.2 : 1 } },
       transparent: true, depthWrite: false,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
@@ -111,6 +114,12 @@ export class Particles {
 
   spawn(x, y, z, vx, vy, vz, life, s0, s1, color, color2, alpha = 1, grav = 0, drag = 0) {
     if (this.count >= this.max) return;
+    if (this.smoke) {
+      const s = FX.smoke ?? 0.5;
+      alpha *= s;
+      const sz = 0.5 + 0.5 * s;
+      s0 *= sz; s1 *= sz;
+    }
     const i = this.count++;
     const i3 = i * 3;
     this.pos[i3] = x; this.pos[i3 + 1] = y; this.pos[i3 + 2] = z;

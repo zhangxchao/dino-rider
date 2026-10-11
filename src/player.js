@@ -495,12 +495,77 @@ export class Player {
 
   // ------------------------------------------------------------------
   //  技能（跑道版）
+  //  表现参考王者荣耀：施法先亮地面指示器，脚下起一圈光再竖一道短光柱，
+  //  命中用技能色的冲击环和火花收尾。烟尘只留一点点，避免糊住判定。
   // ------------------------------------------------------------------
+  skillColor(type) {
+    return ({
+      roar: 0xffc14a, charge: 0xffe14a, pounce: 0xffd36a, dive: 0xff8a3a,
+      spin: 0xe8f4ff, stomp: 0xffc56a, sonic: 0x7ad4ff, venom: 0xb6ff4a,
+      wave: 0x9ad7ff, spikes: 0xf4ecd2, frenzy: 0xff4a3a, fortress: 0xffd15a, sprint: 0x5ec8ff,
+    })[type] || 0xffe08a;
+  }
+
+  /** 施法起手：脚下光圈 + 短光柱，并按真实命中形状铺一层指示器 */
+  skillCastFx(d) {
+    const g = this.game;
+    const color = this.skillColor(d.type);
+    g.fx.rings.ring(this.pos, { r0: 0.35, r1: this.radius + 1.5, life: 0.32, color, opacity: 0.9 });
+    g.fx.rings.pillar(this.pos, { r: 0.45, h: 6.5, life: 0.42, color, opacity: 0.5 });
+    const x = this.pos.x, z = this.pos.z;
+    const lane = (length, width, duration, z0 = z) => g.tele.add({
+      shape: 'rect', x, z: z0, angle: 0, length, width, duration, color,
+    });
+    switch (d.type) {
+      case 'roar':
+        lane(4 + d.radius * 2.4, g.track.roadHalf * 2, 0.34, z - 4);
+        break;
+      case 'charge':
+        lane(d.dist || 22, this.radius * 2 + 1.4, 0.3);
+        break;
+      case 'spin':
+        g.tele.add({ shape: 'circle', x, z, radius: (d.radius || 7) + 1.5, duration: 0.28, color });
+        break;
+      case 'stomp':
+        lane(36, 13, 0.45, z + 5);
+        break;
+      case 'sonic':
+        g.tele.add({ shape: 'sector', x, z, angle: 0, radius: (d.range || 18) + 14, half: THREE.MathUtils.degToRad((d.angle || 70) / 2), duration: 0.25, color });
+        break;
+      case 'venom':
+        g.tele.add({ shape: 'sector', x, z, angle: 0, radius: 18, half: THREE.MathUtils.degToRad((d.spread || 50) / 2), duration: 0.22, color });
+        break;
+      case 'wave':
+        lane(d.range || 40, d.width || 7, 0.28);
+        break;
+      case 'spikes':
+        g.tele.add({ shape: 'sector', x, z, angle: 0, radius: 20, half: Math.PI * 0.55, duration: 0.22, color });
+        break;
+      case 'pounce':
+      case 'dive':
+        g.tele.add({ shape: 'circle', x, z: z + Math.max(8, this.fwd * 0.9), radius: (d.radius || 6) + 2, duration: 0.7, color });
+        break;
+      default:
+        g.tele.add({ shape: 'circle', x, z, radius: this.radius + 1.3, duration: 0.32, color });
+    }
+  }
+
+  /** 技能命中：一圈扩散环、一道短光柱、一小簇火花，烟只带一点 */
+  skillHitFx(pos, r, color, dust = 5) {
+    const g = this.game;
+    g.fx.rings.ring(pos, { r0: 0.4, r1: r, life: 0.32, color, opacity: 0.85 });
+    g.fx.rings.pillar(pos, { r: Math.min(1.2, 0.35 + r * 0.08), h: 5 + r * 0.25, life: 0.36, color, opacity: 0.42 });
+    g.fx.sparks.burst(pos, { count: 10, speed: 6, life: 0.32, size: 0.5, color, color2: 0xffffff, up: 2 });
+    if (dust > 0) g.fx.dust.burst(pos, { count: dust, speed: 3, life: 0.4, size: 0.6, sizeEnd: 1.3, color: g.dustColor, alpha: 0.3, flat: true, up: 1 });
+  }
+
   startSkill(running) {
     const g = this.game;
     const d = this.def.skill;
     const s = { type: d.type, t: 0, dur: 1, fired: false, hit: new Set(), count: 0, running };
     this.skillJuice(d.type);
+    this.skillCastFx(d);
+    if (d.type !== 'frenzy' && d.type !== 'fortress' && d.type !== 'sprint') g.floatText(this.pos, d.name, 'info', this.top + 1.8);
     meta.track('skill');
     switch (d.type) {
       case 'roar': s.dur = 1.2; break;
@@ -515,7 +580,7 @@ export class Player {
         s.dur = 3; s.air = true; s.invuln = d.type !== 'dive'; s.noBite = true;
         this.vy = d.type === 'dive' ? 21 : 14; this.onGround = false;
         g.audio.play(d.type === 'dive' ? 'dive' : 'pounce');
-        g.fx.dust.burst(this.pos, { count: 16, speed: 5, life: 0.7, size: 1, sizeEnd: 2.5, color: g.dustColor, alpha: 0.5, flat: true, up: 1 });
+        g.fx.sparks.burst(this.pos, { count: 8, speed: 4, life: 0.35, size: 0.45, color: this.skillColor(d.type), color2: 0xffffff, up: 3 });
         break;
       case 'spin': s.dur = 0.3 * (d.hits || 3) + 0.15; g.audio.play('spin'); break;
       case 'stomp': s.dur = 0.5 + 0.2 * 6; s.noBite = true; break;
@@ -647,9 +712,8 @@ export class Player {
     const atk = this.stats.atk * (this.buffs.power > 0 ? 1.5 : 1);
     const R = d.radius + 2;
     g.aoe(this.pos, R, atk * d.power * 1.5, { knock: 12, up: 8, stun: 0.6, source: 'skill' });
-    g.fx.rings.ring(this.pos, { r0: 1, r1: R * 1.2, life: 0.5, color: s.type === 'dive' ? 0xff9040 : 0xffe0a0 });
-    g.fx.dust.burst(this.pos, { count: 40, speed: 9, life: 0.9, size: 1.4, sizeEnd: 3.5, color: g.dustColor, alpha: 0.55, flat: true, drag: 2.5, up: 2 });
-    if (s.type === 'dive') g.fx.sparks.burst(this.pos, { count: 50, speed: 13, life: 0.7, size: 1, color: 0xffd060, color2: 0xff2000, up: 4 });
+    this.skillHitFx(this.pos, R * 1.15, this.skillColor(s.type), 8);
+    if (s.type === 'dive') g.fx.sparks.burst(this.pos, { count: 16, speed: 10, life: 0.4, size: 0.7, color: 0xffd060, color2: 0xff2000, up: 3 });
     g.audio.play('quake', { volume: 0.8 });
     g.shake.add(0.35);
     g.hitstop(0.06);
@@ -679,10 +743,10 @@ export class Player {
           g.aoeBox(this.pos.z - 4, this.pos.z + d.radius * 2.4, g.track.roadHalf + 2, atk * d.power, { knock: 12, stun: d.stun, source: 'skill' });
           for (let i = 0; i < 4; i++) {
             _v.set(this.pos.x, this.pos.y, this.pos.z + 6 + i * 7);
-            g.fx.rings.ring(_v, { r0: 2, r1: 9 + i * 2, life: 0.5 + i * 0.1, color: 0xffc070, opacity: 0.7 });
+            g.fx.rings.ring(_v, { r0: 1.2, r1: 8 + i * 1.6, life: 0.42 + i * 0.06, color: 0xffc14a, opacity: 0.75 });
           }
           this.model.mouth.getWorldPosition(this.mouth);
-          g.fx.sparks.burst(this.mouth, { count: 40, speed: 22, life: 0.6, size: 0.9, color: 0xfff0d0, color2: 0xffa040, dir: FWD, spread: 0.5 });
+          g.fx.sparks.burst(this.mouth, { count: 14, speed: 16, life: 0.4, size: 0.6, color: 0xfff0d0, color2: 0xffc14a, dir: FWD, spread: 0.35 });
           g.hitstop(0.06);
         }
         break;
@@ -696,7 +760,7 @@ export class Player {
           g.damageEnemy(e, atk * d.power * 2, { dir: _dir, knock: 18, up: 8, stun: d.stun || 0.6, source: 'skill' });
           g.audio.play('hitHeavy', { volume: 0.7 });
         }
-        if (Math.random() < 0.7) g.fx.dust.burst(this.pos, { count: 3, speed: 2, life: 0.6, size: 1, sizeEnd: 2.5, color: g.dustColor, alpha: 0.5, up: 1 });
+        if (Math.random() < 0.45) g.fx.sparks.burst(this.pos, { count: 2, speed: 3, life: 0.25, size: 0.4, color: 0xffe14a, color2: 0xffffff, up: 1 });
         break;
 
       case 'pounce':
@@ -711,6 +775,7 @@ export class Player {
             _v2.y = g.heightAt(_v2.x, _v2.z);
             this.getCenter(_v).y += 2;
             _dir.subVectors(_v2, _v).normalize();
+            g.tele.add({ shape: 'circle', x: _v2.x, z: _v2.z, radius: d.radius * 0.7, duration: 0.4, color: 0xff8a3a });
             g.projectiles.spawn({ kind: 'meteor', owner: 'player', source: 'skill', pos: _v, dir: _dir, speed: 40, dmg: atk * d.power, radius: 1.4, life: 2, aoe: d.radius * 0.7, knock: 10, color: 0xff7a2a, scale: 0.6 });
           }
           g.audio.play('missile');
@@ -726,7 +791,7 @@ export class Player {
           s.count++;
           g.aoe(this.pos, d.radius + 1.5, atk * d.power, { knock: 9, source: 'skill' });
           g.audio.play('tail', { pitch: 0.9 + s.count * 0.08 });
-          g.fx.rings.ring(this.pos, { r0: d.radius * 0.5, r1: d.radius + 1.5, life: 0.3, color: 0xffffff, opacity: 0.5 });
+          g.fx.rings.ring(this.pos, { r0: d.radius * 0.35, r1: d.radius + 1.5, life: 0.28, color: 0xe8f4ff, opacity: 0.7 });
         }
         // 旋风还能打散来袭的子弹
         for (const p of g.projectiles.list) {
@@ -743,8 +808,7 @@ export class Player {
           _v.set(this.pos.x, 0, this.pos.z + 5 + i * 6);
           _v.y = g.heightAt(_v.x, _v.z);
           g.aoe(_v, 6.5, atk * d.power * 0.8, { knock: 8, up: 8, stun: 0.5, source: 'skill' });
-          g.fx.rings.ring(_v, { r0: 1, r1: 7, life: 0.45, color: 0xffe0a0, opacity: 0.8 });
-          g.fx.dust.burst(_v, { count: 22, speed: 6, life: 0.8, size: 1.3, sizeEnd: 3, color: g.dustColor, alpha: 0.5, flat: true, drag: 1.8, up: 2 });
+          this.skillHitFx(_v, 7, 0xffc56a, 4);
           g.audio.play('quake', { volume: 0.8 - i * 0.08 });
           if (i === 0) g.shake.add(0.3);
         }
@@ -802,7 +866,7 @@ export class Player {
             _dir.set(Math.sin(a), 0, Math.cos(a));
             g.projectiles.spawn({ kind: 'spike', owner: 'player', source: 'skill', pos: _v, dir: _dir, speed: 36, inherit: _inherit.set(0, 0, this.fwd), dmg: atk * d.power, radius: 0.8, life: 1.1, pierce: 3, knock: 6, hover: 1.1 });
           }
-          g.fx.rings.ring(this.pos, { r0: 1, r1: 6, life: 0.35, color: 0xf6ecd0 });
+          g.fx.rings.ring(this.pos, { r0: 0.6, r1: 5.5, life: 0.3, color: 0xf4ecd2, opacity: 0.75 });
         }
         break;
     }

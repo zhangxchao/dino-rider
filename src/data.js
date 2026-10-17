@@ -537,10 +537,10 @@ const STRENGTH_ORDER = [
   'diplodocus',          // 390 血、最长攻击距离，音爆贯穿整条路
   'brachiosaurus',       // 410 血，三道震踏沿路推进
   'allosaurus',          // 300 血 / 29 攻 / 速度 12.5，飞扑无敌，普攻面板进前五
-  'carnotaurus',         // 最快的无敌冲锋，冲得最远
+  'ankylosaurus',        // 最高减伤，堡垒再减 80%，和食肉牛龙对调后进三星
   'carcharodontosaurus', // 320 血 / 30 攻，狂暴吸血
   'spinosaurus',         // 330 血的狂暴吸血，冷却比鲨齿龙长一档
-  'ankylosaurus',        // 最高减伤，堡垒再减 80%，输出偏弱所以落到两星
+  'carnotaurus',         // 最快的无敌冲锋，和甲龙对调后落到两星
   'triceratops',         // 厚甲无敌冲锋，输出不如异特龙
   'therizinosaurus',     // 攻速和狂暴倍率高，血量中等
   'baryonyx',            // 四连旋风还能打掉子弹

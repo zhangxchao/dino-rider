@@ -527,21 +527,45 @@ export function upgradeCost(up, level) {
 }
 
 // ---------------------------------------------------------------------
-//  全部实力：血量、攻击、减伤、速度、攻击距离、攻速、技能冷却（1/冷却）
-//  每项按全体最高值换算成百分比，7 项平均 → 0~100；前 8 名发奖杯（1 金、2~3 银、4~8 铜）
+//  实力排名：按实战判断，不是七项数值平均。
+//  无尽跑酷里更看重整路清怪、血量和减伤、无敌窗口，再看普攻和技能覆盖。
+//  前 8 名三星，中间 8 名两星，后 8 名一星。名次唯一，每只恐龙都有星。
 // ---------------------------------------------------------------------
-const POWER_KEYS = [(d) => d.stats.hp, (d) => d.stats.atk, (d) => d.stats.def, (d) => d.stats.speed, (d) => d.stats.reach, (d) => d.stats.atkRate, (d) => 1 / d.skill.cd];
-const POWER_MAX = POWER_KEYS.map((f) => Math.max(...DINOS.map(f)));
-export function dinoPower(d) { return POWER_KEYS.reduce((a, f, i) => a + f(d) / POWER_MAX[i], 0) / POWER_KEYS.length * 100; }
-/** id → { rank, score, cup: 'gold' | 'silver' | 'bronze' | null } */
+const STRENGTH_ORDER = [
+  'giganotosaurus',      // 325 血 / 36 攻 / 攻击距离 2.8，怒吼覆盖整条路并眩晕
+  'trex',                // 最高撕咬 38，同族整路咆哮，眩晕更久
+  'diplodocus',          // 390 血、最长攻击距离，音爆贯穿整条路
+  'brachiosaurus',       // 410 血，三道震踏沿路推进
+  'carnotaurus',         // 最快的无敌冲锋，冲得最远
+  'carcharodontosaurus', // 320 血 / 30 攻，狂暴吸血
+  'spinosaurus',         // 330 血的狂暴吸血，冷却比鲨齿龙长一档
+  'ankylosaurus',        // 最高减伤，堡垒再减 80%，输出偏弱所以垫底三星
+  'allosaurus',          // 300 血 / 29 攻 / 很快，飞扑无敌但倍率低
+  'triceratops',         // 厚甲无敌冲锋，输出不如异特龙
+  'therizinosaurus',     // 攻速和狂暴倍率高，血量中等
+  'baryonyx',            // 四连旋风还能打掉子弹
+  'stegosaurus',         // 厚甲三连旋风，走得慢
+  'styracosaurus',       // 厚甲，扇形骨刺数量多但每根很弱
+  'iguanodon',           // 结实，两道震踏覆盖不如腕龙
+  'ceratosaurus',        // 中等面板加上无敌冲锋
+  'yutyrannus',          // 中等面板，无敌飞扑范围小
+  'parasaurolophus',     // 号角能回 30% 血，攻击偏低
+  'pachycephalosaurus',  // 冲锋倍率高还能眩晕，血量和攻击距离短
+  'gigantoraptor',       // 跑得快还有无敌，伤害低
+  'dilophosaurus',       // 毒液扇形，身板薄
+  'raptor',              // 攻速最快、飞扑无敌，但只有 170 血
+  'pteranodon',          // 俯冲有伤害，空中仍会挨打
+  'gallimimus',          // 最快，攻击和减伤都是全场最低，疾跑几乎不造成伤害
+];
 export const DINO_RANK = (() => {
-  const out = {};
-  for (const d of DINOS) {
-    const sc = dinoPower(d);
-    const rank = 1 + DINOS.filter((x) => dinoPower(x) > sc + 1e-9).length;
-    out[d.id] = { rank, score: sc, cup: rank === 1 ? 'gold' : rank <= 3 ? 'silver' : rank <= 8 ? 'bronze' : null };
+  if (STRENGTH_ORDER.length !== DINOS.length || new Set(STRENGTH_ORDER).size !== DINOS.length
+    || DINOS.some((d) => !STRENGTH_ORDER.includes(d.id))) {
+    throw new Error('STRENGTH_ORDER must list every dinosaur once');
   }
-  return out;
+  return Object.fromEntries(STRENGTH_ORDER.map((id, i) => {
+    const rank = i + 1;
+    return [id, { rank, stars: rank <= 8 ? 3 : rank <= 16 ? 2 : 1 }];
+  }));
 })();
 
 // ---------------------------------------------------------------------

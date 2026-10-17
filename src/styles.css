@@ -600,16 +600,15 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 }
 .notices .nt.boss { color: #ff9a6a; }
 
-/* 全部实力奖杯：1 金、2~3 银、4~8 铜 */
-.card .cup { position: absolute; top: 3px; left: 5px; font-size: 13px; line-height: 1; z-index: 1; }
-.card .cup b { font-size: 10px; margin-left: 1px; color: #fff; text-shadow: 0 1px 2px #000; vertical-align: 1px; }
-.cup.silver { filter: grayscale(1) brightness(1.35); }
-.cup.bronze { filter: sepia(1) saturate(2.2) hue-rotate(-28deg) brightness(.85); }
-.era.power { background: rgba(255,255,255,.08); color: var(--muted); }
-.era.power.gold { background: rgba(255,200,40,.2); color: #ffd84a; }
-.era.power.silver { background: rgba(210,220,235,.18); color: #e4ecf6; }
-.era.power.bronze { background: rgba(205,127,50,.22); color: #f0a868; }
-@media (max-height: 500px) { .card .cup { font-size: 11px; } .card .cup b { font-size: 9px; } }
+/* 实力星级：前 8 三星，中 8 两星，后 8 一星 */
+.card .stars { position: absolute; top: 3px; left: 4px; z-index: 1; font-size: 11px; line-height: 1; letter-spacing: -1px; color: #ffd84a; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.card .stars b { margin-left: 2px; font-size: 10px; letter-spacing: 0; color: #fff; vertical-align: 1px; }
+.card .stars.s2 { color: #ffe7a3; }
+.card .stars.s1 { color: #e7c27a; }
+.era.power.s3 { background: rgba(255,200,40,.22); color: #ffd84a; }
+.era.power.s2 { background: rgba(255,214,120,.16); color: #ffe7a8; }
+.era.power.s1 { background: rgba(255,255,255,.08); color: #f0d9a0; }
+@media (max-height: 500px) { .card .stars { font-size: 9px; } .card .stars b { font-size: 9px; } }
 
 /* 皮肤选择 */
 .skin-box { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }

@@ -186,7 +186,7 @@ export class UI {
           ${d.en !== d.name ? `<div class="en">${d.en}</div>` : ''}
           <span class="era">${d.era}</span> <span class="era" style="background:rgba(79,201,255,.15);color:#8fdcff">${t('select.attack', { name: t('attack.' + d.attack) })}</span>
           ${wins ? `<span class="era" style="background:rgba(98,227,127,.15);color:#8ff0a0">${t('select.wins', { n: wins })}</span>` : ''}
-          <span class="era power s${DINO_RANK[d.id].stars}">${'★'.repeat(DINO_RANK[d.id].stars)} ${t('select.power', { n: DINO_RANK[d.id].rank })}</span>
+          <span class="era power s${DINO_RANK[d.id].stars}">${'★'.repeat(DINO_RANK[d.id].stars)}</span>
           <p>${d.desc}</p>
           <div style="margin-top:12px">
             ${bar(t('stat.hp'), s.hp + gemN * GEM.hp, 330, gemN ? `${s.hp}<em class="gem-plus">+${gemN * GEM.hp}</em>` : s.hp)}
@@ -302,7 +302,7 @@ export class UI {
       if (this.tab === 'dino') {
         grid.innerHTML = DINOS.map((d) => `
           <div class="card ${d.id === save.dino ? 'active' : ''}" data-id="${d.id}">
-            <span class="stars s${DINO_RANK[d.id].stars}" title="${t('select.power', { n: DINO_RANK[d.id].rank })}">${'★'.repeat(DINO_RANK[d.id].stars)}<b>${DINO_RANK[d.id].rank}</b></span>
+            <span class="stars s${DINO_RANK[d.id].stars}">${'★'.repeat(DINO_RANK[d.id].stars)}</span>
             ${save.dinoWins[d.id] ? `<span class="badge">✔${save.dinoWins[d.id]}</span>` : ''}
             <img src="${thumbs.dino[d.id] || ''}" alt="">
             <div class="nm" title="${d.name}">${d.name}</div>

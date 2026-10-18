@@ -11,7 +11,7 @@ import { Tutorial } from './tutorial.js';
 import { meta } from './meta.js';
 import { Hud } from './hud.js';
 import { input } from './input.js';
-import { save, persist } from './save.js';
+import { save, persist, spendDinoGems } from './save.js';
 import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut, uploadRange, setCount, RIM } from './util.js';
 import { t } from './i18n.js';
 import { Hazards } from './hazards.js';
@@ -323,6 +323,7 @@ export class Game {
     this.aimTarget = null;
     this.paused = false;
     this.finished = false;
+    this.gemsSpent = false;
     this.bannerTimer = null;
     this.timers = [];
     this.route = [];
@@ -706,6 +707,7 @@ export class Game {
       save.dinoWins[this.dino.id] = (save.dinoWins[this.dino.id] || 0) + 1;
       if (this.levelIdx === LEVELS.length - 1) save.cleared = true;
       this.trackRunEnd(true);
+      this.spendRunGems();
       persist();
       this.app.onResult({
         win: true, stars, hpR, killRate, time: this.time, coins: coinsGained, reward, kills: this.stats.kills,
@@ -735,6 +737,7 @@ export class Game {
       let newBest = false;
       if (this.endless && dist > save.endlessBest) { save.endlessBest = dist; newBest = true; }
       this.trackRunEnd(false);
+      this.spendRunGems();
       persist();
       this.app.onResult({
         win: false, endless: this.endless, dist, newBest, time: this.time, coins: this.stats.coins,
@@ -1546,6 +1549,13 @@ export class Game {
     setTimeout(() => d.remove(), 1900);
   }
 
+  /** 本局用过的宝石不留在这只恐龙身上，也不退回袋子 */
+  spendRunGems() {
+    if (this.gemsSpent || !this.dino) return;
+    this.gemsSpent = true;
+    spendDinoGems(this.dino.id);
+  }
+
   dispose() {
     clearTimeout(this.bannerTimer);
     this.app.bannerEl.innerHTML = '';
@@ -1581,7 +1591,8 @@ export class Game {
     this.tutorial.dispose();
     meta.onNotify = null;
     if (!this.finished && this.player) meta.track('dist', Math.round(this.player.pos.z));
-    persist();   // 中途退出也保住每日任务 / 成就进度
+    this.spendRunGems();
+    persist();   // 中途退出也保住每日任务 / 成就进度，并消耗本局镶嵌的宝石
     this.hud.dispose();
     this.track.dispose();
     if (this.envRT) { this.scene.environment = null; this.envRT.dispose(); this.envRT = null; }

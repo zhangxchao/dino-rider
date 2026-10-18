@@ -106,7 +106,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.1, riderScale: 1.0,
     features: ['browHorns', 'stripes'],
     colors: { main: 0xa0663a, belly: 0xe6c9a0, accent: 0x5a2e1a, extra: 0xd24a2a, eye: 0xffc400 },
-    stats: { hp: 300, atk: 29, def: 0.12, speed: 12.5, reach: 2.3, atkRate: 1.1 },
+    stats: { hp: 300, atk: 29, def: 0.16, speed: 12.5, reach: 2.3, atkRate: 1.1 },
     attack: 'bite',
     skill: { type: 'pounce', name: '猎杀突袭', desc: '猛然跃起扑杀，落地撕裂一片区域并释放冲击波。', cd: 7, power: 1.25, radius: 7, dist: 22 },
   },
@@ -547,8 +547,8 @@ const STRENGTH_ORDER = [
   'stegosaurus',         // 厚甲三连旋风，走得慢
   'styracosaurus',       // 厚甲，扇形骨刺数量多但每根很弱
   'iguanodon',           // 结实，两道震踏覆盖不如腕龙
-  'ceratosaurus',        // 中等面板加上无敌冲锋
-  'yutyrannus',          // 中等面板，无敌飞扑范围小
+  'yutyrannus',          // 和角鼻龙对调，两星
+  'ceratosaurus',        // 和羽王龙对调，一星
   'parasaurolophus',     // 号角能回 30% 血，攻击偏低
   'pachycephalosaurus',  // 冲锋倍率高还能眩晕，血量和攻击距离短
   'gigantoraptor',       // 跑得快还有无敌，伤害低
@@ -590,6 +590,7 @@ export function skinnedDef(def, skinId) {
 
 // 宝石：粉 / 黄 / 绿 / 蓝 / 紫只是颜色不同。价格和效果都跟原先那颗普通宝石一样：
 // 4000 金币一颗，先进宝石袋；镶嵌后每颗 +2 攻击、+11 血，每只恐龙最多 5 颗（颜色随便混）
+// 镶在出战恐龙上的宝石是一次性的：这一局结束（胜利、失败或中途退出）后直接消失，不退回袋子
 export const GEM = { price: 4000, atk: 2, hp: 11, max: 5 };
 export const GEM_COLORS = [
   { id: 'pink', hex: '#ff6eb4' },

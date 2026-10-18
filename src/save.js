@@ -97,6 +97,14 @@ export function persist() {
   try { localStorage.setItem(KEY, JSON.stringify(save)); } catch { /* 隐私模式等情况下忽略 */ }
 }
 
+/** 这只恐龙镶着的宝石用完即弃，不退回宝石袋 */
+export function spendDinoGems(id) {
+  const list = save.dinoGems && save.dinoGems[id];
+  if (!list || (Array.isArray(list) ? list.length === 0 : !(list | 0))) return false;
+  delete save.dinoGems[id];
+  return true;
+}
+
 export function resetSave() {
   const d = defaults();
   d.settings = save.settings;

@@ -176,7 +176,6 @@ export class UI {
       if (this.tab === 'dino') {
         const s = d.stats;
         const bar = (k, v, max, txt) => `<div class="stat-row"><span class="k">${k}</span><span class="bar"><i style="width:${Math.min(100, v / max * 100)}%"></i></span><span class="v">${txt}</span></div>`;
-        const wins = save.dinoWins[d.id] || 0;
         const socketed = Array.isArray(save.dinoGems[d.id]) ? save.dinoGems[d.id] : [];
         const gemN = gemCount(socketed);
         const stone = (id, extra = '') => {
@@ -187,7 +186,6 @@ export class UI {
           <h3>${d.name}</h3>
           ${d.en !== d.name ? `<div class="en">${d.en}</div>` : ''}
           <span class="era">${d.era}</span> <span class="era" style="background:rgba(79,201,255,.15);color:#8fdcff">${t('select.attack', { name: t('attack.' + d.attack) })}</span>
-          ${wins ? `<span class="era" style="background:rgba(98,227,127,.15);color:#8ff0a0">${t('select.wins', { n: wins })}</span>` : ''}
           <span class="era power s${DINO_RANK[d.id].stars}">${'★'.repeat(DINO_RANK[d.id].stars)}</span>
           <p>${d.desc}</p>
           <div style="margin-top:12px">

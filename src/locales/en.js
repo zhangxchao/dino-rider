@@ -52,7 +52,6 @@ export default {
     'select.dragHint': 'Drag to rotate the view',
     'select.go': 'Let’s go →',
     'select.attack': 'Attack: {name}',
-    'select.wins': 'Wins {n}',
     'select.power': 'Overall power #{n}',
     'skin.title': 'Skins',
     'skin.note': 'Cosmetic only — stats unchanged',

@@ -52,7 +52,6 @@ export default {
     'select.dragHint': '拖动画面可旋转查看',
     'select.go': '确认出发 →',
     'select.attack': '攻击方式：{name}',
-    'select.wins': '胜场 {n}',
     'select.power': '全部实力 第 {n} 名',
     'skin.title': '皮肤',
     'skin.note': '只改外观，数值不变',

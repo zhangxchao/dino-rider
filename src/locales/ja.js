@@ -52,7 +52,6 @@ export default {
     'select.dragHint': 'ドラッグで回転して見られます',
     'select.go': '出発する →',
     'select.attack': '攻撃：{name}',
-    'select.wins': '勝利 {n}',
     'select.power': '総合実力 {n} 位',
     'skin.title': 'スキン',
     'skin.note': '見た目だけ・能力は変わらない',

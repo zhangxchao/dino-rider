@@ -1,6 +1,6 @@
 // 一局游戏（跑道模式）：沿路线自动前进，怪物从前方涌来，终点首领战
 import * as THREE from 'three';
-import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, DIFFICULTIES, BALANCE, ENDLESS_BOSSES } from './data.js';
+import { DINOS, RIDERS, PETS, ENEMIES, BOSSES, LEVELS, GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, DIFFICULTIES, BALANCE, ENDLESS_BOSSES, petRiderDef, petBossFor, petLevel } from './data.js';
 import { createTrack } from './track.js';
 import { Particles, Rings, Telegraphs, FloatingText, Shake, applyCameraFade, BlobShadows, Bars, Debris, Scorch, LightFlashes, Streaks } from './effects.js';
 import { Projectiles } from './projectiles.js';
@@ -11,7 +11,7 @@ import { Tutorial } from './tutorial.js';
 import { meta } from './meta.js';
 import { Hud } from './hud.js';
 import { input } from './input.js';
-import { save, persist, spendDinoGems } from './save.js';
+import { save, persist, spendDinoGems, spendPetGear } from './save.js';
 import { clamp, damp, rand, randInt, pick, shuffle, lerp, easeInOut, uploadRange, setCount, RIM } from './util.js';
 import { t } from './i18n.js';
 import { Hazards } from './hazards.js';
@@ -230,6 +230,13 @@ export class Game {
     this.level = this.endless ? null : LEVELS[this.levelIdx];
     this.diffId = DIFFICULTIES[opts.difficulty] ? opts.difficulty : DIFFICULTIES[save.settings.difficulty] ? save.settings.difficulty : 'medium';
     this.diff = DIFFICULTIES[this.diffId];
+    // 宠物模式：沿用地形和长度，怪物换成黑化生物，首领换成骑着恐龙的黑心博士
+    //（简单 / 中等 / 困难 = 1 / 2 / 3 星恐龙），没有无尽模式
+    this.petMode = !!opts.petMode && !this.endless;
+    if (this.petMode) {
+      this.bossDino = petBossFor(this.diffId);
+      this.level = petLevel(this.levelIdx, this.bossDino);
+    }
     this.biome = this.endless ? pick(BIOMES) : this.level.biome;
     this.length = this.endless ? Infinity : this.level.length;
     this.quality = save.settings.quality;
@@ -296,8 +303,14 @@ export class Game {
     setCount(this.coinMesh, 0);
     this.scene.add(this.coinMesh);
 
-    this.dino = DINOS.find((d) => d.id === opts.dinoId) || DINOS[0];
-    this.rider = RIDERS.find((r) => r.id === opts.riderId) || RIDERS[0];
+    if (this.petMode) {
+      this.dino = PETS.find((d) => d.id === opts.dinoId) || PETS[0];
+      // 小骑手没有攻击力：带了装备才有武器，带了技能才有被动
+      this.rider = petRiderDef(opts.riderId, save.pets.gear, save.pets.skill);
+    } else {
+      this.dino = DINOS.find((d) => d.id === opts.dinoId) || DINOS[0];
+      this.rider = RIDERS.find((r) => r.id === opts.riderId) || RIDERS[0];
+    }
     this.stats = { kills: 0, spawned: 0, coins: 0, dmgDealt: 0, dmgTaken: 0, maxCombo: 0, score: 0, skills: 0, bosses: 0, gates: 0 };
     this.player = new Player(this, this.dino, this.rider, computeStats(this.dino, this.rider, NO_UPGRADES, save.dinoGems && save.dinoGems[this.dino.id]));
     this.hazards = new Hazards(this);
@@ -429,13 +442,15 @@ export class Game {
     const rh = this.track.roadHalf;
     const mul = this.mulAt(ev.z);
     if (ev.kind === 'gate') {
-      const OFF = ['count', 'rate', 'dmg', 'pierce'];
-      const UTIL = ['heal', 'shield', 'skill', 'xp', 'magnet'];
-      const a = pick(OFF);
+      // 没有武器的小骑手用不上弹道 / 射速 / 伤害 / 穿透 / 武器经验这些强化
+      const armed = !!this.rider.weapon;
+      const OFF = armed ? ['count', 'rate', 'dmg', 'pierce'] : [];
+      const UTIL = armed ? ['heal', 'shield', 'skill', 'xp', 'magnet'] : ['heal', 'shield', 'skill', 'magnet'];
+      const a = OFF.length ? pick(OFF) : pick(UTIL);
       let b;
-      if (this.player.hp / this.player.stats.maxHp < 0.5) b = 'heal';
-      else if (Math.random() < 0.2) b = 'gamble';
-      else b = Math.random() < 0.5 ? pick(OFF.filter((k) => k !== a)) : pick(UTIL);
+      if (this.player.hp / this.player.stats.maxHp < 0.5) b = a === 'heal' ? 'shield' : 'heal';
+      else if (armed && Math.random() < 0.2) b = 'gamble';
+      else b = armed && Math.random() < 0.5 ? pick(OFF.filter((k) => k !== a)) : pick(UTIL.filter((k) => k !== a));
       this.gates.push(new Gate(this, ev.z, shuffle([a, b])));
       return;
     }
@@ -626,7 +641,8 @@ export class Game {
     this.spawnQueue.length = 0;
     this.hazards.clearZones();
     this.tele.clear();
-    this.boss = new Boss(this, type, 0, p.pos.z + 30, { hp: mul.hp * this.diff.boss * BALANCE.bossHp, dmg: mul.dmg * this.diff.bossDmg * BALANCE.bossDmg });
+    // 宠物模式的首领血量就是「恐龙血量 + 黑化宝石 800」，难度只决定是几星恐龙
+    this.boss = new Boss(this, type, 0, p.pos.z + 30, this.petMode ? { hp: 1, dmg: 1 } : { hp: mul.hp * this.diff.boss * BALANCE.bossHp, dmg: mul.dmg * this.diff.bossDmg * BALANCE.bossDmg });
     this.enemies.push(this.boss);
     this.hud.showBoss(this.boss);
     this.audio.startMusic('boss');
@@ -712,7 +728,7 @@ export class Game {
       this.app.onResult({
         win: true, stars, hpR, killRate, time: this.time, coins: coinsGained, reward, kills: this.stats.kills,
         maxCombo: this.stats.maxCombo, score: Math.round(this.stats.score), dmg: Math.round(this.stats.dmgDealt),
-        weaponLv: this.player.weapon.level, levelIdx: this.levelIdx, firstClear, final: this.levelIdx === LEVELS.length - 1, difficulty: this.diffId,
+        weaponLv: this.player.weapon.level, petMode: this.petMode, armed: !!this.rider.weapon, levelIdx: this.levelIdx, firstClear, final: this.levelIdx === LEVELS.length - 1, difficulty: this.diffId,
         firstBonus, newBest, prevBest,
       });
     });
@@ -742,7 +758,7 @@ export class Game {
       this.app.onResult({
         win: false, endless: this.endless, dist, newBest, time: this.time, coins: this.stats.coins,
         kills: this.stats.kills, maxCombo: this.stats.maxCombo, score: Math.round(this.stats.score), dmg: Math.round(this.stats.dmgDealt),
-        weaponLv: this.player.weapon.level, levelIdx: this.levelIdx, progress: this.progress, bossReached: !!this.boss, difficulty: this.diffId,
+        weaponLv: this.player.weapon.level, petMode: this.petMode, armed: !!this.rider.weapon, levelIdx: this.levelIdx, progress: this.progress, bossReached: !!this.boss, difficulty: this.diffId,
       });
     });
   }
@@ -1447,7 +1463,7 @@ export class Game {
       const n = main.has(t) ? (this.endless ? 6 : 10) : 3;
       for (let k = 0; k < n; k++) { try { warmEnemies.push(new Enemy(this, t, 0, 25 + k * 0.01)); } catch { /* ignore */ } }
     }
-    const bossTypes = this.endless ? Object.keys(BOSSES) : [this.level.boss];
+    const bossTypes = this.endless ? Object.keys(BOSSES).filter((k) => !BOSSES[k].dinoId) : [this.level.boss];
     for (const b of bossTypes) { try { tmp.add(buildBossModel(b).root); } catch { /* ignore */ } }
     for (const side of [THREE.FrontSide, THREE.DoubleSide]) tmp.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, side })));
     // 强化门文字（贴图 + 双面透明）
@@ -1457,7 +1473,7 @@ export class Game {
     tmp.add(new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, fog: false, forceSinglePass: true })));
     tmp.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ fog: false })));
     tmp.add(new THREE.Mesh(new THREE.CylinderGeometry(), new THREE.MeshStandardMaterial({ color: 0x3a3a44, metalness: 0.4, roughness: 0.5 })));
-    const kinds = [[this.rider.weapon.type], ['wave', undefined, 5], ['wave', undefined, 7], ['meteor'], ['venom'], ['spike']];
+    const kinds = [...(this.rider.weapon ? [[this.rider.weapon.type]] : []), ['wave', undefined, 5], ['wave', undefined, 7], ['meteor'], ['venom'], ['spike']];
     for (const t of types) { const r = ENEMIES[t].ranged; if (r) kinds.push([{ arrow: 'earrow', spore: 'spore', orb: 'orb', fireball: 'efire', ice: 'ice' }[r.kind] || 'orb', r.kind === 'orb' ? r.color : undefined]); }
     for (const b of bossTypes) {
       kinds.push(['borb', BOSSES[b].projColor]);
@@ -1549,11 +1565,12 @@ export class Game {
     setTimeout(() => d.remove(), 1900);
   }
 
-  /** 本局用过的宝石不留在这只恐龙身上，也不退回袋子 */
+  /** 本局用过的宝石不留在这只恐龙身上，也不退回袋子；宠物模式的装备和技能同样用完即清 */
   spendRunGems() {
     if (this.gemsSpent || !this.dino) return;
     this.gemsSpent = true;
     spendDinoGems(this.dino.id);
+    if (this.petMode) spendPetGear(); // 装备和技能一局用完就没了，再玩要重新买
   }
 
   dispose() {

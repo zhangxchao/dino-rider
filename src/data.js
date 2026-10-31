@@ -613,3 +613,186 @@ export function gemBagTotal(bag) {
   if (!bag || typeof bag !== 'object') return 0;
   return GEM_COLORS.reduce((sum, c) => sum + Math.max(0, bag[c.id] | 0), 0);
 }
+
+// =====================================================================
+//  宠物模式
+//  5 只宠物（幼年 → 喂 10 次变成体）、饲料、住所、两位无攻击力的小骑手、
+//  装备（普通骑手的武器）与技能（普通骑手的被动）、黑化生物小怪、
+//  普通恐龙首领（骑手永远是黑心博士，黑化宝石 +800 血）。
+//  所有价格、规则都集中在 PET_RULES，改数字只改这里。
+// =====================================================================
+export const PET_RULES = {
+  petPrice: 300,        // 购买一只宠物（幼年体）
+  feedPrice: 10,        // 一份饲料
+  feedsToAdult: 10,     // 喂满这么多次变成体
+  feedsPerDay: 2,       // 每只宠物每天最多喂几次
+  habitatPrice: 20,     // 树林 / 荒原 / 湿地
+  gearPrice: 100,       // 装备、技能
+  bossGemHp: 800,       // 黑化宝石给首领恐龙加的血量
+  juvenileScale: 0.55,  // 幼年体的缩放（只影响菜单里的外观）
+};
+
+// 肉食恐龙吃的都是活物
+export const FEEDS = {
+  sheep:   { name: '绵羊', icon: '🐑', live: true },
+  fish:    { name: '活鱼', icon: '🐟', live: true },
+  buffalo: { name: '水牛', icon: '🐃', live: true },
+  branch:  { name: '树枝', icon: '🌿', live: false },
+  shrub:   { name: '灌木', icon: '🌳', live: false },
+};
+
+// 住所只换背景，不影响数值。biome：菜单里用哪种地形做背景
+export const HABITATS = [
+  { id: 'lawn',      name: '草坪', icon: '🌱', price: 0,  biome: 'jungle' },
+  { id: 'forest',    name: '树林', icon: '🌲', price: 20, biome: 'jungle', tint: 'rgba(10,60,20,.28)' },
+  { id: 'wasteland', name: '荒原', icon: '🏜️', price: 20, biome: 'desert' },
+  { id: 'wetland',   name: '湿地', icon: '🪷', price: 20, biome: 'swamp' },
+];
+
+// 幼年 → 成体：数值写的是成体。modelId：借用现有恐龙的身体比例
+export const PETS = [
+  {
+    id: 'darkRaptor', modelId: 'raptor', name: '黑暗迅猛龙', en: 'Dark Velociraptor', era: '白垩纪晚期',
+    desc: '浑身漆黑的迅猛龙，是最弱的宠物，扑上去一边咬一边用爪子挠。',
+    body: 'theropod', scale: 0.78, riderScale: 0.8,
+    features: ['feathers', 'sickleClaw', 'stripes'],
+    colors: { main: 0x1b1b22, belly: 0x4a4a58, accent: 0x08080c, extra: 0x6a2a8a, eye: 0xff3030 },
+    stats: { hp: 860, atk: 35, def: 0.06, speed: 14, reach: 1.9, atkRate: 1.7 },
+    attack: 'maul', feed: 'sheep',
+    skill: { type: 'pounce', name: '暗影扑咬', desc: '高高跃起（空中无敌），落地一口咬住并挠碎周围的敌人。', cd: 6, power: 1.85, radius: 6, dist: 20 },
+  },
+  {
+    id: 'skyStego', modelId: 'stegosaurus', name: '天神剑龙', en: 'Sky Stegosaurus', era: '侏罗纪晚期',
+    desc: '蓝白两色的神圣剑龙，背上的骨板像天空里的云，尾刺能把敌人甩飞。',
+    body: 'stegosaur', scale: 1.1, riderScale: 1.0,
+    features: ['plates', 'thagomizer'],
+    colors: { main: 0x3d7fd8, belly: 0xf2f6ff, accent: 0xffffff, extra: 0x9cd0ff, eye: 0xfff0a0 },
+    stats: { hp: 950, atk: 38, def: 0.3, speed: 8.5, reach: 2.8, atkRate: 0.85 },
+    attack: 'tail', feed: 'branch',
+    skill: { type: 'spin', name: '天罚旋风', desc: '原地旋转甩尾，三连击周围敌人，还能打散飞来的子弹。', cd: 9, power: 1.7, radius: 8, hits: 3 },
+  },
+  {
+    id: 'mechScythe', modelId: 'therizinosaurus', name: '机械镰刀龙', en: 'Mecha Therizinosaurus', era: '白垩纪晚期',
+    desc: '浑身金属的镰刀龙，灰色的钢铁身躯连巨爪都闪着寒光。',
+    body: 'theropod', scale: 1.15, riderScale: 1.0,
+    features: ['longClaws', 'potBelly', 'longNeck'],
+    colors: { main: 0x8c9199, belly: 0xc4c9d1, accent: 0x4a4f58, extra: 0xe2e6ec, eye: 0xff5a3a },
+    skinMat: { metalness: 0.75, roughness: 0.3, sheen: 0.18 },
+    stats: { hp: 950, atk: 40, def: 0.28, speed: 9.5, reach: 2.4, atkRate: 1.2 },
+    attack: 'claw', feed: 'shrub',
+    skill: { type: 'frenzy', name: '合金乱舞', desc: '6 秒内撕咬加速，镰刃吸取生命。', cd: 13, duration: 6, rateMul: 2.4, lifesteal: 0.2 },
+  },
+  {
+    id: 'thunderSpino', modelId: 'spinosaurus', name: '雷霆棘龙', en: 'Thunder Spinosaurus', era: '白垩纪中期',
+    desc: '蓝绿色的雷霆棘龙，背帆上雷光闪动，是血量最厚的宠物。',
+    body: 'theropod', scale: 1.3, riderScale: 1.0,
+    features: ['sail', 'crocSnout'],
+    colors: { main: 0x2f8f9a, belly: 0xc8f0d8, accent: 0x2a6adf, extra: 0x58e08a, eye: 0xfff060 },
+    stats: { hp: 1150, atk: 43, def: 0.15, speed: 10, reach: 2.6, atkRate: 0.95 },
+    attack: 'bite', feed: 'fish',
+    skill: { type: 'frenzy', name: '雷霆狂噬', desc: '6 秒内撕咬加速，并且撕咬可以吸血。', cd: 14, duration: 6, rateMul: 2.2, lifesteal: 0.25 },
+  },
+  {
+    id: 'flameRex', modelId: 'trex', name: '烈焰霸王龙', en: 'Flame Tyrannosaurus', era: '白垩纪晚期',
+    desc: '红橙相间的烈焰霸王龙，是最强的宠物，咬合力和攻击都最高。',
+    body: 'theropod', scale: 1.3, riderScale: 1.0,
+    features: ['bigHead', 'tinyArms', 'stripes', 'tyrantSkull'],
+    colors: { main: 0xc8381c, belly: 0xffb04a, accent: 0x6a1408, extra: 0xff7a1a, eye: 0xffe040 },
+    stats: { hp: 1050, atk: 45, def: 0.2, speed: 9.5, reach: 2.6, atkRate: 0.85 },
+    attack: 'bite', feed: 'buffalo',
+    skill: { type: 'roar', name: '烈焰咆哮', desc: '震耳欲聋的咆哮，伤害前方整条道路上的敌人并眩晕 2.5 秒。', cd: 12, power: 1.5, radius: 14, stun: 2.5 },
+  },
+];
+export const petById = (id) => PETS.find((p) => p.id === id) || null;
+/** 菜单、缩略图、战斗里统一用它找恐龙定义：普通恐龙或宠物 */
+export const findDino = (id) => DINOS.find((d) => d.id === id) || PETS.find((p) => p.id === id) || null;
+
+// 宠物骑手：一男一女，没有攻击力（武器靠装备）。黑心博士是敌方首领的骑手。
+export const PET_RIDERS = [
+  { id: 'kidBoy', name: '小骑手 · 男孩', en: 'Boy Rider', desc: '勇敢的小男孩，自己没有攻击力，靠宠物战斗。',
+    colors: { main: 0x3a8ae0, accent: 0xf2c030, skin: 0xf2c9a0, extra: 0x5a3a20 }, weapon: null, bonus: {}, bonusText: '无攻击力' },
+  { id: 'kidGirl', name: '小骑手 · 女孩', en: 'Girl Rider', desc: '机灵的小女孩，自己没有攻击力，靠宠物战斗。',
+    colors: { main: 0xe0508a, accent: 0xffe070, skin: 0xf6d8b8, extra: 0x6a3a1a }, weapon: null, bonus: {}, bonusText: '无攻击力' },
+];
+export const DOCTOR = {
+  id: 'doctor', name: '黑心博士', en: 'Dr. Blackheart', desc: '用黑化宝石和黑心药水害人的坏博士。',
+  colors: { main: 0x2a1a3a, accent: 0x7a2ab0, skin: 0xe8c8a8, extra: 0x9cff3a },
+  weapon: { type: 'potion', name: '黑心药水', dmg: 0, cd: 1, speed: 20, color: 0x9a3aff }, bonus: {}, bonusText: '',
+};
+
+/** 装备 = 普通骑手的武器；技能 = 普通骑手的被动加成。每件 100 币，一局用完就没了 */
+export const gearList = () => RIDERS.map((r) => ({ id: r.id, name: r.weapon.name, weapon: r.weapon, rider: r.name }));
+export const skillList = () => RIDERS.map((r) => ({ id: r.id, name: r.bonusText, bonus: r.bonus, rider: r.name }));
+/** 把小骑手 + 装备 + 技能合成这一局的骑手定义 */
+export function petRiderDef(riderId, gearId, skillId) {
+  const kid = PET_RIDERS.find((r) => r.id === riderId) || PET_RIDERS[0];
+  const g = RIDERS.find((r) => r.id === gearId);
+  const s = RIDERS.find((r) => r.id === skillId);
+  return { ...kid, weapon: g ? g.weapon : null, bonus: s ? s.bonus : {}, bonusText: s ? s.bonusText : kid.bonusText };
+}
+
+// ---------------------------------------------------------------------
+//  黑化生物（宠物模式的小怪）。攻击力：2~3 / 4~5 / 超强 8 和 10
+// ---------------------------------------------------------------------
+Object.assign(ENEMIES, {
+  darkAnt:       { name: '黑化巨蚁',   hp: 60,  dmg: 2,  speed: 6.0, radius: 0.8, atkRange: 1.5, atkCd: 1.0, score: 12, coins: 1, color: 0x2a1c22 },
+  darkSnake:     { name: '黑化毒蛇',   hp: 55,  dmg: 3,  speed: 6.5, radius: 0.7, atkRange: 1.7, atkCd: 1.1, score: 14, coins: 2, color: 0x2c2438, poison: 2 },
+  darkWolf:      { name: '黑化恶狼',   hp: 75,  dmg: 3,  speed: 8.5, radius: 1.0, atkRange: 1.8, atkCd: 1.0, score: 16, coins: 2, color: 0x1c1a24, eye: 0xff2a2a, shard: 0x9a3aff },
+  darkSpider:    { name: '黑化蜘蛛',   hp: 60,  dmg: 2,  speed: 6.0, radius: 0.85, atkRange: 1.5, atkCd: 1.0, score: 14, coins: 2, color: 0x241a2e },
+  darkCentipede: { name: '黑化蜈蚣',   hp: 80,  dmg: 3,  speed: 7.0, radius: 0.9, atkRange: 1.9, atkCd: 1.1, score: 16, coins: 2, color: 0x3a1c2a, poison: 2 },
+  darkEagle:     { name: '黑化金雕',   hp: 130, dmg: 4,  speed: 7.5, radius: 0.9, atkRange: 2.0, atkCd: 1.2, score: 24, coins: 3, flying: true, hover: 3.0, color: 0x6a5420 },
+  darkZombie:    { name: '黑化僵尸',   hp: 180, dmg: 4,  speed: 4.4, radius: 0.9, atkRange: 1.9, atkCd: 1.3, score: 26, coins: 3, color: 0x6a7a58 },
+  darkTiger:     { name: '黑化猛虎',   hp: 160, dmg: 5,  speed: 8.0, radius: 1.15, atkRange: 2.0, atkCd: 1.1, score: 28, coins: 4, color: 0x7a3a14 },
+  darkLion:      { name: '黑化雄狮',   hp: 170, dmg: 5,  speed: 7.5, radius: 1.2, atkRange: 2.1, atkCd: 1.2, score: 28, coins: 4, color: 0x8a6420 },
+  darkBear:      { name: '黑化棕熊',   hp: 240, dmg: 5,  speed: 5.0, radius: 1.5, atkRange: 2.4, atkCd: 1.5, score: 34, coins: 5, color: 0x4a2c1c, eye: 0xff2a2a, skin: 0x6a4a34, ears: true },
+  // 攻击力超强
+  darkWyvern:    { name: '黑化飞龙',   hp: 380, dmg: 8,  speed: 7.0, radius: 1.5, atkRange: 2.6, atkCd: 1.4, score: 60, coins: 8, flying: true, hover: 3.4, color: 0x3a2a5a },
+  darkLizard:    { name: '黑化蜥蜴怪', hp: 620, dmg: 10, speed: 5.5, radius: 1.8, atkRange: 3.2, atkCd: 1.7, score: 90, coins: 12, color: 0x2e3a2a },
+});
+export const DARK_TIERS = {
+  1: ['darkAnt', 'darkSnake', 'darkWolf', 'darkSpider', 'darkCentipede'],
+  2: ['darkEagle', 'darkZombie', 'darkTiger', 'darkLion', 'darkBear'],
+  3: ['darkWyvern', 'darkLizard'],
+};
+
+// 宠物模式每关的怪物组成（地形沿用原来的 7 关）
+export const PET_LEVELS = [
+  { pool: { darkAnt: 3, darkSnake: 3, darkSpider: 2, darkCentipede: 2 },                           elite: 'darkEagle' },
+  { pool: { darkWolf: 4, darkSnake: 2, darkAnt: 2 },                                               elite: 'darkBear' },
+  { pool: { darkSpider: 3, darkSnake: 3, darkCentipede: 2, darkAnt: 2 },                           elite: 'darkZombie' },
+  { pool: { darkWolf: 2, darkCentipede: 2, darkEagle: 2, darkZombie: 2 },                          elite: 'darkTiger' },
+  { pool: { darkZombie: 3, darkWolf: 2, darkEagle: 2, darkTiger: 2 },                              elite: 'darkLion' },
+  { pool: { darkSnake: 2, darkSpider: 2, darkTiger: 2, darkLion: 2, darkBear: 1, darkEagle: 1 },  elite: 'darkWyvern' },
+  { pool: { darkLion: 2, darkBear: 2, darkTiger: 2, darkZombie: 2, darkEagle: 2, darkWyvern: 1 },  elite: 'darkLizard' },
+];
+
+// ---------------------------------------------------------------------
+//  首领：普通恐龙 + 黑心博士。简单 1 星 / 中等 2 星 / 困难 3 星
+//  每只恐龙一份首领定义（BOSSES['pb_<id>']），血量 = 恐龙血量 + 黑化宝石 800
+// ---------------------------------------------------------------------
+export const petBossKey = (dinoId) => 'pb_' + dinoId;
+for (const d of DINOS) {
+  BOSSES[petBossKey(d.id)] = {
+    dinoId: d.id,
+    get name() { return d.name; },
+    title: '黑心博士的坐骑',
+    hp: d.stats.hp + PET_RULES.bossGemHp,
+    dmg: Math.round(d.stats.atk * 0.8),
+    speed: 6, radius: Math.max(2, 1.7 * d.scale), height: 3 * d.scale + 1,
+    patterns: ['slam', 'charge', 'volley'], summon: [],
+    skills: { slam: '重踏', charge: '狂暴冲撞', volley: '黑心药水' },
+    anim: { slam: 'slam', charge: 'charge', volley: 'volley' },
+    projColor: 0x9a3aff, color: 0x2a1a3a, phases: 2,
+  };
+}
+export function petBossFor(diffId, rand = Math.random) {
+  const stars = diffId === 'easy' ? 1 : diffId === 'hard' ? 3 : 2;
+  const list = DINOS.filter((d) => DINO_RANK[d.id].stars === stars);
+  return list[Math.floor(rand() * list.length)];
+}
+/** 宠物模式这一关的定义：沿用地形 / 长度 / 奖励，换上黑化怪和恐龙首领 */
+export function petLevel(levelIdx, bossDino) {
+  const L = LEVELS[levelIdx];
+  const P = PET_LEVELS[levelIdx];
+  return { ...L, pool: P.pool, elite: P.elite, boss: petBossKey(bossDino.id), spiders: false };
+}

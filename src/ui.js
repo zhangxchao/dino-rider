@@ -1,5 +1,6 @@
 // 菜单界面：标题 / 选择坐骑 / 关卡 / 升级 / 设置 / 帮助 / 暂停 / 结算 / 结局
-import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK, SKINS, GEM, GEM_COLORS, gemCount, gemBagTotal, gemColor } from './data.js';
+import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK, SKINS, GEM, GEM_COLORS, gemCount, gemBagTotal, gemColor, PETS, PET_RIDERS, PET_RULES, FEEDS, HABITATS, petById, gearList, skillList } from './data.js';
+import { petDef, ownedPet, isAdult, adultPets, feedsLeft, buyPet, feedPet, buyHabitat, setHabitat, toggleSlot, buyGem } from './pets.js';
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
@@ -109,6 +110,7 @@ export class UI {
           <button class="btn" data-act="levels"><span class="ico">⚔️</span>${t('title.start')}</button>
           <button class="btn ghost" data-act="select"><span class="ico">🦖</span>${t('title.select')}</button>
           <button class="btn ghost" data-act="shop"><span class="ico">🛒</span>${t('title.mall')}</button>
+          <button class="btn ghost" data-act="pets"><span class="ico">🐾</span>${t('title.pets')}</button>
           <button class="btn ghost" data-act="missions"><span class="ico">🎯</span>${t('title.missions')}${meta.claimable ? `<i class="badge">${meta.claimable}</i>` : ''}</button>
           <button class="btn ghost" data-act="settings"><span class="ico">⚙️</span>${t('title.settings')}</button>
           <button class="btn ghost" data-act="help"><span class="ico">📖</span>${t('title.help')}</button>
@@ -303,7 +305,6 @@ export class UI {
         grid.innerHTML = DINOS.map((d) => `
           <div class="card ${d.id === save.dino ? 'active' : ''}" data-id="${d.id}">
             <span class="stars s${DINO_RANK[d.id].stars}">${'★'.repeat(DINO_RANK[d.id].stars)}</span>
-            ${save.dinoWins[d.id] ? `<span class="badge">✔${save.dinoWins[d.id]}</span>` : ''}
             <img src="${thumbs.dino[d.id] || ''}" alt="">
             <div class="nm" title="${d.name}">${d.name}</div>
           </div>`).join('');
@@ -346,9 +347,10 @@ export class UI {
   }
 
   // ------------------------------------------------------------------
-  build_levels() {
-    const d = DINOS.find((x) => x.id === save.dino) || DINOS[0];
-    const r = RIDERS.find((x) => x.id === save.rider) || RIDERS[0];
+  build_levels(data = {}) {
+    const pet = !!data.pet;   // 宠物出征：同样的 7 个地形，怪物是黑化生物，首领是骑着恐龙的黑心博士
+    const d = pet ? (petById(save.pets.active) || PETS[0]) : (DINOS.find((x) => x.id === save.dino) || DINOS[0]);
+    const r = pet ? (PET_RIDERS.find((x) => x.id === save.pets.rider) || PET_RIDERS[0]) : (RIDERS.find((x) => x.id === save.rider) || RIDERS[0]);
     const cards = LEVELS.map((lv, i) => {
       const locked = false;   // 所有关卡一开始就能挑战
       const stars = save.stars[i] || 0;
@@ -358,7 +360,7 @@ export class UI {
           <div class="num">${String(i + 1).padStart(2, '0')}</div>
           <div class="emoji">${BIOME_EMOJI[lv.biome]}</div>
           <h4>${lv.name}</h4>
-          <div class="boss">${t('levels.route', { len: lv.length, boss: BOSSES[lv.boss].name })}</div>
+          <div class="boss">${pet ? t('pet.levels.route', { len: lv.length }) : t('levels.route', { len: lv.length, boss: BOSSES[lv.boss].name })}</div>
           <div class="desc">${lv.desc}</div>
           <div class="stars">${[0, 1, 2].map((k) => `<span class="${k < stars ? 'on' : 'off'}">★</span>`).join('')}
             ${save.bestTime[i] ? `<span style="font-size:12px;color:#fffa;letter-spacing:0;margin-left:8px">${t('levels.best', { time: formatTime(save.bestTime[i]) })}</span>` : ''}</div>
@@ -366,6 +368,7 @@ export class UI {
         </div>`;
     }).join('');
     const endlessLocked = false;
+    const dk = pet ? 'pet.diff.' : 'diff.';
     const diff = DIFFICULTIES[save.settings.difficulty] ? save.settings.difficulty : 'medium';
     const n = el(`
       <div>
@@ -374,6 +377,7 @@ export class UI {
           <h2>${t('levels.title')}</h2>
           <span style="color:var(--muted);font-weight:700">${t('levels.team', { dino: d.name, rider: r.name })}</span>
           <button class="btn ghost small" data-sel>${t('levels.change')}</button>
+          ${pet ? `<span style="color:var(--muted);font-weight:700">${t('pet.levels.gear', { gear: save.pets.gear ? RIDERS.find((x) => x.id === save.pets.gear).weapon.name : t('pet.none2'), skill: save.pets.skill ? RIDERS.find((x) => x.id === save.pets.skill).bonusText : t('pet.none2') })}</span>` : ''}
           <div class="spacer"></div>
           ${this.coinPill()}
         </div>
@@ -381,33 +385,34 @@ export class UI {
           <div class="diff-bar">
             <span class="diff-label">${t('diff.label')}</span>
             <div class="seg" data-diff>${DIFFICULTY_IDS.map((id) => `<button data-v="${id}" class="${id === diff ? 'on' : ''}">${t('diff.' + id)}</button>`).join('')}</div>
-            <span class="diff-desc">${t('diff.' + diff + '.desc')}</span>
+            <span class="diff-desc">${t(dk + diff + '.desc')}</span>
           </div>
           ${cards}
-          <div class="level-card endless ${endlessLocked ? 'locked' : ''}" data-endless style="animation-delay:.4s">
+          ${pet ? '' : `<div class="level-card endless ${endlessLocked ? 'locked' : ''}" data-endless style="animation-delay:.4s">
             <div class="bg" style="background:linear-gradient(120deg,#3a1a0a,#7a2a1a 40%,#2a1a4a)"></div>
             <div class="emoji">♾️</div>
             <h4>${t('endless.name')}</h4>
             <div class="desc">${t('endless.desc')}${save.endlessBest ? t('endless.best', { n: save.endlessBest }) : endlessLocked ? t('endless.locked') : t('endless.none')}</div>
             ${endlessLocked ? '<div class="lock">🔒</div>' : ''}
-          </div>
+          </div>`}
         </div>
       </div>`);
-    n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));
-    n.querySelector('[data-sel]').addEventListener('click', () => this.show('select'));
+    n.querySelector('[data-back]').addEventListener('click', () => this.show(pet ? 'pets' : 'title'));
+    n.querySelector('[data-sel]').addEventListener('click', () => this.show(pet ? 'pets' : 'select'));
     n.querySelectorAll('.seg[data-diff] button').forEach((b) => b.addEventListener('click', () => {
       save.settings.difficulty = b.dataset.v;
       persist();
       this.app.audio.play('select');
       n.querySelectorAll('.seg[data-diff] button').forEach((x) => x.classList.toggle('on', x === b));
-      n.querySelector('.diff-desc').textContent = t('diff.' + b.dataset.v + '.desc');
+      n.querySelector('.diff-desc').textContent = t(dk + b.dataset.v + '.desc');
     }));
     n.querySelectorAll('.level-card[data-i]').forEach((c) => c.addEventListener('click', () => {
       const i = +c.dataset.i;
       this.app.audio.play('select');
-      this.app.startGame({ levelIdx: i, dinoId: save.dino, riderId: save.rider });
+      if (pet) this.app.startGame({ levelIdx: i, petMode: true, dinoId: d.id, riderId: r.id });
+      else this.app.startGame({ levelIdx: i, dinoId: save.dino, riderId: save.rider });
     }));
-    n.querySelector('[data-endless]').addEventListener('click', () => {
+    n.querySelector('[data-endless]')?.addEventListener('click', () => {
       if (endlessLocked) { this.app.audio.play('error'); return; }
       this.app.audio.play('select');
       this.app.startGame({ endless: true, dinoId: save.dino, riderId: save.rider });
@@ -534,6 +539,308 @@ export class UI {
       }));
     };
     n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));
+    render();
+    return n;
+  }
+
+  // ------------------------------------------------------------------
+  //  宠物乐园：我的宠物（投喂 / 住所 / 宝石 / 使用）+ 宠物商城（宠物 / 饲料 / 住所 / 装备 / 技能 / 宝石）
+  // ------------------------------------------------------------------
+  build_pets(data = {}) {
+    if (data.tab) this.petTab = data.tab;
+    this.petTab = this.petTab || 'mine';
+    this.petStep = data.step || 'view';       // view | ride（成体点「使用」后选小骑手）
+    const P = save.pets;
+    if (!P.active || !ownedPet(P.active)) P.active = Object.keys(P.owned)[0] || null;
+    const thumbs = this.app.thumbs || { dino: {}, rider: {} };
+    const hex = (v) => '#' + (v ?? 0x777777).toString(16).padStart(6, '0');
+    const n = el(`
+      <div>
+        <div class="topbar">
+          <button class="btn ghost small" data-back>${t('common.back')}</button>
+          <h2>🐾 ${t('pet.title')}</h2>
+          <div class="tabs">
+            <div class="tab ${this.petTab === 'mine' ? 'active' : ''}" data-tab="mine">${t('pet.tabMine')}</div>
+            <div class="tab ${this.petTab === 'shop' ? 'active' : ''}" data-tab="shop">${t('pet.tabShop')}</div>
+          </div>
+          <div class="spacer"></div>
+          ${this.coinPill()}
+        </div>
+        <div class="pet-body"></div>
+      </div>`);
+    const body = n.querySelector('.pet-body');
+    const refreshCoins = () => n.querySelectorAll('.coin-pill span').forEach((x) => { x.textContent = save.coins; });
+    const feedName = (d) => FEEDS[d.feed].name;
+
+    /** 菜单背景：显示选中的宠物（幼年体缩小），背景是它的住所 */
+    const syncShowcase = () => {
+      const app = this.app;
+      if (!app.showcase) return;
+      const d = P.active ? petDef(P.active) : null;
+      const o = d ? ownedPet(d.id) : null;
+      const hab = HABITATS.find((h) => h.id === (o ? o.habitat : 'lawn')) || HABITATS[0];
+      if (this.petTab === 'shop' || !d) {
+        // 商城页不挡视线：显示当前选中的宠物（没有就显示第一只宠物）
+        const first = d || PETS[0];
+        if (app.showcase.biome !== hab.biome) app.rebuildShowcase(hab.biome);
+        app.showcase.setSelection(first.id, P.rider, false, { juvenile: !d || !isAdult(first.id), noRider: true });
+      } else {
+        if (app.showcase.biome !== hab.biome) app.rebuildShowcase(hab.biome);
+        const adult = isAdult(d.id);
+        app.showcase.setSelection(d.id, P.rider, false, { juvenile: !adult, noRider: !adult });
+      }
+      app.showcase.setFrame(this.petTab === 'mine' ? 'center' : 'right');
+    };
+
+    // ---------------- 我的宠物 ----------------
+    const renderMine = () => {
+      const ids = Object.keys(P.owned);
+      if (!ids.length) {
+        body.innerHTML = `<div class="center-panel panel pet-empty"><h3>🥚 ${t('pet.none')}</h3><div class="row-btns"><button class="btn" data-go-shop>${t('pet.goShop')}</button></div></div>`;
+        body.querySelector('[data-go-shop]').addEventListener('click', () => this.show('pets', { tab: 'shop' }));
+        return;
+      }
+      if (this.petStep === 'ride') return renderRide();
+      const d = petDef(P.active);
+      const o = ownedPet(d.id);
+      const adult = isAdult(d.id);
+      const s = d.stats;
+      const gemN = gemCount(save.dinoGems[d.id]);
+      const socketed = Array.isArray(save.dinoGems[d.id]) ? save.dinoGems[d.id] : [];
+      const bar = (k, v, max, txt) => `<div class="stat-row"><span class="k">${k}</span><span class="bar"><i style="width:${Math.min(100, v / max * 100)}%"></i></span><span class="v">${txt}</span></div>`;
+      const stone = (id, extra = '') => { const c = id ? gemColor(id) : null; return `<i class="gem-stone${c ? ' on' : ''}" ${c ? `style="--c:${c.hex}"` : ''} ${extra}></i>`; };
+      const left = feedsLeft(d.id);
+      body.innerHTML = `
+        <div class="grid-panel panel"><div class="card-grid">${ids.map((id) => {
+          const pd = petDef(id);
+          return `<div class="card ${id === d.id ? 'active' : ''}" data-id="${id}">
+            <span class="stars s${isAdult(id) ? 3 : 1}">${isAdult(id) ? t('pet.stage.adult') : t('pet.stage.baby')}</span>
+            <img src="${thumbs.dino[id] || ''}" alt="${pd.name}"><div class="nm" title="${pd.name}">${pd.name}</div></div>`;
+        }).join('')}</div></div>
+        <div class="info-panel panel">
+          <h3>${d.name}</h3>
+          ${getLang() !== 'en' ? `<div class="en">${d.en}</div>` : ''}
+          <span class="era">${adult ? t('pet.stage.adult') : t('pet.stage.baby')}</span>
+          <span class="era" style="background:rgba(79,201,255,.15);color:#8fdcff">${t('select.attack', { name: t('attack.' + d.attack) })}</span>
+          <p>${d.desc}</p>
+          <div style="margin-top:10px">
+            ${bar(t('stat.hp'), s.hp + gemN * GEM.hp, 1300, gemN ? `${s.hp}<em class="gem-plus">+${gemN * GEM.hp}</em>` : s.hp)}
+            ${bar(t('stat.atk'), s.atk + gemN * GEM.atk, 50, gemN ? `${s.atk}<em class="gem-plus">+${gemN * GEM.atk}</em>` : s.atk)}
+            ${bar(t('stat.def'), s.def, 0.45, Math.round(s.def * 100) + '%')}
+            ${bar(t('stat.speed'), s.speed, 16, s.speed)}
+          </div>
+          <div class="skill-box">
+            <div class="t">🍖 ${t('pet.growth', { n: Math.min(o.feeds, PET_RULES.feedsToAdult), max: PET_RULES.feedsToAdult })}
+              <small>${FEEDS[d.feed].icon} ${feedName(d)}${FEEDS[d.feed].live ? ' · ' + t('pet.diet.live') : ''}</small></div>
+            <div class="pet-dots">${Array.from({ length: PET_RULES.feedsToAdult }, (_, k) => `<i class="${k < o.feeds ? 'on' : ''}"></i>`).join('')}</div>
+            ${adult ? `<div class="d">${t('pet.grown')}</div>`
+              : `<div class="row-btns" style="justify-content:flex-start;margin-top:8px">
+                  <button class="btn small" data-feed ${left <= 0 || save.coins < PET_RULES.feedPrice ? 'disabled' : ''}>${FEEDS[d.feed].icon} ${t('pet.feedBtn', { feed: feedName(d) })} · <i class="coin-ico"></i>${PET_RULES.feedPrice}</button>
+                  <span class="d" style="align-self:center">${left > 0 ? t('pet.feedLeft', { n: left }) : t('pet.feedDone', { max: PET_RULES.feedsPerDay })}</span></div>`}
+          </div>
+          <div class="skill-box">
+            <div class="t">🏡 ${t('pet.habitat')}</div>
+            <div class="hab-row">${HABITATS.map((h) => {
+              const own = P.habitats.includes(h.id);
+              return `<button class="hab ${o.habitat === h.id ? 'on' : ''}" data-hab="${h.id}"><b>${h.icon} ${h.name}</b><small>${own ? (o.habitat === h.id ? t('pet.living') : t('pet.moveIn')) : `🔒 <i class="coin-ico"></i>${h.price}`}</small></button>`;
+            }).join('')}</div>
+          </div>
+          <div class="gem-box">
+            <div class="t">💎 ${t('gem.title')} <b>${gemN}/${GEM.max}</b><small>${t('gem.each', { atk: GEM.atk, hp: GEM.hp })}</small></div>
+            <div class="gem-row"><span class="gems">${Array.from({ length: GEM.max }, (_, k) => stone(socketed[k], socketed[k] ? `data-unsocket="${k}" title="${t('gem.remove')}"` : '')).join('')}</span></div>
+            <div class="gem-picks">${GEM_COLORS.map((c) => {
+              const cnt = save.gems[c.id] || 0;
+              return `<button class="gem-pick" data-gem-add="${c.id}" ${gemN >= GEM.max || cnt <= 0 ? 'disabled' : ''} style="--c:${c.hex}">${stone(c.id)}<b>${t('gem.' + c.id)}</b><small>${cnt}</small></button>`;
+            }).join('')}</div>
+          </div>
+          <div class="pet-msg"></div>
+          <div class="row-btns" style="justify-content:flex-start;margin-top:10px">
+            ${adult ? `<button class="btn" data-use>🐾 ${t('pet.use')}</button>` : `<button class="btn" disabled>🔒 ${t('pet.useHint')}</button>`}
+          </div>
+        </div>`;
+      const msg = (txt) => { body.querySelector('.pet-msg').textContent = txt; };
+      body.querySelectorAll('.card').forEach((c) => c.addEventListener('click', () => {
+        if (P.active === c.dataset.id) return;
+        P.active = c.dataset.id;
+        persist();
+        this.app.audio.roar(d.scale);
+        syncShowcase(); renderMine();
+      }));
+      body.querySelector('[data-feed]')?.addEventListener('click', () => {
+        const r = feedPet(d.id);
+        if (!r.ok) { this.app.audio.play('error'); msg(r.reason === 'coins' ? t('pet.need', { n: r.need }) : t('pet.feedDone', { max: PET_RULES.feedsPerDay })); return; }
+        this.app.audio.play('buy');
+        refreshCoins();
+        syncShowcase(); renderMine();
+        const m2 = r.grew ? t('pet.grew', { name: d.name }) : t('pet.fed', { n: PET_RULES.feedsToAdult - ownedPet(d.id).feeds });
+        body.querySelector('.pet-msg').textContent = m2;
+        if (r.grew) this.app.audio.play('levelUp');
+      });
+      body.querySelectorAll('[data-hab]').forEach((b) => b.addEventListener('click', () => {
+        const id = b.dataset.hab;
+        if (!P.habitats.includes(id)) {
+          const r = buyHabitat(id);
+          if (!r.ok) { this.app.audio.play('error'); msg(t('pet.need', { n: r.need })); return; }
+          this.app.audio.play('buy');
+          refreshCoins();
+        }
+        setHabitat(d.id, id);
+        this.app.audio.play('select');
+        syncShowcase(); renderMine();
+      }));
+      body.querySelectorAll('[data-unsocket]').forEach((e) => e.addEventListener('click', () => {
+        const list = socketed; const i = +e.dataset.unsocket;
+        if (i < 0 || i >= list.length) return;
+        const color = list.splice(i, 1)[0];
+        if (gemColor(color)) save.gems[color] = (save.gems[color] || 0) + 1;
+        persist(); this.app.audio.play('select'); renderMine();
+      }));
+      body.querySelectorAll('[data-gem-add]').forEach((b) => b.addEventListener('click', () => {
+        const color = b.dataset.gemAdd;
+        if (!Array.isArray(save.dinoGems[d.id])) save.dinoGems[d.id] = [];
+        const list = save.dinoGems[d.id];
+        if (list.length >= GEM.max || (save.gems[color] || 0) <= 0) { this.app.audio.play('error'); return; }
+        save.gems[color]--; list.push(color);
+        persist(); this.app.audio.play('powerup', { volume: 0.6, pitch: 1.3 }); renderMine();
+      }));
+      body.querySelector('[data-use]')?.addEventListener('click', () => { this.app.audio.roar(d.scale); this.petStep = 'ride'; renderMine(); });
+    };
+
+    // ---------------- 成体点「使用」：选小骑手，再出发 ----------------
+    const renderRide = () => {
+      const d = petDef(P.active);
+      const gear = P.gear ? RIDERS.find((r) => r.id === P.gear) : null;
+      const skill = P.skill ? RIDERS.find((r) => r.id === P.skill) : null;
+      body.innerHTML = `
+        <div class="center-panel panel pet-ride">
+          <h2>${t('pet.pickRider')}</h2>
+          <div class="ride-cards">${PET_RIDERS.map((r) => `
+            <div class="card ${r.id === P.rider ? 'active' : ''}" data-rider="${r.id}">
+              <img src="${thumbs.rider[r.id] || ''}" alt=""><div class="nm">${r.name}</div><div class="rb">${r.bonusText}</div></div>`).join('')}</div>
+          <p class="pet-note">${t('pet.rider.note')}</p>
+          <div class="ride-gear">
+            <div>⚔️ ${t('pet.gearNow', { name: gear ? gear.weapon.name : t('pet.none2') })}</div>
+            <div>✨ ${t('pet.skillNow', { name: skill ? skill.bonusText : t('pet.none2') })}</div>
+            <button class="btn ghost small" data-shop>🛒 ${t('pet.tabShop')}</button>
+          </div>
+          <div class="row-btns">
+            <button class="btn ghost" data-cancel>${t('common.back')}</button>
+            <button class="btn" data-go>⚔️ ${t('pet.go')} · ${d.name}</button>
+          </div>
+        </div>`;
+      body.querySelectorAll('[data-rider]').forEach((c) => c.addEventListener('click', () => {
+        P.rider = c.dataset.rider; persist(); this.app.audio.play('select');
+        body.querySelectorAll('[data-rider]').forEach((x) => x.classList.toggle('active', x === c));
+      }));
+      body.querySelector('[data-shop]').addEventListener('click', () => this.show('pets', { tab: 'shop' }));
+      body.querySelector('[data-cancel]').addEventListener('click', () => { this.petStep = 'view'; renderMine(); });
+      body.querySelector('[data-go]').addEventListener('click', () => this.show('levels', { pet: true }));
+    };
+
+    // ---------------- 宠物商城 ----------------
+    const renderShop = (note = '') => {
+      const anyOwned = Object.keys(P.owned).length > 0;
+      const gears = gearList(), skills = skillList();
+      const gearCard = (slot, it) => {
+        const on = P[slot] === it.id;
+        const r = RIDERS.find((x) => x.id === it.id);
+        const sw = `linear-gradient(135deg, ${hex(r.colors.main)} 0 45%, ${hex(r.colors.accent)} 45% 70%, ${hex(r.colors.extra)} 70%)`;
+        return `<div class="mall-skin ${on ? 'owned' : ''}"><i style="background:${sw}"></i><b>${it.name}</b><small class="sub">${it.rider}</small>
+          <button class="btn small" data-slot="${slot}" data-id="${it.id}">${on ? t('pet.unequip') : `<i class="coin-ico"></i> ${PET_RULES.gearPrice}`}</button></div>`;
+      };
+      body.innerHTML = `<div class="list panel mall">
+        <h3 class="mall-h">🐾 ${t('pet.shop.pets')} <small>${t('pet.shop.petsNote', { n: PET_RULES.feedsToAdult })}</small></h3>
+        ${PETS.map((d) => {
+          const own = ownedPet(d.id);
+          return `<div class="up-row">
+            <div class="ico"><img class="pet-thumb" src="${thumbs.dino[d.id] || ''}" alt=""></div>
+            <div class="main"><div class="t">${d.name} <span style="color:var(--muted);font-size:13px">${t('stat.hp')} ${d.stats.hp} · ${t('stat.atk')} ${d.stats.atk}</span></div>
+              <div class="d">${FEEDS[d.feed].icon} ${t('pet.eats', { feed: FEEDS[d.feed].name })}${FEEDS[d.feed].live ? ' · ' + t('pet.diet.live') : ''}</div></div>
+            ${own ? `<span class="own">✔ ${t('pet.owned')}</span>` : `<button class="btn small" data-buy-pet="${d.id}" ${save.coins < PET_RULES.petPrice ? 'disabled' : ''}><i class="coin-ico"></i> ${PET_RULES.petPrice}</button>`}
+          </div>`;
+        }).join('')}
+        <h3 class="mall-h">🍖 ${t('pet.shop.feeds')} <small>${t('pet.shop.feedsNote', { n: PET_RULES.feedsPerDay })}</small></h3>
+        ${Object.entries(FEEDS).map(([fid, f]) => {
+          const d = PETS.find((x) => x.feed === fid);
+          const own = d && ownedPet(d.id);
+          const adult = own && isAdult(d.id);
+          const left = own ? feedsLeft(d.id) : 0;
+          const can = own && !adult && left > 0 && save.coins >= PET_RULES.feedPrice;
+          return `<div class="up-row">
+            <div class="ico">${f.icon}</div>
+            <div class="main"><div class="t">${f.name}${f.live ? ` <span style="color:#ff9a8a;font-size:13px">${t('pet.diet.live')}</span>` : ''}</div>
+              <div class="d">${own ? (adult ? t('pet.grown') : t('pet.shop.feedFor', { pet: d.name, n: left })) : t('pet.shop.noPet', { pet: d.name })}</div></div>
+            <button class="btn small" data-feed-pet="${d.id}" ${can ? '' : 'disabled'}><i class="coin-ico"></i> ${PET_RULES.feedPrice}</button>
+          </div>`;
+        }).join('')}
+        <h3 class="mall-h">🏡 ${t('pet.shop.habitats')} <small>${t('pet.shop.habNote', { n: PET_RULES.habitatPrice })}</small></h3>
+        <div class="mall-skins">${HABITATS.map((h) => {
+          const own = P.habitats.includes(h.id);
+          return `<div class="mall-skin ${own ? 'owned' : ''}"><i class="hab-ico">${h.icon}</i><b>${h.name}</b>
+            ${own ? `<span class="own">✔ ${t('pet.owned')}</span>` : `<button class="btn small" data-buy-hab="${h.id}" ${save.coins < h.price ? 'disabled' : ''}><i class="coin-ico"></i> ${h.price}</button>`}</div>`;
+        }).join('')}</div>
+        <h3 class="mall-h">⚔️ ${t('pet.shop.gear')} <small>${t('pet.shop.gearNote', { n: PET_RULES.gearPrice })}</small></h3>
+        <div class="mall-skins">${gears.map((it) => gearCard('gear', it)).join('')}</div>
+        <h3 class="mall-h">✨ ${t('pet.shop.skills')} <small>${t('pet.shop.skillNote', { n: PET_RULES.gearPrice })}</small></h3>
+        <div class="mall-skins">${skills.map((it) => gearCard('skill', it)).join('')}</div>
+        <h3 class="mall-h">💎 ${t('mall.gems')}</h3>
+        <p class="mall-gem-note">${t('mall.gemDesc', { atk: GEM.atk, hp: GEM.hp, max: GEM.max })} ${t('mall.bag', { n: gemBagTotal(save.gems), m: Object.values(save.dinoGems).reduce((a, b) => a + gemCount(b), 0) })}</p>
+        ${GEM_COLORS.map((c) => `<div class="up-row">
+          <div class="ico"><i class="gem-stone on lg" style="--c:${c.hex}"></i></div>
+          <div class="main"><div class="t">${t('gem.' + c.id)} <span style="color:var(--muted);font-size:13px">${t('mall.colorBag', { n: save.gems[c.id] || 0 })}</span></div>
+            <div class="d">${t('gem.each', { atk: GEM.atk, hp: GEM.hp })}</div></div>
+          <button class="btn small" data-buy-gem="${c.id}" ${save.coins < GEM.price ? 'disabled' : ''}><i class="coin-ico"></i> ${GEM.price}</button></div>`).join('')}
+        <p class="mall-msg">${note}</p>
+        ${anyOwned ? '' : `<p style="color:var(--muted);font-size:12.5px">${t('pet.none')}</p>`}
+      </div>`;
+      const again = (m) => { refreshCoins(); this.app.audio.play('buy'); renderShop(m); };
+      const fail = (r) => { this.app.audio.play('error'); renderShop(r.reason === 'coins' ? t('pet.need', { n: r.need }) : ''); };
+      body.querySelectorAll('[data-buy-pet]').forEach((b) => b.addEventListener('click', () => {
+        const r = buyPet(b.dataset.buyPet);
+        if (!r.ok) return fail(r);
+        P.active = P.active || b.dataset.buyPet;
+        persist(); syncShowcase();
+        again(t('pet.bought', { name: petDef(b.dataset.buyPet).name }));
+      }));
+      body.querySelectorAll('[data-feed-pet]').forEach((b) => b.addEventListener('click', () => {
+        const r = feedPet(b.dataset.feedPet);
+        if (!r.ok) return fail(r);
+        const d = petDef(b.dataset.feedPet);
+        if (r.grew) this.app.audio.play('levelUp');
+        again(r.grew ? t('pet.grew', { name: d.name }) : t('pet.fed', { n: PET_RULES.feedsToAdult - ownedPet(d.id).feeds }));
+      }));
+      body.querySelectorAll('[data-buy-hab]').forEach((b) => b.addEventListener('click', () => {
+        const r = buyHabitat(b.dataset.buyHab);
+        if (!r.ok) return fail(r);
+        again(t('pet.habBought', { name: HABITATS.find((h) => h.id === b.dataset.buyHab).name }));
+      }));
+      body.querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', () => {
+        const r = toggleSlot(b.dataset.slot, b.dataset.id);
+        if (!r.ok) return fail(r);
+        const rd = RIDERS.find((x) => x.id === b.dataset.id);
+        const name = b.dataset.slot === 'gear' ? rd.weapon.name : rd.bonusText;
+        again(r.action === 'unequip' ? t('pet.msg.unequip', { n: PET_RULES.gearPrice }) : r.action === 'swap' ? t('pet.msg.swap', { name }) : t('pet.msg.equip', { name }));
+      }));
+      body.querySelectorAll('[data-buy-gem]').forEach((b) => b.addEventListener('click', () => {
+        const r = buyGem(b.dataset.buyGem);
+        if (!r.ok) return fail(r);
+        again(t('mall.gotGem', { color: t('gem.' + b.dataset.buyGem), n: r.total }));
+      }));
+    };
+
+    const render = () => { syncShowcase(); if (this.petTab === 'shop') renderShop(); else renderMine(); };
+    n.querySelectorAll('.tab').forEach((tb) => tb.addEventListener('click', () => {
+      this.petTab = tb.dataset.tab; this.petStep = 'view';
+      n.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x === tb));
+      render();
+    }));
+    n.querySelector('[data-back]').addEventListener('click', () => {
+      // 离开宠物乐园：把菜单背景和坐骑恢复成普通模式
+      const app = this.app;
+      if (app.showcase && app.showcase.biome !== app.menuBiome()) app.rebuildShowcase(app.menuBiome());
+      app.showcase?.setSelection(save.dino, save.rider);
+      this.show('title');
+    });
     render();
     return n;
   }
@@ -698,7 +1005,7 @@ export class UI {
           <div class="cell"><div class="k">${t('result.time')}</div><div class="v">${formatTime(r.time)}</div>${r.prevBest ? `<div class="sub">${t('result.best', { t: formatTime(r.newBest ? r.time : r.prevBest) })}</div>` : ''}</div>
           <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${cnt(r.kills)}</div></div>
           <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${cnt(r.maxCombo)}</div></div>
-          <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
+          ${r.petMode && !r.armed ? '' : `<div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>`}
           <div class="cell"><div class="k">${t('result.coinsPicked')}</div><div class="v gold">${cnt(r.coins, '+')}</div></div>
           <div class="cell"><div class="k">${t('result.reward')}</div><div class="v gold">${cnt(r.reward, '+')}</div></div>
         </div>
@@ -714,7 +1021,7 @@ export class UI {
         ${r.endless ? `<div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:12px">${t('result.dist', { n: r.dist })}${r.newBest ? ` <span style="color:var(--gold)">${t('result.newBest')}</span>` : ''}</div>` : `<p style="text-align:center;color:var(--muted);margin-bottom:12px">${r.bossReached ? t('result.bossReached') : t('result.progress', { n: Math.round(r.progress * 100) })}${t('result.tryUpgrade')}${r.difficulty && r.difficulty !== 'easy' ? t('result.tryEasy') : ''}</p>`}
         ${scoreRow}
         <div class="result-grid">
-          <div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>
+          ${r.petMode && !r.armed ? '' : `<div class="cell"><div class="k">${t('result.weaponLv')}</div><div class="v">Lv.${r.weaponLv >= 10 ? 'MAX' : r.weaponLv}</div></div>`}
           <div class="cell"><div class="k">${t('result.kills')}</div><div class="v">${cnt(r.kills)}</div></div>
           <div class="cell"><div class="k">${t('result.combo')}</div><div class="v">${cnt(r.maxCombo)}</div></div>
           <div class="cell"><div class="k">${t('result.coinsGot')}</div><div class="v gold">${cnt(r.coins, '+')}</div></div>
@@ -737,7 +1044,7 @@ export class UI {
       </div>`);
     n.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
       const a = b.dataset.a;
-      if (a === 'next') this.app.startGame({ levelIdx: r.levelIdx + 1, dinoId: save.dino, riderId: save.rider });
+      if (a === 'next') this.app.startGame(this.app.lastOpts?.petMode ? { ...this.app.lastOpts, levelIdx: r.levelIdx + 1 } : { levelIdx: r.levelIdx + 1, dinoId: save.dino, riderId: save.rider });
       else if (a === 'retry') this.app.restart();
       else if (a === 'ending') this.app.exitToMenu('ending');
       else if (a === 'shop') this.app.exitToMenu('shop');

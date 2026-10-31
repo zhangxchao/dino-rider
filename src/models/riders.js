@@ -764,6 +764,99 @@ const BUILDERS = {
   },
 };
 
+// ---------------------------------------------------------------------
+//  宠物模式：两位小骑手（没有攻击力，装备了武器才会拿着发光的法球）与黑心博士
+// ---------------------------------------------------------------------
+function kidHeld(c, d) {
+  const held = c.grp(c.weapon);
+  if (d.weapon) {
+    c.add(held, sphere(0.08, 8, 6), c.glow(d.weapon.color, 1.5), [0, 0.02, 0.1]);
+    c.muzzle.position.set(0, 0.02, 0.18);
+  } else {
+    c.muzzle.position.set(0, 0, 0.15);
+  }
+  c.cfg.held = held;
+}
+
+BUILDERS.kidBoy = (c, d) => {
+  const C = d.colors;
+  const shirt = c.mat(C.main), pants = c.mat(0x3a4a6a), skin = c.mat(C.skin), cap = c.mat(C.accent), hair = c.mat(C.extra);
+  base(c, {
+    skin, torso: shirt, pelvis: pants, upperArm: shirt, foreArm: skin, hand: skin,
+    thigh: pants, shin: pants, foot: c.mat(0xf0f0f0), blush: true,
+  });
+  // 反戴的棒球帽 + 翘起的头发
+  c.add(c.head, partSphere(0.3, 12, 6, 0, TAU, 0, PI * 0.45), cap, [0, 0.0, 0]);
+  c.add(c.head, box(0.3, 0.03, 0.2), cap, [0, 0.12, -0.34], [0.15, 0, 0]);
+  c.add(c.head, cone(0.07, 0.14, 4), hair, [0.1, 0.08, 0.27], [PI / 2 - 0.4, 0, 0.3]);
+  c.add(c.head, cone(0.07, 0.14, 4), hair, [-0.1, 0.08, 0.27], [PI / 2 - 0.4, 0, -0.3]);
+  // 衣服上的星星 + 小背包
+  c.add(c.upper, octa(0.06), c.glow(C.accent, 1.1), [0, 0.28, 0.17], null, [1, 1, 0.3]);
+  c.add(c.upper, box(0.26, 0.3, 0.12), c.mat(0xd8503a), [0, 0.22, -0.2]);
+  kidHeld(c, d);
+};
+
+BUILDERS.kidGirl = (c, d) => {
+  const C = d.colors;
+  const top = c.mat(C.main), skirt = c.mat(shade(C.main, 0.85), { double: true }), skin = c.mat(C.skin), bow = c.mat(C.accent), hair = c.mat(C.extra);
+  base(c, {
+    skin, torso: top, pelvis: skirt, upperArm: top, foreArm: skin, hand: skin,
+    thigh: c.mat(0xf6e8e8), shin: c.mat(0xf6e8e8), foot: c.mat(0x8a3a5a), blush: true,
+  });
+  // 裙摆 + 腰间蝴蝶结
+  c.add(c.rig, cyl(0.2, 0.32, 0.22, 10, true), skirt, [0, 0.0, 0]);
+  c.add(c.upper, box(0.18, 0.06, 0.05), bow, [0, 0.06, 0.19]);
+  // 头发 + 两条马尾 + 头顶蝴蝶结
+  c.shell(c.head, hair, 0.3, 0.3 * PI, 0.62 * PI, 1.8);
+  for (const sg of [1, -1]) {
+    const tail = c.grp(c.head, [0.27 * sg, 0.06, -0.08]);
+    c.add(tail, sphere(0.1, 7, 5), hair, [0.03 * sg, -0.05, 0]);
+    c.add(tail, cone(0.09, 0.3, 5), hair, [0.05 * sg, -0.25, 0], [PI, 0, 0]);
+    c.flutter(tail, 'z', 0.1 * sg, 0.3 * sg, 0.12, 6, sg);
+  }
+  c.add(c.head, box(0.07, 0.07, 0.04), bow, [0.07, 0.3, 0.1], [0, 0, 0.5]);
+  c.add(c.head, box(0.07, 0.07, 0.04), bow, [-0.07, 0.3, 0.1], [0, 0, -0.5]);
+  c.add(c.head, sphere(0.03, 5, 4), bow, [0, 0.3, 0.1]);
+  kidHeld(c, d);
+};
+
+BUILDERS.doctor = (c, d) => {
+  const C = d.colors;
+  const coat = c.mat(C.main, { double: true }), coatTrim = c.mat(C.accent), skin = c.mat(C.skin), hair = c.mat(0xc8c8d4);
+  const dark = c.mat(0x14101c), glass = c.glow(C.extra, 1.6);
+  base(c, {
+    skin, torso: coat, pelvis: dark, upperArm: coat, foreArm: coat, hand: c.mat(0x14101c),
+    thigh: dark, shin: dark, foot: dark,
+  });
+  // 长白大褂变成黑紫长袍 + 立领
+  c.add(c.rig, cyl(0.2, 0.34, 0.34, 10, true), coat, [0, -0.04, 0]);
+  c.add(c.upper, cyl(0.2, 0.215, 0.3, 8), coat, [0, 0.15, 0]);
+  c.add(c.upper, box(0.1, 0.34, 0.03), coatTrim, [0, 0.18, 0.2]);
+  c.add(c.upper, box(0.34, 0.1, 0.12), coat, [0, 0.43, 0]);
+  // 胸前的黑化宝石（黑心博士靠它给坐骑加血）
+  const gem = c.grp(c.upper, [0, 0.3, 0.22]);
+  c.add(gem, octa(0.075), c.glow(0x9a3aff, 2.2), null, null, [1, 1.5, 0.8]);
+  c.spin(gem, 'y', 1.4);
+  c.pulse(gem.children[0].material, 1.6, 0.8, 3);
+  // 乱糟糟的灰发 + 圆护目镜 + 尖鼻子 + 坏笑
+  for (const [p, r] of [[[0, 0.22, -0.05], 0.15], [[-0.16, 0.14, -0.05], 0.13], [[0.16, 0.14, -0.05], 0.13], [[0, 0.1, -0.2], 0.14]]) c.add(c.head, ico(r), hair, p);
+  c.add(c.head, cone(0.06, 0.22, 4), hair, [0, 0.32, -0.04], [-0.3, 0, 0]);
+  for (const sg of [1, -1]) {
+    c.add(c.head, torus(0.075, 0.018, 5, 12), dark, [0.1 * sg, 0.07, 0.25]);
+    c.add(c.head, cyl(0.07, 0.07, 0.015, 10), glass, [0.1 * sg, 0.07, 0.255], [PI / 2, 0, 0]);
+  }
+  c.add(c.head, torus(0.285, 0.014, 4, 18), dark, [0, 0.07, 0], [PI / 2, 0, 0]);
+  c.add(c.head, cone(0.04, 0.14, 4), skin, [0, -0.04, 0.3], [PI / 2, 0, 0]);
+  c.add(c.head, box(0.16, 0.025, 0.03), c.mat(0x5a1a2a), [0, -0.14, 0.26]);
+  // 手里的黑心药水
+  const flask = c.grp(c.weapon, [0, 0.02, 0.08]);
+  c.add(flask, sphere(0.1, 9, 7), c.glow(0x9a3aff, 1.7), [0, 0, 0.06]);
+  c.add(flask, cyl(0.035, 0.035, 0.12, 6), c.mat(0xd8d0e8, { roughness: 0.2 }), [0, 0.12, 0.06]);
+  c.add(flask, sphere(0.04, 5, 4), c.mat(0x6a4424), [0, 0.2, 0.06]);
+  c.muzzle.position.set(0, 0.1, 0.12);
+  c.cfg.held = flask;
+};
+
 // 未知骑手的兜底外观
 BUILDERS.generic = (c, d) => {
   const C = d.colors || { main: 0x8888aa, accent: 0x444466, skin: 0xf2c9a0, extra: 0xffd24a };
@@ -777,7 +870,7 @@ BUILDERS.generic = (c, d) => {
 //  动作风格
 // ---------------------------------------------------------------------
 const STYLE = {
-  spear: 'throw', rock: 'throw', shuriken: 'throw', heart: 'throw',
+  spear: 'throw', rock: 'throw', shuriken: 'throw', heart: 'throw', potion: 'throw',
   slash: 'slash',
   arrow: 'bow',
   fireball: 'cast', ice: 'cast',

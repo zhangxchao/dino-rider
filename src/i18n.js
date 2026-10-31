@@ -1,6 +1,6 @@
 // 多语言：界面文案 t(key, params) + 游戏数据（恐龙 / 骑手 / 怪物名等）的就地替换
 //   data.js 中的中文是原文；切换语言时把译文写回这些数据对象，其他模块照常读取 def.name 即可。
-import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, WEAPON_LEVELS, GATES, BIOME_NAMES, UPGRADES, SKINS } from './data.js';
+import { DINOS, RIDERS, ENEMIES, BOSSES, LEVELS, WEAPON_LEVELS, GATES, BIOME_NAMES, UPGRADES, SKINS, PETS, PET_RIDERS, DOCTOR, FEEDS, HABITATS } from './data.js';
 import { save, persist } from './save.js';
 import zh from './locales/zh-CN.js';
 import en from './locales/en.js';
@@ -17,6 +17,7 @@ const byId = (arr) => Object.fromEntries(arr.filter(Boolean).map((x) => [x.id, x
 const DATA_TARGETS = {
   dinos: byId(DINOS), riders: byId(RIDERS), enemies: ENEMIES, bosses: BOSSES, levels: byId(LEVELS),
   weaponLevels: WEAPON_LEVELS, gates: GATES, biomes: BIOME_NAMES, upgrades: byId(UPGRADES), skins: byId(SKINS),
+  pets: byId(PETS), petRiders: { ...byId(PET_RIDERS), doctor: DOCTOR }, feeds: FEEDS, habitats: byId(HABITATS),
 };
 
 // 按译文的结构从 data.js 读出中文原文，切回中文时用它还原
@@ -74,6 +75,7 @@ export function setLang(id, { store = true } = {}) {
   document.documentElement.lang = id;
   document.documentElement.dataset.lang = id;
   document.title = t('doc.title');
+  for (const b of Object.values(BOSSES)) if (b.dinoId) b.title = t('pet.bossTitle'); // 恐龙首领的称号
   if (store) { save.settings.lang = id; persist(); }
 }
 

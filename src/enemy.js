@@ -65,7 +65,8 @@ function disposeModel(root) {
 
 const PROJ_KIND = { arrow: 'earrow', spore: 'spore', orb: 'orb', fireball: 'efire', ice: 'ice' };
 const MARCH = { melee: 0.75, ranged: 0.3, flying: 0.85 };
-const LATERAL = { wolf: 3.2, bat: 2.6, goblin: 1.6, slime: 1.2, skeleton: 1.4, scorpion: 1.4, yeti: 1.0, golem: 0.8, darkKnight: 1.4 };
+const LATERAL = { wolf: 3.2, bat: 2.6, goblin: 1.6, slime: 1.2, skeleton: 1.4, scorpion: 1.4, yeti: 1.0, golem: 0.8, darkKnight: 1.4,
+  darkAnt: 2.2, darkSnake: 2.4, darkWolf: 3.2, darkSpider: 2.0, darkCentipede: 2.0, darkEagle: 2.6, darkZombie: 1.2, darkTiger: 2.6, darkLion: 2.2, darkBear: 1.0, darkWyvern: 2.0, darkLizard: 1.0 };
 
 // ---------------------------------------------------------------------
 //  普通怪物
@@ -103,7 +104,7 @@ export class Enemy {
     this.xp = Math.max(1, Math.round((this.def.score || 10) / 8));
     this.speed = this.def.speed * rand(0.9, 1.12);
     this.kind = this.flying ? 'flying' : this.def.ranged ? 'ranged' : 'melee';
-    this.mass = Math.pow(this.radius, 1.5) * (this.type === 'golem' || this.type === 'yeti' || this.type === 'darkKnight' ? 1.8 : 1);
+    this.mass = Math.pow(this.radius, 1.5) * (this.type === 'golem' || this.type === 'yeti' || this.type === 'darkKnight' || this.type === 'darkBear' || this.type === 'darkLizard' ? 1.8 : 1);
     this.pos.set(x, game.heightAt(x, z), z);
     this.homeX = x;
     this.vel.set(0, 0, 0);
@@ -540,7 +541,8 @@ export class Boss {
     this.dmg = this.def.dmg * mul.dmg;
     this.xp = 0;
     this.mass = 40;
-    this.anchorD = 22 + this.radius * 1.3;
+    // 宠物模式的恐龙首领要近身肉搏：停在宠物嘴边，不像别的首领那样远远站着
+    this.anchorD = this.def.dinoId ? 3.2 + this.radius * 0.9 : 22 + this.radius * 1.3;
     this.pos = new THREE.Vector3(x, game.heightAt(x, z), z);
     this.vel = new THREE.Vector3();
     this.heading = Math.PI;

@@ -235,7 +235,14 @@ class App {
   }
 
   onScreen(name) {
-    if (this.showcase) this.showcase.setFrame(name === 'select' ? 'center' : 'right');
+    if (this.showcase) this.showcase.setFrame(name === 'select' || name === 'pets' ? 'center' : 'right');
+  }
+
+  /** 宠物乐园换住所：重建菜单背景的地形（宠物 / 骑手由调用方再 setSelection） */
+  rebuildShowcase(biome) {
+    if (this.showcase) this.showcase.dispose();
+    this.showcase = new Showcase(this, biome);
+    return this.showcase;
   }
 
   startGame(opts) {

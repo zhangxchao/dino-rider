@@ -1,6 +1,6 @@
 // 离屏渲染恐龙 / 骑手头像（用于选择界面和 HUD）
 import * as THREE from 'three';
-import { DINOS, RIDERS } from './data.js';
+import { DINOS, RIDERS, PETS, PET_RIDERS } from './data.js';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
 
@@ -56,9 +56,11 @@ export async function renderThumbnails(onProgress) {
     return url;
   };
 
-  const total = DINOS.length + RIDERS.length;
+  const dinoList = [...DINOS, ...PETS];
+  const riderList = [...RIDERS, ...PET_RIDERS];
+  const total = dinoList.length + riderList.length;
   let done = 0;
-  for (const def of DINOS) {
+  for (const def of dinoList) {
     try {
       const m = createDinoModel(def);
       m.update(0.016, idle);
@@ -67,7 +69,7 @@ export async function renderThumbnails(onProgress) {
     onProgress && onProgress(++done / total, def.name);
     await nextFrame();
   }
-  for (const def of RIDERS) {
+  for (const def of riderList) {
     try {
       const m = createRiderModel(def);
       m.update(0.016, idle);

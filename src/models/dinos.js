@@ -438,14 +438,14 @@ function buildHead(ctx, head) {
       msh(jaw, gBox(), M.mouth, 0, jr0 * jfl * 0.55, L * 0.45, jr0 * 1.1, 0.02, L * 0.72);
       teethRow(jaw, M, 0, L * 0.86, 0, H * 0.05, jr0, jr1, jfl, 4, H * 0.15, W * 0.035, true);
       addEyes(ctx, head, W * 0.4, H * 0.4, L * 0.14, W * 0.13, true);
-      if (ctx.def.id === 'spinosaurus') msh(head, gCrest(), M.accent, 0, H * 0.38, L * 0.34, L * 0.14, H * 0.38, 0.04, 0, PI / 2, 0);
+      if ((ctx.def.modelId || ctx.def.id) === 'spinosaurus') msh(head, gCrest(), M.accent, 0, H * 0.38, L * 0.34, L * 0.14, H * 0.38, 0.04, 0, PI / 2, 0);
       ctx.mouth = grp(head, 0, jy, L * 0.98);
       ctx.maxJaw = 0.7;
       break;
     }
     case 'beak': {
       msh(head, gSph(), M.main, 0, H * 0.15, L * 0.3, W * 0.5, H * 0.52, L * 0.38);
-      const beakMat = ctx.def.id === 'gallimimus' ? M.beak : M.accent;
+      const beakMat = (ctx.def.modelId || ctx.def.id) === 'gallimimus' ? M.beak : M.accent;
       msh(head, gCone(6), beakMat, 0, H * 0.0, L * 0.84, W * 0.28, L * 0.5, H * 0.24, PI / 2, 0, 0);
       const jaw = grp(head, 0, -H * 0.18, L * 0.5); ctx.jaw = jaw;
       msh(jaw, gCone(6), beakMat, 0, 0, L * 0.22, W * 0.22, L * 0.4, H * 0.12, PI / 2, 0, 0);
@@ -566,7 +566,7 @@ function buildHead(ctx, head) {
     case 'sauro': {
       msh(head, gSph(), M.main, 0, 0, L * 0.3, W * 0.5, H * 0.5, L * 0.38);
       seg(head, [0, -H * 0.05, L * 0.4], [0, -H * 0.12, L * 1.0], W * 0.4, W * 0.34, M.main, 6, 0.7);
-      if (ctx.def.id === 'brachiosaurus') msh(head, gSph(), M.main, 0, H * 0.42, L * 0.42, W * 0.32, H * 0.4, L * 0.28);
+      if ((ctx.def.modelId || ctx.def.id) === 'brachiosaurus') msh(head, gSph(), M.main, 0, H * 0.42, L * 0.42, W * 0.32, H * 0.4, L * 0.28);
       const jaw = grp(head, 0, -H * 0.36, L * 0.3); ctx.jaw = jaw;
       seg(jaw, [0, 0, 0], [0, 0.02, L * 0.64], W * 0.34, W * 0.3, M.main, 6, 0.5);
       for (const s of [-1, 1]) for (let i = 0; i < 2; i++) spike(head, [s * W * (0.12 + i * 0.12), -H * 0.33, L * (0.96 - i * 0.08)], [0, -1, 0.1], H * 0.14, W * 0.04, M.tooth, 4);
@@ -964,6 +964,18 @@ function makeUpdater(ctx) {
           if (sickle) kick = swipe;
           break;
         }
+        case 'maul': {
+          // 扑咬：先张嘴扑上去咬住，再用前爪和镰刀爪连续挠
+          const open = a < 0.3 ? smooth(a / 0.3) : a < 0.42 ? 1 - smooth((a - 0.3) / 0.12) : 0;
+          const lunge = a < 0.3 ? -0.3 * smooth(a / 0.3) : a < 0.48 ? lerp(-0.3, 1, smooth((a - 0.3) / 0.18)) : 1 - smooth((a - 0.48) / 0.52);
+          const rake = bump(a, 0.45, 0.62) + bump(a, 0.62, 0.8) * 0.8;
+          jaw = Math.max(jaw, open);
+          neckX += lunge * 0.3; headX += -open * 0.25 + lunge * 0.1;
+          bodyZ += lunge * 0.4; pitch += lunge * 0.12;
+          armX += -1.2 * rake * (0.6 + 0.4 * Math.sin(a * 60)); elbowX += -0.4 * rake; armOut += 0.2 * rake;
+          if (sickle) kick = Math.max(kick, rake);
+          break;
+        }
         case 'tail': {
           const sw = a < 0.3 ? 0.6 * smooth(a / 0.3) : a < 0.55 ? lerp(0.6, -1.25, smooth((a - 0.3) / 0.25)) : -1.25 * (1 - smooth((a - 0.55) / 0.45));
           tailY += sw; rigYaw += -sw * 0.45; yaw += sw * 0.15; neckY += -sw * 0.2;
@@ -1171,7 +1183,7 @@ export function createDinoModel(def) {
   const kind = def.body === 'pterosaur' ? 'ptero'
     : (def.body === 'theropod' || def.body === 'ornithopod') ? 'biped' : 'quad';
   const base = kind === 'ptero' ? PTERO : kind === 'biped' ? BIPED : QUAD;
-  const P = Object.assign({}, base, SPECIES[def.id] || {});
+  const P = Object.assign({}, base, SPECIES[def.modelId || def.id] || {});
   const root = new THREE.Group();
   root.name = 'dino-' + def.id;
   const rig = grp(root);

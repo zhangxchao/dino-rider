@@ -37,12 +37,12 @@ export class Hud {
         <div>
           <div class="nm">${dino.name}<small>${t('common.rider', { name: rider.name })}</small></div>
           <div class="bar-outer"><div class="bar-fill ghost"></div><div class="bar-fill hp"></div><div class="bar-text"></div></div>
-          <div class="weapon-row">
-            <span class="wicon">${WEAPON_ICON[rider.weapon.type] || '🎯'}</span>
+          <div class="weapon-row" ${rider.weapon ? '' : 'style="display:none"'}>
+            <span class="wicon">${rider.weapon ? (WEAPON_ICON[rider.weapon.type] || '🎯') : '🐾'}</span>
             <span class="wlv">Lv.1</span>
-            <span class="wname">${rider.weapon.name}</span>
+            <span class="wname">${rider.weapon ? rider.weapon.name : ''}</span>
           </div>
-          <div class="bar-outer thin xp"><div class="bar-fill xpfill"></div></div>
+          <div class="bar-outer thin xp" ${rider.weapon ? '' : 'style="display:none"'}><div class="bar-fill xpfill"></div></div>
           <div class="gate-icons"></div>
           <div class="buffs"></div>
         </div>
@@ -70,7 +70,7 @@ export class Hud {
         <div class="skill-ico big skill"><div class="lbl">${dino.skill.name}</div>${SKILL_ICON[dino.skill.type] || '✨'}<div class="cd"></div><div class="cdt"></div><div class="key">Q</div></div>
       </div>
       <div class="hud-hints">
-        ${t('hud.hints')}
+        ${t(rider.weapon ? 'hud.hints' : 'hud.hintsPet')}
       </div>`;
     root.classList.toggle('touch', !!touch);
     // 触屏：技能冷却和狂热进度直接画在可点的触屏按钮上（原来的技能卡被按钮挡住了）

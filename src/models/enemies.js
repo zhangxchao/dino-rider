@@ -521,8 +521,9 @@ function buildArcher(c) {
 // ---------------- 冰原狼 ----------------
 function buildWolf(c) {
   const fur = mat(c.color), dark = mat(shade(c.color, 0.7));
-  const ice = mat(0xa8e4ff, { emissive: 0x3aa8ff, emissiveIntensity: 0.6, roughness: 0.2, metalness: 0.1 });
-  const eyeM = glowMat(0x7ae8ff, 2.5), nose = mat(0x1a1a22);
+  const shardC = c.def.shard ?? 0xa8e4ff;
+  const ice = c.def.shard ? glowMat(shardC, 1.6) : mat(0xa8e4ff, { emissive: 0x3aa8ff, emissiveIntensity: 0.6, roughness: 0.2, metalness: 0.1 });
+  const eyeM = glowMat(c.def.eye ?? 0x7ae8ff, 2.5), nose = mat(0x1a1a22);
 
   const body = grp(c.base, 0, 0.97, 0);
   add(body, G.box(0.6, 0.52, 1.25), fur, 0, 0, -0.05);
@@ -580,8 +581,8 @@ function buildWolf(c) {
 
 // ---------------- 雪怪 ----------------
 function buildYeti(c) {
-  const furM = mat(c.color, { roughness: 1 }), skinM = mat(0x7a8aa8), hornM = mat(0xe0d8c0);
-  const eyeM = glowMat(0x40c0ff, 1.8), mouthM = mat(0x3a1a2a), tooth = mat(0xffffff);
+  const furM = mat(c.color, { roughness: 1 }), skinM = mat(c.def.skin ?? 0x7a8aa8), hornM = mat(0xe0d8c0);
+  const eyeM = glowMat(c.def.eye ?? 0x40c0ff, 1.8), mouthM = mat(0x3a1a2a), tooth = mat(0xffffff);
 
   const hips = grp(c.base, 0, 1.0, 0);
   add(hips, G.ico(0.6, 1), furM, 0, 0.1, 0).scale.set(1.1, 0.8, 0.9);
@@ -601,8 +602,14 @@ function buildYeti(c) {
   add(jaw, G.box(0.3, 0.1, 0.12), mouthM, 0, -0.03, 0.14);
   add(jaw, G.cone(0.035, 0.12, 4), tooth, -0.1, 0.03, 0.18);
   add(jaw, G.cone(0.035, 0.12, 4), tooth, 0.1, 0.03, 0.18);
-  add(head, G.cone(0.09, 0.4, 5), hornM, -0.38, 0.42, -0.05).rotation.z = 0.6;
-  add(head, G.cone(0.09, 0.4, 5), hornM, 0.38, 0.42, -0.05).rotation.z = -0.6;
+  if (c.def.ears) { // 熊：圆耳朵 + 突出的口鼻，没有角
+    for (const sx of [-1, 1]) add(head, G.sph(0.17, 7, 5), furM, sx * 0.34, 0.5, -0.02);
+    add(head, G.sph(0.22, 8, 6), skinM, 0, -0.02, 0.5).scale.set(1, 0.8, 1);
+    add(head, G.sph(0.06, 5, 4), mat(0x120c0a), 0, 0.04, 0.68);
+  } else {
+    add(head, G.cone(0.09, 0.4, 5), hornM, -0.38, 0.42, -0.05).rotation.z = 0.6;
+    add(head, G.cone(0.09, 0.4, 5), hornM, 0.38, 0.42, -0.05).rotation.z = -0.6;
+  }
 
   const arms = [];
   for (const side of [-1, 1]) {
@@ -1036,6 +1043,435 @@ function buildDarkKnight(c) {
 // =====================================================================
 //  通用封装
 // =====================================================================
+
+// =====================================================================
+//  黑化生物（宠物模式）：身上都有一块发紫光的黑化晶体、红色的眼睛
+// =====================================================================
+function darkShard(parent, x, y, z, k = 1) {
+  const m = add(parent, G.oct(0.1 * k), glowMat(0x9a3aff, 1.9), x, y, z);
+  m.scale.set(0.7, 1.7, 0.7);
+  return m;
+}
+const redEye = () => glowMat(0xff2a2a, 2.6);
+
+// 昆虫腿：每条腿一个枢轴（偏航 + 抬腿）
+function insectLegs(parent, mat3, n, span, zStart, zStep, legLen, thick = 0.045) {
+  const legs = [];
+  for (let side = -1; side <= 1; side += 2) {
+    for (let i = 0; i < n; i++) {
+      const p = grp(parent, side * span, 0, zStart - i * zStep);
+      add(p, G.box(legLen * 0.8, thick, thick), mat3, side * legLen * 0.4, 0.06, 0).rotation.z = side * 0.5;
+      add(p, G.box(thick, legLen, thick), mat3, side * legLen * 0.85, -legLen * 0.35, 0).rotation.z = side * 0.25;
+      legs.push({ p, side, i, yaw: -side * (0.5 - i * (n > 3 ? 0.18 : 0.35)) });
+    }
+  }
+  return legs;
+}
+function walkLegs(legs, t, m, speed = 10) {
+  const p = t * (speed + 8 * m);
+  for (const L of legs) {
+    const q = p + L.i * 1.4 + (L.side > 0 ? PI : 0);
+    L.p.rotation.y = L.yaw + Math.sin(q) * 0.25 * (m + 0.15);
+    L.p.rotation.z = L.side * Math.max(0, Math.cos(q)) * 0.2 * m;
+  }
+}
+
+// ---------------- 黑化巨蚁 ----------------
+function buildDarkAnt(c) {
+  const shell = mat(c.color, { roughness: 0.4 }), dark = mat(shade(c.color, 0.55)), eyeM = redEye();
+  const body = grp(c.base, 0, 0.5, 0);
+  const abd = add(body, G.sph(0.42, 10, 8), shell, 0, 0.06, -0.62);
+  abd.scale.set(1, 0.9, 1.35);
+  darkShard(body, 0, 0.5, -0.62);
+  add(body, G.sph(0.25, 8, 6), shell, 0, 0.04, -0.08);
+  const head = grp(body, 0, 0.1, 0.34);
+  add(head, G.sph(0.27, 8, 6), shell).scale.set(1, 0.9, 1.05);
+  add(head, G.sph(0.06, 5, 4), eyeM, -0.13, 0.08, 0.2);
+  add(head, G.sph(0.06, 5, 4), eyeM, 0.13, 0.08, 0.2);
+  const mand = [-1, 1].map((sd) => {
+    const g = grp(head, sd * 0.1, -0.1, 0.24);
+    add(g, G.cone(0.05, 0.3, 4), dark, sd * 0.05, 0, 0.1).rotation.set(PI / 2, 0, -sd * 0.4);
+    return { g, sd };
+  });
+  for (const sd of [-1, 1]) add(head, G.box(0.03, 0.03, 0.34), dark, sd * 0.1, 0.24, 0.15).rotation.set(-0.5, sd * 0.2, 0);
+  const legs = insectLegs(body, dark, 3, 0.14, 0.12, 0.2, 0.5);
+  const muzzle = grp(head, 0, 0, 0.32);
+  return {
+    designR: 0.8, muzzle,
+    anim(t, mv, a) {
+      walkLegs(legs, t, Math.min(mv, 1.6), 12);
+      const w = windup(a), s = strike(a);
+      for (const M of mand) M.g.rotation.y = M.sd * (0.15 + 0.5 * w - 0.4 * s);
+      head.rotation.x = -0.3 * w + 0.4 * s;
+      body.position.set(0, 0.5 + 0.03 * Math.sin(t * 9), 0.3 * s - 0.12 * w);
+      abd.rotation.x = 0.2 * w;
+    },
+  };
+}
+
+// ---------------- 黑化毒蛇 ----------------
+function buildDarkSnake(c) {
+  const skin = mat(c.color, { roughness: 0.5 }), belly = mat(0x6a5a78), eyeM = redEye(), tongue = mat(0xd02050);
+  const N = 9;
+  const segs = [];
+  const root = grp(c.base, 0, 0.18, 0);
+  for (let i = 0; i < N; i++) {
+    const r = 0.2 - i * 0.012;
+    const g = grp(root);
+    add(g, G.sph(r, 8, 6), i % 2 ? skin : mat(shade(c.color, 1.5), { roughness: 0.5 })).scale.set(1, 0.9, 1.3);
+    segs.push({ g, z: -0.04 - i * 0.28 });
+  }
+  const head = grp(root, 0, 0.02, 0.28);
+  add(head, G.sph(0.2, 8, 6), skin).scale.set(1, 0.85, 1.25);
+  add(head, G.sph(0.045, 5, 4), eyeM, -0.11, 0.08, 0.13);
+  add(head, G.sph(0.045, 5, 4), eyeM, 0.11, 0.08, 0.13);
+  const jaw = grp(head, 0, -0.07, 0.05);
+  add(jaw, G.box(0.2, 0.05, 0.3), belly, 0, 0, 0.12);
+  add(jaw, G.cone(0.03, 0.12, 4), mat(0xffffff), -0.06, 0.07, 0.2).rotation.x = PI;
+  add(jaw, G.cone(0.03, 0.12, 4), mat(0xffffff), 0.06, 0.07, 0.2).rotation.x = PI;
+  const tng = add(head, G.box(0.02, 0.01, 0.2), tongue, 0, -0.02, 0.4);
+  darkShard(root, 0, 0.3, -0.9, 0.9);
+  const muzzle = grp(head, 0, 0, 0.35);
+  return {
+    designR: 0.7, muzzle,
+    anim(t, mv, a) {
+      const m = Math.min(mv, 1.5), w = windup(a), s = strike(a);
+      const lift = 0.55 * w; // 蓄力时前半身立起来
+      for (let i = 0; i < N; i++) {
+        const S = segs[i];
+        const sway = Math.sin(t * (4 + 3 * m) - i * 0.75) * (0.12 + 0.1 * m) * (0.3 + i / N);
+        S.g.position.set(sway, 0, S.z + 0.5 * s * Math.max(0, 1 - i * 0.25));
+        S.g.position.y = i < 4 ? lift * (1 - i * 0.22) * 0.9 : 0;
+      }
+      head.position.set(segs[0].g.position.x, lift * 0.9 + 0.02, 0.28 + 0.5 * s);
+      head.rotation.x = -0.5 * w + 0.6 * s;
+      jaw.rotation.x = 0.1 + 0.6 * w + 0.2 * s;
+      tng.scale.z = 0.6 + 0.4 * Math.sin(t * 14);
+    },
+  };
+}
+
+// ---------------- 黑化蜈蚣 ----------------
+function buildDarkCentipede(c) {
+  const shell = mat(c.color, { roughness: 0.45 }), legM = mat(0xb03030), eyeM = redEye();
+  const N = 11;
+  const root = grp(c.base, 0, 0.3, 0);
+  const segs = [];
+  for (let i = 0; i < N; i++) {
+    const g = grp(root);
+    const r = 0.26 - Math.abs(i - 3) * 0.012;
+    add(g, G.sph(r, 8, 6), shell).scale.set(1.15, 0.7, 0.75);
+    const lg = [];
+    for (const sd of [-1, 1]) {
+      const p = grp(g, sd * 0.2, -0.04, 0);
+      add(p, G.box(0.34, 0.035, 0.035), legM, sd * 0.17, -0.04, 0).rotation.z = sd * -0.35;
+      lg.push({ p, sd });
+    }
+    segs.push({ g, z: 0.4 - i * 0.3, lg, i });
+  }
+  const head = grp(root, 0, 0.02, 0.62);
+  add(head, G.sph(0.27, 8, 6), mat(shade(c.color, 1.6))).scale.set(1.1, 0.8, 1);
+  add(head, G.sph(0.05, 5, 4), eyeM, -0.12, 0.08, 0.2);
+  add(head, G.sph(0.05, 5, 4), eyeM, 0.12, 0.08, 0.2);
+  const pincer = [-1, 1].map((sd) => {
+    const g = grp(head, sd * 0.14, -0.1, 0.22);
+    add(g, G.cone(0.05, 0.32, 4), legM, sd * 0.06, 0, 0.1).rotation.set(PI / 2, 0, -sd * 0.5);
+    return { g, sd };
+  });
+  for (const sd of [-1, 1]) add(head, G.box(0.025, 0.025, 0.5), legM, sd * 0.1, 0.22, 0.3).rotation.set(-0.35, sd * 0.25, 0);
+  darkShard(root, 0, 0.32, -1.0, 0.9);
+  const muzzle = grp(head, 0, 0, 0.3);
+  return {
+    designR: 0.9, muzzle,
+    anim(t, mv, a) {
+      const m = Math.min(mv, 1.6), w = windup(a), s = strike(a);
+      for (const S of segs) {
+        const ph = t * (7 + 6 * m) - S.i * 0.6;
+        S.g.position.set(Math.sin(ph * 0.5) * 0.12 * (0.3 + S.i / N), 0, S.z + 0.4 * s * (S.i < 3 ? 1 : 0.3));
+        for (const L of S.lg) L.p.rotation.y = L.sd * Math.sin(ph + (L.sd > 0 ? PI : 0)) * 0.55 * (m + 0.2);
+      }
+      head.position.set(segs[0].g.position.x, 0.02 + 0.3 * w, 0.62 + 0.45 * s);
+      head.rotation.x = -0.4 * w + 0.5 * s;
+      for (const P of pincer) P.g.rotation.y = P.sd * (0.1 + 0.5 * w - 0.5 * s);
+    },
+  };
+}
+
+// ---------------- 黑化金雕 ----------------
+function buildDarkEagle(c) {
+  const fur = mat(c.color), gold = mat(0xd8a838), wingM = mat(shade(c.color, 0.8)), beak = mat(0xe8b830), eyeM = redEye();
+  const body = grp(c.base);
+  add(body, G.sph(0.34, 9, 7), fur).scale.set(1, 0.95, 1.5);
+  const head = grp(body, 0, 0.26, 0.5);
+  add(head, G.sph(0.2, 8, 6), gold);
+  add(head, G.cone(0.1, 0.3, 5), beak, 0, -0.04, 0.26).rotation.x = PI / 2 + 0.35;
+  add(head, G.sph(0.045, 5, 4), eyeM, -0.1, 0.07, 0.14);
+  add(head, G.sph(0.045, 5, 4), eyeM, 0.1, 0.07, 0.14);
+  add(head, G.box(0.38, 0.05, 0.08), fur, 0, 0.14, 0.12);
+  const tail = grp(body, 0, 0.0, -0.6);
+  for (let i = -2; i <= 2; i++) add(tail, G.box(0.1, 0.03, 0.55), wingM, i * 0.1, 0, -0.25).rotation.y = i * 0.12;
+  const wings = [-1, 1].map((sd) => {
+    const w = grp(body, sd * 0.28, 0.12, 0.05);
+    for (let k = 0; k < 4; k++) {
+      add(w, G.box(0.46, 0.04, 0.5 - k * 0.07), k % 2 ? wingM : fur, sd * (0.25 + k * 0.42), 0, -0.1 - k * 0.07).rotation.y = sd * k * 0.07;
+    }
+    return { w, sd };
+  });
+  for (const sd of [-1, 1]) {
+    const f = add(body, G.cone(0.05, 0.22, 4), beak, sd * 0.12, -0.34, 0.2);
+    f.rotation.x = PI;
+  }
+  darkShard(body, 0, 0.42, -0.12, 0.8);
+  const muzzle = grp(head, 0, 0, 0.35);
+  return {
+    designR: 0.9, groundY: 0.3, muzzle,
+    anim(t, mv, a, hurt, d) {
+      const flap = Math.sin(t * (9 + 4 * mv));
+      const fold = ss(d * 2);
+      const w = windup(a), s = strike(a);
+      for (const W of wings) W.w.rotation.z = W.sd * lerp(flap * 0.7 + 0.1, -1.0, fold);
+      c.base.position.y += 0.3 * Math.sin(t * 2.1) + 0.1 * flap + 0.5 * w - 1.6 * s;
+      c.base.rotation.x = 0.2 * Math.min(mv, 1) + 0.5 * s - 0.25 * w;
+      head.rotation.x = 0.1 * Math.sin(t * 1.4) + 0.3 * s;
+    },
+  };
+}
+
+// ---------------- 黑化僵尸（骨架换成腐绿皮肤，双臂前伸） ----------------
+function buildDarkZombie(c) {
+  const r = skeletonRig(c, 0xff2a2a);
+  const rag = mat(0x3a3430, { side: THREE.DoubleSide });
+  add(r.torso, G.box(0.46, 0.5, 0.26), rag, 0, 0.36, -0.03);
+  add(r.hips, G.box(0.4, 0.3, 0.24), rag, 0, -0.14, 0);
+  darkShard(r.torso, 0.1, 0.78, -0.2, 0.7);
+  const muzzle = grp(r.head, 0, 0.1, 0.25);
+  return {
+    designR: 0.8, muzzle,
+    anim(t, mv, a) {
+      const m = Math.min(mv, 1.4);
+      const sw = walkSkeleton(r, t, m);
+      const w = windup(a), s = strike(a), act = Math.max(w, s);
+      // 僵尸走路：双臂平举，身体前倾
+      r.armL.rotation.x = -1.45 * (1 - act) - 2.4 * w + 0.4 * s;
+      r.armR.rotation.x = -1.45 * (1 - act) - 2.4 * w + 0.4 * s;
+      r.armL.rotation.z = -0.12; r.armR.rotation.z = 0.12;
+      r.elbL.rotation.x = -0.2; r.elbR.rotation.x = -0.2;
+      r.torso.rotation.x = 0.25 - 0.2 * w + 0.4 * s;
+      r.head.rotation.x = 0.1 + 0.25 * s;
+      r.torso.rotation.z = Math.sin(t * 2.3) * 0.08 * m;
+      void sw;
+    },
+  };
+}
+
+// ---------------- 黑化猛虎 / 雄狮 ----------------
+function buildBigCat(c, lion) {
+  const fur = mat(c.color), dark = mat(shade(c.color, lion ? 0.6 : 0.45)), belly = mat(lion ? 0xc8a060 : 0xe0c8a0);
+  const mane = mat(0x2a1608), eyeM = redEye(), nose = mat(0x1a1010), tooth = mat(0xffffff);
+  const body = grp(c.base, 0, 1.0, 0);
+  add(body, G.box(0.66, 0.58, 1.35), fur, 0, 0, -0.05);
+  add(body, G.box(0.74, 0.66, 0.55), fur, 0, 0.04, 0.46);
+  add(body, G.box(0.5, 0.2, 1.1), belly, 0, -0.26, 0);
+  if (!lion) for (let i = 0; i < 5; i++) add(body, G.box(0.7, 0.06, 0.1), dark, 0, 0.3 - Math.abs(i - 2) * 0.03, 0.55 - i * 0.28); // 虎纹
+  darkShard(body, 0, 0.42, -0.3, 0.9);
+  const head = grp(body, 0, 0.32, 0.86);
+  add(head, G.box(0.5, 0.42, 0.44), fur, 0, 0.03, 0.08);
+  add(head, G.box(0.3, 0.2, 0.3), belly, 0, -0.06, 0.4);
+  add(head, G.box(0.1, 0.08, 0.06), nose, 0, 0.02, 0.58);
+  if (lion) {
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * TAU;
+      add(head, G.ico(0.2, 0), mane, Math.cos(a) * 0.3, 0.05 + Math.sin(a) * 0.3, -0.12).scale.set(1, 1, 1.3);
+    }
+    add(head, G.ico(0.3, 0), mane, 0, 0.0, -0.1);
+  } else {
+    for (const sx of [-1, 1]) add(head, G.sph(0.11, 6, 4), fur, sx * 0.2, 0.28, -0.02);
+    for (const sx of [-1, 1]) add(head, G.box(0.04, 0.2, 0.04), dark, sx * 0.2, 0.16, 0.28).rotation.z = sx * 0.3;
+  }
+  add(head, G.sph(0.05, 6, 4), eyeM, -0.14, 0.12, 0.3);
+  add(head, G.sph(0.05, 6, 4), eyeM, 0.14, 0.12, 0.3);
+  const jaw = grp(head, 0, -0.14, 0.26);
+  add(jaw, G.box(0.24, 0.07, 0.3), dark, 0, 0, 0.12);
+  add(jaw, G.cone(0.03, 0.12, 4), tooth, -0.08, 0.08, 0.22);
+  add(jaw, G.cone(0.03, 0.12, 4), tooth, 0.08, 0.08, 0.22);
+  const tail = grp(body, 0, 0.2, -0.72);
+  add(tail, G.cyl(0.05, 0.08, 0.9, 5), fur, 0, 0.2, -0.35).rotation.x = -1.1;
+  if (lion) add(tail, G.sph(0.11, 6, 4), mane, 0, 0.62, -0.62); else add(tail, G.sph(0.07, 6, 4), dark, 0, 0.62, -0.62);
+  const legs = [];
+  for (const [x, z, off] of [[-0.25, 0.52, 0], [0.25, 0.52, PI], [-0.25, -0.56, PI], [0.25, -0.56, 0]]) {
+    const L = grp(body, x, -0.16, z);
+    add(L, G.box(0.2, 0.5, 0.24), fur, 0, -0.22, 0);
+    const K = grp(L, 0, -0.46, 0);
+    add(K, G.box(0.15, 0.46, 0.18), fur, 0, -0.22, 0);
+    add(K, G.box(0.2, 0.09, 0.26), dark, 0, -0.46, 0.05);
+    legs.push({ L, K, off, dir: z > 0 ? 1 : -1 });
+  }
+  const muzzle = grp(head, 0, 0, 0.6);
+  return {
+    designR: 1.15, muzzle,
+    anim(t, mv, a) {
+      const m = Math.min(mv, 1.6), p = t * (6 + 5 * m);
+      for (const g of legs) {
+        const q = p + g.off;
+        g.L.rotation.x = Math.sin(q) * 0.55 * m;
+        g.K.rotation.x = g.dir * Math.max(0, Math.cos(q)) * 0.6 * m;
+      }
+      const w = windup(a), s = strike(a);
+      body.position.set(0, 1.0 + Math.abs(Math.sin(p)) * 0.05 * m, -0.25 * w + 0.6 * s);
+      body.rotation.x = 0.04 * Math.sin(p * 2) * m - 0.15 * w + 0.2 * s;
+      head.rotation.x = 0.05 * Math.sin(p) - 0.4 * w + 0.4 * s;
+      jaw.rotation.x = 0.12 + 0.05 * Math.sin(t * 5) + 0.8 * w;
+      tail.rotation.y = Math.sin(t * (2.5 + 3 * m)) * 0.4;
+    },
+  };
+}
+
+// ---------------- 黑化飞龙 ----------------
+function buildDarkWyvern(c) {
+  const hide = mat(c.color), belly = mat(shade(c.color, 1.8)), wingM = mat(0x2a1c44, { side: THREE.DoubleSide }), eyeM = redEye();
+  const horn = mat(0xd8d0e0), tooth = mat(0xffffff);
+  const body = grp(c.base);
+  add(body, G.sph(0.5, 10, 8), hide).scale.set(1, 0.9, 1.6);
+  add(body, G.sph(0.34, 8, 6), belly, 0, -0.16, 0.1).scale.set(1, 0.8, 1.5);
+  const neck = grp(body, 0, 0.2, 0.7);
+  add(neck, G.cyl(0.15, 0.2, 0.6, 6), hide, 0, 0.2, 0.2).rotation.x = 0.9;
+  const head = grp(neck, 0, 0.5, 0.55);
+  add(head, G.box(0.34, 0.28, 0.5), hide, 0, 0, 0.12);
+  add(head, G.box(0.24, 0.16, 0.3), hide, 0, -0.02, 0.45);
+  add(head, G.sph(0.05, 5, 4), eyeM, -0.15, 0.1, 0.18);
+  add(head, G.sph(0.05, 5, 4), eyeM, 0.15, 0.1, 0.18);
+  add(head, G.cone(0.05, 0.4, 4), horn, -0.12, 0.24, -0.1).rotation.x = -0.9;
+  add(head, G.cone(0.05, 0.4, 4), horn, 0.12, 0.24, -0.1).rotation.x = -0.9;
+  const jaw = grp(head, 0, -0.1, 0.3);
+  add(jaw, G.box(0.22, 0.06, 0.4), hide, 0, 0, 0.18);
+  add(jaw, G.cone(0.03, 0.1, 4), tooth, -0.07, 0.07, 0.3);
+  add(jaw, G.cone(0.03, 0.1, 4), tooth, 0.07, 0.07, 0.3);
+  const tail = grp(body, 0, 0.0, -0.8);
+  add(tail, G.cone(0.2, 1.7, 5), hide, 0, 0, -0.8).rotation.x = -PI / 2;
+  add(tail, G.cone(0.14, 0.4, 3), belly, 0, 0, -1.8).rotation.x = -PI / 2;
+  const wings = [-1, 1].map((sd) => {
+    const w = grp(body, sd * 0.3, 0.3, 0.1);
+    const mem = add(w, G.wing(), wingM);
+    mem.rotation.x = -PI / 2;
+    mem.scale.set(sd * 2.3, 2.3, 1);
+    add(w, G.box(2.8, 0.07, 0.07), hide, sd * 1.4, 0, 0.1);
+    return { w, sd };
+  });
+  darkShard(body, 0, 0.55, -0.2, 1.1);
+  const muzzle = grp(head, 0, 0, 0.55);
+  return {
+    designR: 1.5, groundY: 0.5, muzzle,
+    anim(t, mv, a, hurt, d) {
+      const flap = Math.sin(t * (6 + 3 * mv));
+      const fold = ss(d * 2);
+      const w = windup(a), s = strike(a);
+      for (const W of wings) W.w.rotation.z = W.sd * lerp(flap * 0.6 + 0.1, -1.1, fold);
+      c.base.position.y += 0.35 * Math.sin(t * 1.6) + 0.18 * flap + 0.4 * w - 1.7 * s;
+      c.base.rotation.x = 0.12 + 0.4 * s - 0.2 * w;
+      neck.rotation.x = -0.5 * w + 0.6 * s;
+      jaw.rotation.x = 0.1 + 0.8 * w;
+      tail.rotation.y = Math.sin(t * 2) * 0.4;
+    },
+  };
+}
+
+// ---------------- 黑化蜥蜴怪 ----------------
+//  脖子上一圈羽毛，两只前臂两侧长着很长的尖刺。攻击：先颠咬（头上下甩着咬），
+//  再把尖刺往前伸出刺向对手。
+function buildDarkLizard(c) {
+  const scale = mat(c.color, { roughness: 0.6 }), belly = mat(shade(c.color, 1.9)), eyeM = redEye();
+  const feather = mat(0x8a3ad0, { side: THREE.DoubleSide }), featherD = mat(0x3a1a6a, { side: THREE.DoubleSide });
+  const spikeM = mat(0xe8e0d0, { roughness: 0.4 }), tooth = mat(0xffffff), claw = mat(0x1a1410);
+  const hips = grp(c.base, 0, 1.15, 0);
+  add(hips, G.sph(0.62, 10, 8), scale).scale.set(1, 0.9, 1.5);
+  add(hips, G.sph(0.42, 8, 6), belly, 0, -0.22, 0.1).scale.set(1, 0.8, 1.5);
+  for (let i = 0; i < 6; i++) add(hips, G.cone(0.07, 0.26, 4), featherD, 0, 0.5 - Math.abs(i - 2.5) * 0.05, 0.6 - i * 0.28); // 背脊
+  darkShard(hips, 0, 0.7, -0.1, 1.2);
+  const tail = grp(hips, 0, 0.1, -0.9);
+  add(tail, G.cone(0.34, 2.0, 5), scale, 0, 0, -1.0).rotation.x = -PI / 2;
+  const neck = grp(hips, 0, 0.3, 0.8);
+  add(neck, G.cyl(0.24, 0.32, 0.7, 7), scale, 0, 0.28, 0.12).rotation.x = 0.7;
+  // 脖子上的羽毛：一圈放射状的长羽
+  const ruff = grp(neck, 0, 0.5, 0.3);
+  const feathers = [];
+  for (let i = 0; i < 14; i++) {
+    const ang = (i / 14) * TAU;
+    const g = grp(ruff);
+    g.rotation.z = ang;
+    add(g, G.box(0.1, 0.62, 0.025), i % 2 ? feather : featherD, 0, 0.5, 0);
+    add(g, G.cone(0.05, 0.16, 3), i % 2 ? feather : featherD, 0, 0.86, 0);
+    feathers.push({ g, ang, i });
+  }
+  ruff.rotation.x = -0.55;
+  const head = grp(neck, 0, 0.62, 0.52);
+  add(head, G.box(0.46, 0.36, 0.6), scale, 0, 0, 0.16);
+  add(head, G.box(0.34, 0.2, 0.4), scale, 0, -0.04, 0.6);
+  add(head, G.sph(0.07, 5, 4), eyeM, -0.22, 0.1, 0.22);
+  add(head, G.sph(0.07, 5, 4), eyeM, 0.22, 0.1, 0.22);
+  const jaw = grp(head, 0, -0.16, 0.3);
+  add(jaw, G.box(0.32, 0.08, 0.56), belly, 0, 0, 0.26);
+  for (const sx of [-1, 1]) {
+    add(jaw, G.cone(0.04, 0.14, 4), tooth, sx * 0.1, 0.1, 0.46);
+    add(head, G.cone(0.04, 0.14, 4), tooth, sx * 0.1, -0.2, 0.72).rotation.x = PI;
+  }
+  // 前臂：每侧两根又长又尖的刺
+  const arms = [-1, 1].map((sd) => {
+    const arm = grp(hips, sd * 0.62, 0.0, 0.62);
+    add(arm, G.cyl(0.14, 0.11, 0.5, 6), scale, 0, -0.25, 0.05).rotation.x = 0.2;
+    const fore = grp(arm, 0, -0.5, 0.1);
+    add(fore, G.cyl(0.11, 0.09, 0.55, 6), scale, 0, -0.1, 0.22).rotation.x = 1.2;
+    const sp = [];
+    for (const [off, len] of [[0.12, 1.15], [0.32, 1.0]]) {
+      const s1 = grp(fore, sd * 0.12, -0.04, off);
+      add(s1, G.cone(0.055, len, 5), spikeM, sd * 0.1, 0, len / 2).rotation.set(PI / 2, 0, 0); // 朝前的长刺
+      sp.push(s1);
+    }
+    add(fore, G.cone(0.06, 0.26, 4), claw, 0, -0.1, 0.6).rotation.x = PI / 2;
+    return { arm, fore, sd, sp };
+  });
+  const legs = [];
+  for (const sd of [-1, 1]) {
+    const L = grp(hips, sd * 0.4, -0.3, -0.3);
+    add(L, G.cyl(0.22, 0.17, 0.7, 6), scale, 0, -0.3, 0);
+    const K = grp(L, 0, -0.62, 0);
+    add(K, G.cyl(0.17, 0.12, 0.62, 6), scale, 0, -0.28, 0);
+    add(K, G.box(0.26, 0.08, 0.42), claw, 0, -0.6, 0.12);
+    legs.push({ L, K, sd });
+  }
+  const muzzle = grp(head, 0, 0, 0.8);
+  return {
+    designR: 1.8, muzzle,
+    anim(t, mv, a) {
+      const m = Math.min(mv, 1.4), p = t * (4.5 + 3 * m);
+      for (const g of legs) {
+        const q = p + (g.sd > 0 ? PI : 0);
+        g.L.rotation.x = Math.sin(q) * 0.5 * m;
+        g.K.rotation.x = Math.max(0, Math.sin(q + 1.2)) * 0.6 * m;
+      }
+      // 攻击：前 0.45 蓄力抬头 → 颠咬（头快速上下甩 3 下）→ 0.6 之后双臂刺伸向前
+      const w = windup(a), s = strike(a);
+      const chomp = a >= 0.3 && a < 0.62 ? Math.abs(Math.sin((a - 0.3) / 0.32 * PI * 3)) : 0;
+      const thrust = a < 0.5 ? 0 : a < 0.7 ? ss((a - 0.5) / 0.2) : 1 - ss((a - 0.7) / 0.3);
+      hips.position.set(0, 1.15 + Math.abs(Math.cos(p)) * 0.06 * m, 0.55 * s * 0.6);
+      hips.rotation.x = 0.04 - 0.1 * w + 0.12 * s;
+      neck.rotation.x = -0.1 - 0.35 * w + 0.5 * chomp;
+      head.rotation.x = 0.1 - 0.3 * w + 0.6 * chomp;
+      jaw.rotation.x = 0.12 + 0.9 * chomp + 0.5 * w;
+      for (const A of arms) {
+        A.arm.rotation.x = -0.3 - 0.9 * thrust;                  // 抬起前臂
+        A.fore.rotation.x = -0.4 * thrust;
+        for (const S of A.sp) S.position.z = 0.1 + 0.5 * thrust; // 尖刺伸出
+        A.arm.rotation.z = A.sd * (0.15 + 0.1 * Math.sin(t * 1.4)) * (1 - thrust);
+      }
+      for (const F of feathers) { // 羽毛随呼吸抖动，攻击时炸开
+        F.g.rotation.z = F.ang;
+        F.g.scale.setScalar(1 + 0.08 * Math.sin(t * 3 + F.i) + 0.3 * w);
+      }
+      tail.rotation.y = Math.sin(t * 2.2) * 0.3;
+    },
+  };
+}
+
 const BUILDERS = {
   slime: buildSlime,
   goblin: buildGoblin,
@@ -1052,6 +1488,18 @@ const BUILDERS = {
   golem: buildGolem,
   mage: buildMage,
   darkKnight: buildDarkKnight,
+  darkAnt: buildDarkAnt,
+  darkSnake: buildDarkSnake,
+  darkWolf: buildWolf,
+  darkSpider: buildSpiderling,
+  darkCentipede: buildDarkCentipede,
+  darkEagle: buildDarkEagle,
+  darkZombie: buildDarkZombie,
+  darkTiger: (c) => buildBigCat(c, false),
+  darkLion: (c) => buildBigCat(c, true),
+  darkBear: buildYeti,
+  darkWyvern: buildDarkWyvern,
+  darkLizard: buildDarkLizard,
 };
 
 export const ENEMY_MODEL_TYPES = Object.keys(BUILDERS);

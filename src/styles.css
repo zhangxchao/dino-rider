@@ -658,3 +658,38 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 .mall-skin .own { color: #8ff0a0; font-size: 13px; font-weight: 800; }
 .mall-msg { min-height: 18px; color: #ffd84a; font-weight: 800; margin: 4px 0; }
 @media (max-height: 500px) { .mall-skins { grid-template-columns: repeat(6, 1fr); gap: 6px; } .mall-skin { padding: 6px 4px; } .mall-skin > i { width: 30px; height: 30px; } .gem-pick { padding: 2px 6px; font-size: 11px; } }
+
+/* ---------- 宠物乐园 ---------- */
+#s-pets .tabs { display: flex; gap: 8px; }
+#s-pets .pet-body { position: absolute; inset: 0; pointer-events: none; }
+#s-pets .pet-body > * { pointer-events: auto; }
+#s-pets .grid-panel { position: absolute; left: 18px; top: 76px; bottom: 18px; width: min(300px, 30vw); padding: 14px; overflow-y: auto; }
+#s-pets .info-panel { position: absolute; right: 18px; top: 76px; bottom: 18px; width: min(400px, 38vw); padding: 20px; overflow-y: auto; }
+#s-pets .list { position: absolute; left: 50%; top: 54%; transform: translate(-50%, -50%); width: min(780px, 94vw); padding: 18px; display: grid; gap: 10px; max-height: 76vh; overflow-y: auto; }
+#s-pets .card .stars { color: #8ff0a0; font-size: 11px; letter-spacing: 0; }
+#s-pets .card .stars.s1 { color: #ffd84a; }
+#s-pets .pet-empty { text-align: center; }
+#s-pets .pet-dots { display: flex; gap: 6px; margin: 8px 0 2px; }
+#s-pets .pet-dots i { flex: 1; height: 10px; border-radius: 99px; background: rgba(255,255,255,.1); }
+#s-pets .pet-dots i.on { background: linear-gradient(90deg, #6be07a, #2fbf6a); box-shadow: 0 0 8px rgba(98,227,127,.5); }
+#s-pets .hab-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+#s-pets .hab { cursor: pointer; display: flex; flex-direction: column; gap: 2px; align-items: center; padding: 8px 6px; border-radius: 10px; color: inherit; font: inherit; background: rgba(255,255,255,.06); border: 2px solid transparent; }
+#s-pets .hab.on { border-color: #6be07a; background: rgba(98,227,127,.14); }
+#s-pets .hab b { font-size: 15px; }
+#s-pets .hab small { color: var(--muted); font-size: 11.5px; }
+#s-pets .pet-msg { min-height: 18px; margin-top: 10px; color: #ffd84a; font-weight: 800; }
+#s-pets .pet-ride { width: min(560px, 92vw); text-align: center; }
+#s-pets .ride-cards { display: flex; justify-content: center; gap: 16px; margin: 12px 0; }
+#s-pets .ride-cards .card { width: 150px; }
+#s-pets .ride-cards .rb { font-size: 12px; color: var(--muted); }
+#s-pets .pet-note { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 6px 0 10px; }
+#s-pets .ride-gear { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center; align-items: center; margin-bottom: 12px; font-weight: 700; }
+#s-pets .pet-thumb { width: 52px; height: 52px; object-fit: contain; }
+#s-pets .own { color: #8ff0a0; font-weight: 800; }
+#s-pets .mall-skin .sub { color: var(--muted); font-size: 11px; }
+#s-pets .hab-ico { display: flex; align-items: center; justify-content: center; font-size: 26px; font-style: normal; background: rgba(255,255,255,.08); }
+#s-pets .up-row .ico { font-size: 30px; width: 56px; text-align: center; }
+@media (max-width: 760px), (max-height: 500px) {
+  #s-pets .grid-panel { width: 28vw; top: 70px; }
+  #s-pets .info-panel { width: 52vw; top: 70px; }
+}

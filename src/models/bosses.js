@@ -5,6 +5,9 @@
 //  s = { t, move, attack(-1|0..1), pattern, hurt, dead, phase(1..3), burrow(0..1) }
 // =====================================================================
 import * as THREE from 'three';
+import { DINOS, DOCTOR } from '../data.js';
+import { createDinoModel } from './dinos.js';
+import { createRiderModel } from './riders.js';
 
 const PI = Math.PI;
 const TAU = PI * 2;
@@ -1486,7 +1489,61 @@ const BUILDERS = {
 
 export const BOSS_MODEL_TYPES = Object.keys(BUILDERS);
 
+// ---------------------------------------------------------------------
+//  宠物模式的首领：一只普通恐龙 + 骑在背上的黑心博士
+//  把首领的动作状态翻译成恐龙 / 骑手各自的动作：
+//    slam 重踏 → 恐龙攻击动作；charge 冲撞 → 低头狂奔；volley 黑心药水 → 博士甩手投药
+// ---------------------------------------------------------------------
+function buildDinoBoss(def) {
+  const dinoDef = DINOS.find((d) => d.id === def.dinoId) || DINOS[0];
+  const dino = createDinoModel(dinoDef);
+  const rider = createRiderModel(DOCTOR);
+  rider.root.scale.setScalar(dinoDef.riderScale || 1);
+  dino.saddle.add(rider.root);
+  const root = new THREE.Group();
+  root.add(dino.root);
+  // 头顶悬着一颗黑化宝石，缓缓转动
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), new THREE.MeshStandardMaterial({
+    color: 0x9a3aff, emissive: 0x9a3aff, emissiveIntensity: 2.2, flatShading: true, roughness: 0.3,
+  }));
+  gem.scale.set(0.8, 1.5, 0.8);
+  gem.position.set(0, dino.size.top + 0.9, 0);
+  root.add(gem);
+  const dA = { t: 0, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0 };
+  const rA = { t: 0, bounce: 0, shoot: -1, cheer: false, lean: 0 };
+  let spin = 0;
+  function update(dt, s = {}) {
+    const pat = s.pattern;
+    const a = typeof s.attack === 'number' ? s.attack : -1;
+    dA.t = rA.t = s.t ?? 0;
+    dA.dead = s.dead || 0;
+    dA.hurt = s.hurt || 0;
+    dA.move = clamp(+s.move || 0, 0, 1.8);
+    dA.attack = -1; dA.skill = -1; dA.air = false;
+    rA.bounce = Math.min(1.6, dA.move); rA.shoot = -1; rA.cheer = false; rA.lean = 0;
+    if (a >= 0 && !(s.dead > 0)) {
+      if (pat === 'volley' || pat === 'barrage') rA.shoot = a;
+      else if (pat === 'charge') { dA.move = 1.8; dA.skill = a; }
+      else if (pat === 'summon') rA.cheer = true;
+      else dA.attack = a;
+    }
+    dino.update(dt, dA);
+    rider.update(dt, rA);
+    spin += (dt || 0) * 1.6;
+    gem.rotation.y = spin;
+    gem.position.y = dino.size.top + 0.9 + Math.sin(spin * 2) * 0.1;
+  }
+  update(0, {});
+  return { root, update, muzzle: rider.muzzle, size: { height: dino.size.top, radius: dino.size.radius } };
+}
+
 export function createBossModel(type, def = {}) {
+  if (def.dinoId) {
+    const d = buildDinoBoss(def);
+    d.root.name = `boss-${type}`;
+    d.root.userData.bossType = type;
+    return d;
+  }
   let build = BUILDERS[type];
   if (!build) {
     console.warn(`[bosses] 未知首领类型 "${type}"，使用 spider 代替`);

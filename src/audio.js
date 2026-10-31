@@ -29,7 +29,7 @@ const MAX_VOICES = 80;
 
 const ALIASES = {
   skill: 'powerup', shield: 'fortress', dash: 'sprint', spit: 'venom', hurt: 'playerHurt',
-  pickup: 'coin', roarSkill: 'roar', explode: 'explosion',
+  pickup: 'coin', roarSkill: 'roar', explode: 'explosion', maul: 'bite', potion: 'orb',
 };
 
 // 每 50ms 窗口内同名音效的最大数量（默认 6）

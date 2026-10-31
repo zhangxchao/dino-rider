@@ -48,7 +48,7 @@ export function computeStats(dino, rider, up, gems = 0) {
   };
 }
 
-const MELEE_KNOCK = { bite: 6, peck: 5, horn: 10, headbutt: 10, claw: 6, tail: 9, stomp: 8 };
+const MELEE_KNOCK = { maul: 6, bite: 6, peck: 5, horn: 10, headbutt: 10, claw: 6, tail: 9, stomp: 8 };
 const RADII = { spear: 0.7, arrow: 0.55, fireball: 0.8, laser: 0.6, bullet: 0.5, shuriken: 0.7, missile: 0.7, ice: 0.6, rock: 0.9, cannon: 0.8, heart: 0.6, slash: 1.1 };
 const FRENZY_COL = new THREE.Color(1, 0.15, 0.05);
 const SPRINT_COL = new THREE.Color(0.4, 0.85, 1);
@@ -153,6 +153,7 @@ export class Player {
   // ------------------------------------------------------------------
   weaponStats() {
     const w = this.riderDef.weapon;
+    if (!w) return { count: 0, dmg: 0, cd: 99, pierce: 0, homing: 0, spread: 0 };
     const L = WEAPON_LEVELS[this.weapon.level];
     const W = this.weapon;
     const rage = this.buffs.rage > 0;
@@ -169,6 +170,7 @@ export class Player {
   }
 
   addXp(n) {
+    if (!this.riderDef.weapon) return; // 没带装备的小骑手没有武器可升级
     const W = this.weapon;
     if (W.level >= WEAPON_MAX) return;
     W.xp += n;
@@ -299,7 +301,7 @@ export class Player {
 
     // --- 自动射击 / 自动撕咬 / 技能 ---
     if (ctl.enabled) {
-      if (this.fireCd <= 0) this.fire();
+      if (this.fireCd <= 0 && this.riderDef.weapon) this.fire();
       if (this.biteCd <= 0 && this.atkT < 0 && !(sk && sk.noBite)) this.tryBite();
       if (ctl.ult && this.buffs.rage <= 0) {
         if (g.fever >= 100) this.startRage();
@@ -464,7 +466,7 @@ export class Player {
     }
     if (hits > 0) {
       this.model.mouth.getWorldPosition(this.mouth);
-      g.audio.play(style, { volume: 0.8, pitch: 1.15 - this.size.height * 0.07 });
+      g.audio.play(style === 'maul' ? 'bite' : style, { volume: 0.8, pitch: 1.15 - this.size.height * 0.07 });
       g.hitstop(0.03);
       g.fx.sparks.burst(this.mouth, { count: 12, speed: 6, life: 0.3, size: 0.6, color: 0xfff0c0, color2: 0xff8040 });
     }

@@ -1,6 +1,6 @@
 // 菜单背景：在真实地形上展示当前坐骑与骑手，镜头缓慢环绕
 import * as THREE from 'three';
-import { DINOS, RIDERS, skinnedDef } from './data.js';
+import { DINOS, RIDERS, PET_RIDERS, PET_RULES, findDino, skinnedDef } from './data.js';
 import { save } from './save.js';
 import { createWorld } from './world.js';
 import { createDinoModel } from './models/dinos.js';
@@ -15,6 +15,7 @@ export class Showcase {
     this.app = app;
     this.scene = app.scene;
     this.camera = app.camera;
+    this.biome = biome;
     this.world = createWorld(biome, this.scene, { quality: app.quality });
     this.t = 0;
     this.orbit = 0.7;
@@ -42,9 +43,10 @@ export class Showcase {
     window.addEventListener('pointerup', this._up);
   }
 
-  setSelection(dinoId, riderId, celebrate = false) {
-    const dDef = DINOS.find((d) => d.id === dinoId) || DINOS[0];
-    const rDef = RIDERS.find((r) => r.id === riderId) || RIDERS[0];
+  /** juvenile：宠物还是幼年体时缩小显示；noRider：宠物乐园里不带骑手 */
+  setSelection(dinoId, riderId, celebrate = false, opts = {}) {
+    const dDef = findDino(dinoId) || DINOS[0];
+    const rDef = RIDERS.find((r) => r.id === riderId) || PET_RIDERS.find((r) => r.id === riderId) || RIDERS[0];
     if (this.model) {
       this.scene.remove(this.model.root);
       this.model.root.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose()); });
@@ -53,7 +55,8 @@ export class Showcase {
     this.model = createDinoModel(skinnedDef(dDef, save.dinoSkin && save.dinoSkin[dDef.id]));
     this.rider = createRiderModel(rDef);
     this.rider.root.scale.setScalar(dDef.riderScale || 1);
-    this.model.saddle.add(this.rider.root);
+    if (!opts.noRider) this.model.saddle.add(this.rider.root);
+    if (opts.juvenile) this.model.root.scale.multiplyScalar(PET_RULES.juvenileScale);
     prepareModel(this.model.root, { cast: true });
     const y = this.world.heightAt(0, 0);
     this.model.root.position.set(0, y, 0);
@@ -61,7 +64,8 @@ export class Showcase {
     this.scene.add(this.model.root);
     this.anim = { t: 0, move: 0, air: false, attack: -1, skill: -1, hurt: 0, dead: 0 };
     this.ranim = { t: 0, bounce: 0, shoot: -1, cheer: false, lean: 0 };
-    this.targetDist = 6 + this.model.size.height * 2.3 + this.model.size.length * 0.35;
+    const sc = opts.juvenile ? PET_RULES.juvenileScale : 1;
+    this.targetDist = 6 + (this.model.size.height * 2.3 + this.model.size.length * 0.35) * sc;
     if (celebrate) { this.action = { kind: 'skill', t: 0, dur: 1.4 }; this.actionT = 5; }
   }
 

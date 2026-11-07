@@ -245,10 +245,14 @@ export class Hazards {
     const list = [];
     const zz = p.pos.z + 55;
     for (const side of [1, -1]) {
-      const e = g.spawnEnemy(eliteType, side * (rh - 1), zz + rand(-2, 2), mul, true);
+      const e = g.spawnEnemy(eliteType, side * (rh - 1), zz + (g.endless ? 0 : rand(-2, 2)), mul, true);
       e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2;
       list.push(e);
-      for (let i = 0; i < 2; i++) list.push(g.spawnEnemy(g.pickWeighted(pool), side * rand(rh * 0.5, rh), zz - 4 - i * 2.5, mul, true));
+      if (g.endless) {
+        // 无尽模式：每侧的两只小怪同种，整整齐齐站在精英身后的一竖列里
+        const type = g.pickWeighted(pool);
+        for (let i = 0; i < 2; i++) list.push(g.spawnEnemy(type, side * (rh - 1), zz - 4 - i * 3, mul, true));
+      } else for (let i = 0; i < 2; i++) list.push(g.spawnEnemy(g.pickWeighted(pool), side * rand(rh * 0.5, rh), zz - 4 - i * 2.5, mul, true));
     }
     this.ambushes.push({ list, done: false });
     g.showBanner(t('banner.ambush'), t('banner.ambushSub'), true, 1400);

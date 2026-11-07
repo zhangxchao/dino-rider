@@ -4,9 +4,31 @@ import { save, persist } from './save.js';
 import { today } from './meta.js';
 
 export const petDef = (id) => PETS.find((p) => p.id === id) || null;
-export const ownedPet = (id) => (save.pets.owned[id] || null);
+const dayNum = (str) => { const [y, m, d] = str.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000); };
+
+/** 老存档的成体没有喂食记录：第一次读取时当作今天刚喂过 N 次，给一周宽限期，不会一更新就全员饥饿 */
+export const ownedPet = (id) => {
+  const o = save.pets.owned[id] || null;
+  if (o && !Array.isArray(o.log)) {
+    const adult = o.feeds >= PET_RULES.feedsToAdult;
+    o.log = adult ? Array.from({ length: PET_RULES.adultFeedsPerWeek }, () => today()) : [];
+  }
+  return o;
+};
 export const isAdult = (id) => { const o = ownedPet(id); return !!o && o.feeds >= PET_RULES.feedsToAdult; };
 export const adultPets = () => PETS.filter((p) => isAdult(p.id));
+
+/** 最近 7 天（含今天）喂过几次 */
+export function recentFeeds(id) {
+  const o = ownedPet(id);
+  if (!o) return 0;
+  const now = dayNum(today());
+  return o.log.filter((d) => now - dayNum(d) < PET_RULES.hungryWindow).length;
+}
+/** 成体最近 7 天喂不够 2 次就会饥饿；幼年体不会（它本来就还在长大） */
+export const isHungry = (id) => isAdult(id) && recentFeeds(id) < PET_RULES.adultFeedsPerWeek;
+/** 能出战 = 成体且不饥饿 */
+export const canUse = (id) => isAdult(id) && !isHungry(id);
 
 /** 今天还能喂几次（跨天自动清零；按本机日历天，和每日任务同一套日期） */
 export function feedsLeft(id) {
@@ -24,7 +46,7 @@ export function buyPet(id) {
   if (ownedPet(id)) return fail('owned');
   if (save.coins < PET_RULES.petPrice) return fail('coins', { need: PET_RULES.petPrice - save.coins });
   save.coins -= PET_RULES.petPrice;
-  save.pets.owned[id] = { feeds: 0, day: '', today: 0, habitat: 'lawn' };
+  save.pets.owned[id] = { feeds: 0, day: '', today: 0, log: [] };
   if (!save.pets.active) save.pets.active = id;
   persist();
   return { ok: true };
@@ -34,17 +56,20 @@ export function feedPet(id) {
   const o = ownedPet(id);
   const def = petDef(id);
   if (!o || !def) return fail('unknown');
-  if (o.feeds >= PET_RULES.feedsToAdult) return fail('adult');
   if (feedsLeft(id) <= 0) return fail('daily');
   if (save.coins < PET_RULES.feedPrice) return fail('coins', { need: PET_RULES.feedPrice - save.coins });
   const day = today();
   save.coins -= PET_RULES.feedPrice;
   if (o.day !== day) { o.day = day; o.today = 0; }
   o.today++;
-  o.feeds++;
-  const grew = o.feeds >= PET_RULES.feedsToAdult;
+  const wasBaby = o.feeds < PET_RULES.feedsToAdult;
+  if (wasBaby) o.feeds++;                       // 成体不再长，喂食只是保持不饿
+  const grew = wasBaby && o.feeds >= PET_RULES.feedsToAdult;
+  o.log = [...o.log, day];
+  if (grew) o.log.push(day);                    // 长大那一顿算两顿：刚成年不会马上饥饿
+  o.log = o.log.slice(-6);
   persist();
-  return { ok: true, grew, feed: FEEDS[def.feed] };
+  return { ok: true, grew, adult: !wasBaby, feed: FEEDS[def.feed] };
 }
 
 export function buyHabitat(id) {
@@ -58,10 +83,10 @@ export function buyHabitat(id) {
   return { ok: true };
 }
 
-export function setHabitat(petId, habitatId) {
-  const o = ownedPet(petId);
-  if (!o || !save.pets.habitats.includes(habitatId)) return false;
-  o.habitat = habitatId;
+/** 所有宠物共用一个住所 */
+export function setHabitat(habitatId) {
+  if (!save.pets.habitats.includes(habitatId)) return false;
+  save.pets.habitat = habitatId;
   persist();
   return true;
 }

@@ -4,7 +4,6 @@ import { GATES, WEAPON_LEVELS, WEAPON_MAX, XP_NEED } from './data.js';
 import { formatTime } from './util.js';
 import { t } from './i18n.js';
 import { bendVec } from './bend.js';
-import { RAGE_TIME } from './player.js';
 
 export const SKILL_ICON = {
   roar: '🗯️', charge: '🐂', pounce: '🐾', spin: '🌀', stomp: '💥', frenzy: '🔥', fortress: '🛡️',
@@ -255,8 +254,8 @@ export class Hud {
     this.set('kills', game.stats.kills, (v) => { this.el.kills.textContent = v; this.pulse(this.el.kills.parentElement, 'k'); });
     this.set('time', Math.floor(game.time), () => { this.el.time.textContent = formatTime(game.time); });
 
-    const rage = game.player.buffs.rage;
-    const fv = rage > 0 ? rage / RAGE_TIME * 100 : game.fever;
+    const rage = game.player.ultOn ? 1 : 0;
+    const fv = rage > 0 ? game.player.ultFrac * 100 : game.fever;
     this.set('fever', Math.round(fv * 2) + (rage > 0 ? 'r' : game.fever >= 100 ? 'f' : ''), () => {
       this.el.feverFill.style.height = fv.toFixed(1) + '%';
       this.el.fever.classList.toggle('ready', rage <= 0 && game.fever >= 100);

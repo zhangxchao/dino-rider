@@ -679,6 +679,15 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 #s-pets .hab small { color: var(--muted); font-size: 11.5px; }
 #s-pets .pet-msg { min-height: 18px; margin-top: 10px; color: #ffd84a; font-weight: 800; }
 #s-pets .pet-ride { width: min(560px, 92vw); text-align: center; }
+#s-pets .pet-pick { width: min(560px, 92vw); text-align: center; }
+#s-pets .pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; max-height: 52vh; overflow: auto; }
+#s-pets .pick-pet { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px; border-radius: 12px; background: rgba(255,255,255,.07); border: 2px solid transparent; color: inherit; font: inherit; cursor: pointer; }
+#s-pets .pick-pet img { width: 64px; height: 64px; object-fit: contain; }
+#s-pets .pick-pet b { font-size: 15px; }
+#s-pets .pick-pet small { color: var(--muted); font-size: 12px; }
+#s-pets .pick-pet.ready small { color: #6be07a; }
+#s-pets .pick-pet.hungry small { color: #ff9a8a; }
+#s-pets .pick-pet.active { border-color: #6be07a; background: rgba(98,227,127,.14); }
 #s-pets .ride-cards { display: flex; justify-content: center; gap: 16px; margin: 12px 0; }
 #s-pets .ride-cards .card { width: 150px; }
 #s-pets .ride-cards .rb { font-size: 12px; color: var(--muted); }

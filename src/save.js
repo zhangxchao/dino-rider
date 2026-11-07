@@ -5,8 +5,9 @@ const KEY = 'dino-rider-save-v1';
 
 function defaultPets() {
   return {
-    owned: {},                         // id -> { feeds, day, today, habitat }
+    owned: {},                         // id -> { feeds, day, today, log }  log = 最近几次喂食的日期
     habitats: ['lawn'],                // 已拥有的住所（草坪免费）
+    habitat: 'lawn',                   // 所有宠物共用的住所
     rider: 'kidBoy',                   // 小骑手：kidBoy / kidGirl
     gear: null,                        // 这一局带的装备（普通骑手的武器），一局用完就没了
     skill: null,                       // 这一局带的技能（普通骑手的被动），一局用完就没了
@@ -20,12 +21,17 @@ function normalizePets(p) {
   const owned = {};
   for (const [id, v] of Object.entries(o.owned || {})) {
     if (!v || typeof v !== 'object') continue;
-    owned[id] = { feeds: Math.max(0, v.feeds | 0), day: String(v.day || ''), today: Math.max(0, v.today | 0), habitat: v.habitat || 'lawn' };
+    // log：最近几次喂食的日期（老存档没有，由 pets.js 第一次读取时给成体一段宽限期）
+    const log = Array.isArray(v.log) ? v.log.filter((x) => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)).slice(-6) : undefined;
+    owned[id] = { feeds: Math.max(0, v.feeds | 0), day: String(v.day || ''), today: Math.max(0, v.today | 0), ...(log ? { log } : {}), ...(v.habitat ? { habitat: v.habitat } : {}) };
   }
-  return {
-    ...d, ...o, owned,
-    habitats: Array.from(new Set(['lawn', ...(Array.isArray(o.habitats) ? o.habitats : [])])),
-  };
+  const habitats = Array.from(new Set(['lawn', ...(Array.isArray(o.habitats) ? o.habitats : [])]));
+  // 住所改成所有宠物共用：老存档取出战宠物（没有就取第一只）原来住的那个
+  const first = owned[o.active] || Object.values(owned)[0];
+  let habitat = typeof o.habitat === 'string' ? o.habitat : ((first && first.habitat) || 'lawn');
+  if (!habitats.includes(habitat)) habitat = 'lawn';
+  for (const v of Object.values(owned)) delete v.habitat;
+  return { ...d, ...o, owned, habitats, habitat };
 }
 
 function defaults() {

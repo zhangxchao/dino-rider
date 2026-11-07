@@ -480,13 +480,20 @@ export class Game {
     n = Math.max(2, Math.round(n * this.diff.count * BALANCE.pathCount));
     if (big) n = Math.max(2, Math.round(n * 0.5));
     if (ranged) n = Math.max(2, Math.round(n * 0.6)); // 远程怪数量少一些
-    const shapes = ['row', 'row', 'column', 'v', 'cluster', 'cluster', 'flank', 'swarm', 'swarm'];
+    // 无尽模式：同一种小怪要么排成一行（横向），要么排成一竖列（纵向），整整齐齐，不抖动、不乱撒
+    const shapes = this.endless ? ['row', 'column'] : ['row', 'row', 'column', 'v', 'cluster', 'cluster', 'flank', 'swarm', 'swarm'];
     let shape = pick(shapes);
     const eliteType = this.endless ? pick(['yeti', 'golem', 'darkKnight']) : this.level.elite;
     const elite = p > 0.15 && Math.random() < 0.08 + p * 0.15;
     const spots = [];
     const W = rh - 1.5;
-    if (elite) {
+    if (elite && this.endless) {
+      // 精英站中间，两只同种小怪整整齐齐站在它身后的一行里
+      spots.push({ x: 0, z: ev.z, t: eliteType, elite: true });
+      for (const x of [-3.2, 3.2]) spots.push({ x, z: ev.z - 4.5, t: type });
+    } else if (this.endless) {
+      this.endlessFormation(spots, shape, type, n, ev.z, W);
+    } else if (elite) {
       spots.push({ x: rand(-3, 3), z: ev.z, t: eliteType, elite: true });
       for (let i = 0; i < 2; i++) spots.push({ x: rand(-W, W), z: ev.z - rand(3, 6), t: type });
     } else if (shape === 'row') {
@@ -505,7 +512,34 @@ export class Game {
     } else {
       for (let i = 0; i < n; i++) spots.push({ x: rand(-W, W), z: ev.z + rand(-4, 5), t: type });
     }
-    for (const s of spots) { s.mul = mul; this.spawnQueue.push(s); }
+    // 同一个阵型共用一个摆动相位，远程 / 飞行怪左右摆动时队形也不会散
+    const ph = Math.random() * 10;
+    for (const s of spots) { s.mul = mul; if (this.endless) s.ph = ph; this.spawnQueue.push(s); }
+  }
+
+  /**
+   * 无尽模式的整齐阵型：同一种小怪排成「一行」或「一竖列」，数量再多也按规律排。
+   * 一行放不下就往后再排一行（每行都排满、间距相同）；一列太长就往旁边再排一列。
+   */
+  endlessFormation(spots, shape, type, n, z0, W) {
+    const gap = Math.max(2.2, ENEMIES[type].radius * 2 + 0.8);   // 同行 / 同列相邻两只的间距
+    if (shape === 'row') {
+      const perRow = Math.max(1, Math.min(n, Math.floor((2 * W) / gap) + 1));
+      const rows = Math.ceil(n / perRow);
+      for (let r = 0; r < rows; r++) {
+        const cnt = Math.min(perRow, n - r * perRow);
+        for (let i = 0; i < cnt; i++) spots.push({ x: cnt === 1 ? 0 : -((cnt - 1) * gap) / 2 + i * gap, z: z0 + r * 3.5, t: type });
+      }
+    } else {
+      const perCol = 10;
+      const cols = Math.ceil(n / perCol);
+      const x0 = cols === 1 ? rand(-W + 1, W - 1) : 0;
+      for (let c = 0; c < cols; c++) {
+        const cnt = Math.min(perCol, n - c * perCol);
+        const x = cols === 1 ? x0 : clamp(-((cols - 1) * gap) / 2 + c * gap, -W, W);
+        for (let i = 0; i < cnt; i++) spots.push({ x, z: z0 + i * 3, t: type });
+      }
+    }
   }
 
   // ------------------------------------------------------------------
@@ -831,6 +865,7 @@ export class Game {
       budget -= pooled ? 1 : 4;
       n++;
       const e = this.spawnEnemy(s.t, s.x, s.z, s.mul, true);
+      if (s.ph !== undefined) e.phase = s.ph;
       if (s.elite) { e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.6); e.xp *= 2; }
     }
     if (n) q.splice(0, n);
@@ -912,11 +947,11 @@ export class Game {
   //  狂热槽 / 远古觉醒 / 连击档位 / 完美闪避
   // ------------------------------------------------------------------
   addFever(n) {
-    if (this.player.buffs.rage > 0 || !this.player.alive) return;
+    if (this.player.ultOn || !this.player.alive) return;
     this.fever = Math.min(100, this.fever + n);
     if (this.fever >= 100 && !this.feverReady) {
       this.feverReady = true;
-      this.toast(t('toast.feverReady'));
+      this.toast(t(this.player.def.ult === 'blaze' ? 'toast.feverReadyBlaze' : 'toast.feverReady'));
       this.audio.play('powerup', { volume: 0.7, pitch: 1.25 });
       this.juice.flash(0xffc040, 0.15);
     }
@@ -958,6 +993,28 @@ export class Game {
     this.fx.sparks.burst(p.center, { count: 90, speed: 14, life: 0.9, size: 1.1, color: 0xffe070, color2: 0xff3000, up: 5 });
     this.fx.lights?.flash(p.pos, 0xffb040, 90, 30, 0.8);
   }
+
+  /** 烈火四溅（霸王龙的终极技能）开始：火焰在 player.updateBlaze 里一团团燃起 */
+  onBlazeStart() {
+    const p = this.player;
+    meta.track('ult');
+    input.buzz([30, 40, 60], 0);
+    this.feverReady = false;
+    this.slowmoT = Math.max(this.slowmoT, 0.35);
+    this.showBanner(t('banner.blaze'), t('banner.blazeSub'), false, 1300);
+    this.audio.roar(1.6, { volume: 1 });
+    this.audio.play('explosion', { volume: 0.7, pitch: 0.9 });
+    this.juice.flash(0xff6a20, 0.5);
+    this.juice.radial(1.6);
+    this.juice.aberr(1.2);
+    this.juice.bloom(0.8);
+    this.juice.fovKick(-5);
+    this.fx.rings.ring(p.pos, { r0: 1, r1: 16, life: 0.7, color: 0xff7a1a });
+    this.fx.sparks.burst(p.center, { count: 70, speed: 13, life: 0.9, size: 1.1, color: 0xffd060, color2: 0xff2000, up: 5 });
+    this.fx.lights?.flash(p.pos, 0xff7020, 80, 28, 0.7);
+  }
+
+  onBlazeEnd() {}
 
   onRageEnd() {
     const p = this.player;
@@ -1455,7 +1512,7 @@ export class Game {
     if (!renderer || !renderer.compile) return;
     const tmp = new THREE.Group();
     tmp.position.set(0, this.heightAt(0, 25), 25);
-    const types = new Set(this.endless ? ENDLESS_POOL : [...Object.keys(this.level.pool), this.level.elite, ...BOSSES[this.level.boss].summon, ...(this.level.spiders ? ['spiderling'] : [])]);
+    const types = new Set(this.endless ? ENDLESS_POOL : [...Object.keys(this.level.pool), this.level.elite, ...BOSSES[this.level.boss].summon, ...(BOSSES[this.level.boss].halfSummon || []), ...(this.level.spiders ? ['spiderling'] : [])]);
     // 同时预热"合并静态零件"的缓存，并预先建好几只放进对象池：跑图时刷怪直接复用，不用现建模型
     const warmEnemies = [];
     const main = new Set(this.endless ? ENDLESS_POOL : Object.keys(this.level.pool));

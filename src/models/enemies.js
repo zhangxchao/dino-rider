@@ -824,9 +824,9 @@ function buildImp(c) {
 }
 
 // ---------------- 岩石傀儡 ----------------
-function buildGolem(c) {
+function buildGolem(c, opt = {}) {
   const rock = mat(c.color, { roughness: 1 }), rockD = mat(shade(c.color, 0.7), { roughness: 1 });
-  const lava = glowMat(0xff5a10, 2.2), eyeM = glowMat(0xffa020, 3);
+  const lava = glowMat(opt.glow ?? 0xff5a10, 2.2), eyeM = glowMat(opt.eye ?? 0xffa020, 3);
 
   const hips = grp(c.base, 0, 1.0, 0);
   add(hips, G.dodec(0.62), rockD, 0, 0.05, 0).scale.set(1.2, 0.7, 1);
@@ -867,6 +867,7 @@ function buildGolem(c) {
   const bits = [];
   for (let i = 0; i < 3; i++) bits.push(add(orbit, G.dodec(0.16), rockD));
   const muzzle = grp(head, 0, 0.1, 0.5);
+  if (opt.extra) opt.extra({ torso, head, arms, hips });
 
   return {
     designR: 1.8, muzzle,
@@ -894,6 +895,58 @@ function buildGolem(c) {
       }
     },
   };
+}
+
+
+// ---------------- 三大泰坦（岩石傀儡的亲戚）----------------
+function buildTitan(c) {
+  const d = c.def, kind = d.titan;
+  const leaf = mat(0x58b83a, { roughness: 0.9 }), moss = mat(0x2f5a24, { roughness: 1 });
+  const crystal = mat(0xcff3ff, { roughness: 0.15, transparent: true, opacity: 0.88, emissive: 0x3aa8d8, emissiveIntensity: 0.5 });
+  const gold = mat(0xffd96a, { metalness: 0.6, roughness: 0.3, emissive: 0xffc030, emissiveIntensity: 0.6 });
+  const halo = glowMat(0xfff2a0, 2.4);
+  let haloRing = null;
+  const spec = buildGolem(c, {
+    glow: d.glow, eye: d.eye,
+    extra({ torso, head, arms }) {
+      if (kind === 'forest') {
+        // 苔藓披肩 + 头顶树冠
+        add(torso, G.dodec(0.45), moss, -1.15, 1.75, 0).scale.set(1.1, 0.6, 1);
+        add(torso, G.dodec(0.45), moss, 1.15, 1.75, 0).scale.set(1.1, 0.6, 1);
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * TAU;
+          const lf = add(head, G.cone(0.14, 0.62, 5), leaf, Math.cos(a) * 0.3, 0.55, Math.sin(a) * 0.3);
+          lf.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5);
+        }
+        add(head, G.dodec(0.28), moss, 0, 0.62, 0).scale.set(1.4, 0.7, 1.4);
+        for (const A of arms) add(A.arm, G.cone(0.12, 0.5, 5), leaf, A.side * 0.34, -0.2, 0).rotation.z = -A.side * 0.9;
+      } else if (kind === 'ice') {
+        // 肩头和后背长出冰晶
+        for (const [x, y, z, h] of [[-1.15, 2.0, 0, 0.95], [1.15, 2.0, 0, 0.95], [-0.5, 2.1, -0.65, 0.8], [0.5, 2.1, -0.65, 0.8], [0, 2.3, -0.7, 1.1]]) {
+          const sp = add(torso, G.cone(0.2, h, 5), crystal, x, y, z);
+          sp.rotation.z = -x * 0.25;
+        }
+        add(head, G.cone(0.12, 0.5, 5), crystal, 0, 0.62, 0.1);
+        for (const A of arms) add(A.elb, G.cone(0.16, 0.6, 5), crystal, 0, -1.25, 0.1).rotation.x = PI;
+      } else {
+        // 金色肩甲、胸前光核、头顶光环
+        for (const side of [-1, 1]) add(torso, G.dodec(0.55), gold, side * 1.15, 1.55, 0).scale.set(1.15, 0.8, 1.1);
+        add(torso, G.oct(0.34), halo, 0, 1.0, 1.0);
+        haloRing = add(head, G.torus(0.52, 0.05, 6, 20), halo, 0, 0.78, 0);
+        haloRing.rotation.x = PI / 2;
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * TAU;
+          const ray = add(head, G.cone(0.07, 0.4, 4), gold, Math.cos(a) * 0.52, 0.78, Math.sin(a) * 0.52);
+          ray.rotation.set(Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2);
+        }
+      }
+    },
+  });
+  if (haloRing) {
+    const base = spec.anim;
+    spec.anim = (t, mv, a, ...r) => { base(t, mv, a, ...r); haloRing.rotation.z = t * 1.6; };
+  }
+  return spec;
 }
 
 // ---------------- 暗影法师 ----------------
@@ -1486,6 +1539,9 @@ const BUILDERS = {
   wisp: buildWisp,
   imp: buildImp,
   golem: buildGolem,
+  forestTitan: buildTitan,
+  iceTitan: buildTitan,
+  radiantTitan: buildTitan,
   mage: buildMage,
   darkKnight: buildDarkKnight,
   darkAnt: buildDarkAnt,

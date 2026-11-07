@@ -17,6 +17,7 @@ export const DINOS = [
     features: ['bigHead', 'tinyArms', 'stripes', 'tyrantSkull'],
     colors: { main: 0x5f7a3a, belly: 0xd8c79a, accent: 0x34431f, extra: 0x8a5a2a, eye: 0xffc400 },
     stats: { hp: 320, atk: 38, def: 0.2, speed: 9.5, reach: 2.6, atkRate: 0.85 },
+    ult: 'blaze',   // 终极技能（狂热槽满按 R）：烈火四溅，替代默认的远古觉醒
     attack: 'bite',
     skill: { type: 'roar', name: '霸王咆哮', desc: '震耳欲聋的咆哮，伤害前方整条道路上的敌人并眩晕 2.5 秒。', cd: 12, power: 1.5, radius: 14, stun: 2.5 },
   },
@@ -626,6 +627,8 @@ export const PET_RULES = {
   feedPrice: 10,        // 一份饲料
   feedsToAdult: 10,     // 喂满这么多次变成体
   feedsPerDay: 2,       // 每只宠物每天最多喂几次
+  adultFeedsPerWeek: 2, // 成体每个 7 天窗口里至少要喂几次，否则饥饿、不能出战
+  hungryWindow: 7,      // 「一周」按最近 7 天滚动计算
   habitatPrice: 20,     // 树林 / 荒原 / 湿地
   gearPrice: 100,       // 装备、技能
   bossGemHp: 800,       // 黑化宝石给首领恐龙加的血量
@@ -672,15 +675,15 @@ export const PETS = [
     skill: { type: 'spin', name: '天罚旋风', desc: '原地旋转甩尾，三连击周围敌人，还能打散飞来的子弹。', cd: 9, power: 1.7, radius: 8, hits: 3 },
   },
   {
-    id: 'mechScythe', modelId: 'therizinosaurus', name: '机械镰刀龙', en: 'Mecha Therizinosaurus', era: '白垩纪晚期',
-    desc: '浑身金属的镰刀龙，灰色的钢铁身躯连巨爪都闪着寒光。',
+    id: 'mechScythe', modelId: 'therizinosaurus', name: '岩石镰刀龙', en: 'Rock Therizinosaurus', era: '白垩纪晚期',
+    desc: '浑身岩石的镰刀龙，土黄色的身躯由一块块岩石拼接而成，连巨爪都像山岩一样坚硬。',
     body: 'theropod', scale: 1.15, riderScale: 1.0,
-    features: ['longClaws', 'potBelly', 'longNeck'],
-    colors: { main: 0x8c9199, belly: 0xc4c9d1, accent: 0x4a4f58, extra: 0xe2e6ec, eye: 0xff5a3a },
-    skinMat: { metalness: 0.75, roughness: 0.3, sheen: 0.18 },
+    features: ['longClaws', 'potBelly', 'longNeck', 'rockPlates'],
+    colors: { main: 0xb48c4a, belly: 0xd8bd84, accent: 0x6e5128, extra: 0x8f6c38, eye: 0xff9a3a },
+    skinMat: { roughness: 1 },
     stats: { hp: 950, atk: 40, def: 0.28, speed: 9.5, reach: 2.4, atkRate: 1.2 },
     attack: 'claw', feed: 'shrub',
-    skill: { type: 'frenzy', name: '合金乱舞', desc: '6 秒内撕咬加速，镰刃吸取生命。', cd: 13, duration: 6, rateMul: 2.4, lifesteal: 0.2 },
+    skill: { type: 'frenzy', name: '岩刃乱舞', desc: '6 秒内撕咬加速，镰刃吸取生命。', cd: 13, duration: 6, rateMul: 2.4, lifesteal: 0.2 },
   },
   {
     id: 'thunderSpino', modelId: 'spinosaurus', name: '雷霆棘龙', en: 'Thunder Spinosaurus', era: '白垩纪中期',
@@ -749,6 +752,14 @@ Object.assign(ENEMIES, {
   darkWyvern:    { name: '黑化飞龙',   hp: 380, dmg: 8,  speed: 7.0, radius: 1.5, atkRange: 2.6, atkCd: 1.4, score: 60, coins: 8, flying: true, hover: 3.4, color: 0x3a2a5a },
   darkLizard:    { name: '黑化蜥蜴怪', hp: 620, dmg: 10, speed: 5.5, radius: 1.8, atkRange: 3.2, atkCd: 1.7, score: 90, coins: 12, color: 0x2e3a2a },
 });
+// 三大泰坦：黑心博士的坐骑血量降到一半时，博士召唤它们助战（数值固定，不吃关卡倍率）
+Object.assign(ENEMIES, {
+  forestTitan:  { name: '森林泰坦', hp: 160, dmg: 15, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 50, coins: 6, color: 0x4c7a3a, glow: 0x9cff4a, eye: 0xd8ff6a, titan: 'forest' },
+  iceTitan:     { name: '冰雪泰坦', hp: 150, dmg: 14, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 48, coins: 6, color: 0x8ec8e8, glow: 0x6ae0ff, eye: 0xe8faff, titan: 'ice' },
+  radiantTitan: { name: '光辉泰坦', hp: 140, dmg: 13, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 46, coins: 6, color: 0xd8b84a, glow: 0xffe27a, eye: 0xffffff, titan: 'radiant' },
+});
+export const TITANS = ['forestTitan', 'iceTitan', 'radiantTitan'];
+
 export const DARK_TIERS = {
   1: ['darkAnt', 'darkSnake', 'darkWolf', 'darkSpider', 'darkCentipede'],
   2: ['darkEagle', 'darkZombie', 'darkTiger', 'darkLion', 'darkBear'],
@@ -779,7 +790,7 @@ for (const d of DINOS) {
     hp: d.stats.hp + PET_RULES.bossGemHp,
     dmg: Math.round(d.stats.atk * 0.8),
     speed: 6, radius: Math.max(2, 1.7 * d.scale), height: 3 * d.scale + 1,
-    patterns: ['slam', 'charge', 'volley'], summon: [],
+    patterns: ['slam', 'charge', 'volley'], summon: [], halfSummon: TITANS,
     skills: { slam: '重踏', charge: '狂暴冲撞', volley: '黑心药水' },
     anim: { slam: 'slam', charge: 'charge', volley: 'volley' },
     projColor: 0x9a3aff, color: 0x2a1a3a, phases: 2,

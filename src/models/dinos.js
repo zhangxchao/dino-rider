@@ -302,6 +302,16 @@ function teethRow(parent, M, z0, z1, y0, y1, r0, r1, flat, n, len, rad, up) {
   }
 }
 
+// 岩石拼块：一块块棱角分明的岩片贴在身上，片与片之间留出深色裂缝（底下垫一块略大的深色岩片）
+function rockPlate(parent, x, y, z, nrm, w, tone, M) {
+  const t = tone === 0 ? M.extra : tone === 1 ? M.belly : M.main;
+  for (const [mat, k, h] of [[M.accent, 1.2, 0.03], [t, 1, 0.07]]) {
+    const m = msh(parent, gSphLo(), mat, x, y, z, w * k, h, w * k * 0.9);
+    m.quaternion.setFromUnitVectors(UP, nrm);
+    m.rotateY(((x * 7.3 + z * 3.1) % 1) * 3);
+  }
+}
+
 function addMarkings(ctx, torso, W, H, L, skipZ) {
   const { F, mats: M } = ctx;
   const gap = 0.5 * ctx.k + 0.12;
@@ -330,6 +340,21 @@ function addMarkings(ctx, torso, W, H, L, skipZ) {
       placed++;
     }
   }
+  if (F.has('rockPlates')) {
+    // 躯干：沿身长分成几圈，每圈在背和两侧铺一排岩片，相邻两圈错开
+    const rows = [0.62, 0.38, 0.14, -0.1, -0.34, -0.58, -0.78];
+    rows.forEach((u, ri) => {
+      const z = u * L;
+      if (Math.abs(z - skipZ) < gap) return;
+      const f = Math.sqrt(1 - u * u);
+      const angs = ri % 2 ? [-1.25, -0.6, 0, 0.6, 1.25] : [-0.95, -0.3, 0.3, 0.95, 1.5, -1.5];
+      angs.forEach((a, ai) => {
+        const x = W * f * Math.sin(a), y = H * f * Math.cos(a);
+        _v.set(x / (W * W), y / (H * H), z / (L * L)).normalize();
+        rockPlate(torso, x, y, z, _v.clone(), 0.2 + 0.05 * ((ri + ai) % 3), (ri + ai) % 3, M);
+      });
+    });
+  }
 }
 
 function buildNeck(ctx, parent, base, segs, r0, r1) {
@@ -344,6 +369,18 @@ function buildNeck(ctx, parent, base, segs, r0, r1) {
     const rn = r - dr;
     seg(n, [0, 0, 0], e, r, rn, M.main, 8);
     seg(n, [0, -r * 0.34, r * 0.1], [0, e[1] - rn * 0.34, e[2]], r * 0.74, rn * 0.74, M.belly, 7);
+    if (ctx.F.has('rockPlates')) {
+      // 脖子：沿这一节的背面和两侧贴岩片
+      const dir = _v.set(0, e[1], e[2]).normalize().clone();
+      const up = new THREE.Vector3(0, dir.z, -dir.y).normalize();
+      for (const u of [0.28, 0.72]) {
+        const rr = lerp(r, rn, u);
+        for (const [a, tone] of [[0, 0], [0.85, 1], [-0.85, 2]]) {
+          const nrm = up.clone().multiplyScalar(Math.cos(a)).add(new THREE.Vector3(Math.sin(a), 0, 0)).normalize();
+          rockPlate(n, nrm.x * rr * 0.98, e[1] * u + nrm.y * rr * 0.98, e[2] * u + nrm.z * rr * 0.98, nrm, rr * 0.8, (tone + (u > 0.5 ? 1 : 0)) % 3, M);
+        }
+      }
+    }
     if (i > 0) msh(n, gSphLo(), M.main, 0, 0, 0, r, r, r);
     p = n; pos = e; r = rn;
   }
@@ -366,6 +403,15 @@ function buildTail(ctx, parent, base) {
     const e = [0, -P.tailDrop * len, -len];
     seg(g, [0, 0, 0], e, r, rn, M.main, 8);
     if (i > 0) msh(g, gSphLo(), M.main, 0, 0, 0, r * 0.98, r * 0.98, r * 0.98);
+    if (F.has('rockPlates') && r > 0.06) {
+      for (const u of [0.3, 0.72]) {
+        const rr = lerp(r, rn, u);
+        for (const [a, tone] of [[0, 0], [0.9, 1], [-0.9, 2]]) {
+          const nrm = new THREE.Vector3(Math.sin(a), Math.cos(a), 0);
+          rockPlate(g, nrm.x * rr * 0.98, e[1] * u + nrm.y * rr * 0.98, e[2] * u, nrm, rr * 0.8, (tone + i + (u > 0.5 ? 1 : 0)) % 3, M);
+        }
+      }
+    }
     if (F.has('stripes') && i < n - 1) {
       const a = 0.4, b = 0.55;
       seg(g, [0, e[1] * a, e[2] * a], [0, e[1] * b, e[2] * b], lerp(r, rn, a) * 1.07, lerp(r, rn, b) * 1.07, M.accent, 8);

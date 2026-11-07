@@ -1,6 +1,6 @@
 // 菜单界面：标题 / 选择坐骑 / 关卡 / 升级 / 设置 / 帮助 / 暂停 / 结算 / 结局
 import { DINOS, RIDERS, LEVELS, BOSSES, DIFFICULTIES, DIFFICULTY_IDS, DINO_RANK, SKINS, GEM, GEM_COLORS, gemCount, gemBagTotal, gemColor, PETS, PET_RIDERS, PET_RULES, FEEDS, HABITATS, petById, gearList, skillList } from './data.js';
-import { petDef, ownedPet, isAdult, adultPets, feedsLeft, buyPet, feedPet, buyHabitat, setHabitat, toggleSlot, buyGem } from './pets.js';
+import { petDef, ownedPet, isAdult, isHungry, canUse, recentFeeds, adultPets, feedsLeft, buyPet, feedPet, buyHabitat, setHabitat, toggleSlot, buyGem } from './pets.js';
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
@@ -407,6 +407,7 @@ export class UI {
     n.querySelectorAll('.level-card[data-i]').forEach((c) => c.addEventListener('click', () => {
       const i = +c.dataset.i;
       this.app.audio.play('select');
+      if (pet && !canUse(d.id)) { this.app.audio.play('error'); this.show('pets'); return; }   // 幼年 / 饥饿的宠物不能出战
       if (pet) this.app.startGame({ levelIdx: i, petMode: true, dinoId: d.id, riderId: r.id });
       else this.app.startGame({ levelIdx: i, dinoId: save.dino, riderId: save.rider });
     }));
@@ -547,7 +548,7 @@ export class UI {
   build_pets(data = {}) {
     if (data.tab) this.petTab = data.tab;
     this.petTab = this.petTab || 'mine';
-    this.petStep = data.step || 'view';       // view | ride（成体点「使用」后选小骑手）
+    this.petStep = data.step || 'view';       // view | pick（点「使用」后列出所有宠物）| ride（选小骑手，成体且不饥饿才能出发）
     const P = save.pets;
     if (!P.active || !ownedPet(P.active)) P.active = Object.keys(P.owned)[0] || null;
     const thumbs = this.app.thumbs || { dino: {}, rider: {} };
@@ -576,7 +577,7 @@ export class UI {
       if (!app.showcase) return;
       const d = P.active ? petDef(P.active) : null;
       const o = d ? ownedPet(d.id) : null;
-      const hab = HABITATS.find((h) => h.id === (o ? o.habitat : 'lawn')) || HABITATS[0];
+      const hab = HABITATS.find((h) => h.id === P.habitat) || HABITATS[0];
       if (this.petTab === 'shop' || !d) {
         // 商城页不挡视线：显示当前选中的宠物（没有就显示第一只宠物）
         const first = d || PETS[0];
@@ -585,7 +586,7 @@ export class UI {
       } else {
         if (app.showcase.biome !== hab.biome) app.rebuildShowcase(hab.biome);
         const adult = isAdult(d.id);
-        app.showcase.setSelection(d.id, P.rider, false, { juvenile: !adult, noRider: !adult });
+        app.showcase.setSelection(d.id, P.rider, false, { juvenile: !adult, noRider: !adult && this.petStep !== 'ride' });
       }
       app.showcase.setFrame(this.petTab === 'mine' ? 'center' : 'right');
     };
@@ -598,6 +599,7 @@ export class UI {
         body.querySelector('[data-go-shop]').addEventListener('click', () => this.show('pets', { tab: 'shop' }));
         return;
       }
+      if (this.petStep === 'pick') return renderPick();
       if (this.petStep === 'ride') return renderRide();
       const d = petDef(P.active);
       const o = ownedPet(d.id);
@@ -612,13 +614,14 @@ export class UI {
         <div class="grid-panel panel"><div class="card-grid">${ids.map((id) => {
           const pd = petDef(id);
           return `<div class="card ${id === d.id ? 'active' : ''}" data-id="${id}">
-            <span class="stars s${isAdult(id) ? 3 : 1}">${isAdult(id) ? t('pet.stage.adult') : t('pet.stage.baby')}</span>
+            <span class="stars s${isAdult(id) ? 3 : 1}">${isHungry(id) ? '🍖 ' + t('pet.hungry') : isAdult(id) ? t('pet.stage.adult') : t('pet.stage.baby')}</span>
             <img src="${thumbs.dino[id] || ''}" alt="${pd.name}"><div class="nm" title="${pd.name}">${pd.name}</div></div>`;
         }).join('')}</div></div>
         <div class="info-panel panel">
           <h3>${d.name}</h3>
           ${getLang() !== 'en' ? `<div class="en">${d.en}</div>` : ''}
           <span class="era">${adult ? t('pet.stage.adult') : t('pet.stage.baby')}</span>
+          ${isHungry(d.id) ? `<span class="era" style="background:rgba(255,120,90,.18);color:#ff9a8a">🍖 ${t('pet.hungry')}</span>` : ''}
           <span class="era" style="background:rgba(79,201,255,.15);color:#8fdcff">${t('select.attack', { name: t('attack.' + d.attack) })}</span>
           <p>${d.desc}</p>
           <div style="margin-top:10px">
@@ -631,17 +634,19 @@ export class UI {
             <div class="t">🍖 ${t('pet.growth', { n: Math.min(o.feeds, PET_RULES.feedsToAdult), max: PET_RULES.feedsToAdult })}
               <small>${FEEDS[d.feed].icon} ${feedName(d)}${FEEDS[d.feed].live ? ' · ' + t('pet.diet.live') : ''}</small></div>
             <div class="pet-dots">${Array.from({ length: PET_RULES.feedsToAdult }, (_, k) => `<i class="${k < o.feeds ? 'on' : ''}"></i>`).join('')}</div>
-            ${adult ? `<div class="d">${t('pet.grown')}</div>`
-              : `<div class="row-btns" style="justify-content:flex-start;margin-top:8px">
-                  <button class="btn small" data-feed ${left <= 0 || save.coins < PET_RULES.feedPrice ? 'disabled' : ''}>${FEEDS[d.feed].icon} ${t('pet.feedBtn', { feed: feedName(d) })} · <i class="coin-ico"></i>${PET_RULES.feedPrice}</button>
-                  <span class="d" style="align-self:center">${left > 0 ? t('pet.feedLeft', { n: left }) : t('pet.feedDone', { max: PET_RULES.feedsPerDay })}</span></div>`}
+            ${adult ? `<div class="d">${isHungry(d.id) ? t('pet.hungryHint') : t('pet.grown')}</div>
+                <div class="d">${t('pet.adultNote', { need: PET_RULES.adultFeedsPerWeek })} · ${t('pet.weekFed', { n: recentFeeds(d.id), need: PET_RULES.adultFeedsPerWeek })}</div>` : ''}
+            <div class="row-btns" style="justify-content:flex-start;margin-top:8px">
+              <button class="btn small" data-feed ${left <= 0 || save.coins < PET_RULES.feedPrice ? 'disabled' : ''}>${FEEDS[d.feed].icon} ${t('pet.feedBtn', { feed: feedName(d) })} · <i class="coin-ico"></i>${PET_RULES.feedPrice}</button>
+              <span class="d" style="align-self:center">${left > 0 ? t('pet.feedLeft', { n: left }) : t('pet.feedDone', { max: PET_RULES.feedsPerDay })}</span></div>
           </div>
           <div class="skill-box">
             <div class="t">🏡 ${t('pet.habitat')}</div>
             <div class="hab-row">${HABITATS.map((h) => {
               const own = P.habitats.includes(h.id);
-              return `<button class="hab ${o.habitat === h.id ? 'on' : ''}" data-hab="${h.id}"><b>${h.icon} ${h.name}</b><small>${own ? (o.habitat === h.id ? t('pet.living') : t('pet.moveIn')) : `🔒 <i class="coin-ico"></i>${h.price}`}</small></button>`;
+              return `<button class="hab ${P.habitat === h.id ? 'on' : ''}" data-hab="${h.id}"><b>${h.icon} ${h.name}</b><small>${own ? (P.habitat === h.id ? t('pet.living') : t('pet.moveIn')) : `🔒 <i class="coin-ico"></i>${h.price}`}</small></button>`;
             }).join('')}</div>
+            <div class="d">${t('pet.habShared')}</div>
           </div>
           <div class="gem-box">
             <div class="t">💎 ${t('gem.title')} <b>${gemN}/${GEM.max}</b><small>${t('gem.each', { atk: GEM.atk, hp: GEM.hp })}</small></div>
@@ -653,7 +658,7 @@ export class UI {
           </div>
           <div class="pet-msg"></div>
           <div class="row-btns" style="justify-content:flex-start;margin-top:10px">
-            ${adult ? `<button class="btn" data-use>🐾 ${t('pet.use')}</button>` : `<button class="btn" disabled>🔒 ${t('pet.useHint')}</button>`}
+            <button class="btn" data-use>🐾 ${t('pet.use')}</button>
           </div>
         </div>`;
       const msg = (txt) => { body.querySelector('.pet-msg').textContent = txt; };
@@ -670,7 +675,7 @@ export class UI {
         this.app.audio.play('buy');
         refreshCoins();
         syncShowcase(); renderMine();
-        const m2 = r.grew ? t('pet.grew', { name: d.name }) : t('pet.fed', { n: PET_RULES.feedsToAdult - ownedPet(d.id).feeds });
+        const m2 = r.grew ? t('pet.grew', { name: d.name }) : r.adult ? t('pet.fedAdult', { n: recentFeeds(d.id) }) : t('pet.fed', { n: PET_RULES.feedsToAdult - ownedPet(d.id).feeds });
         body.querySelector('.pet-msg').textContent = m2;
         if (r.grew) this.app.audio.play('levelUp');
       });
@@ -682,7 +687,7 @@ export class UI {
           this.app.audio.play('buy');
           refreshCoins();
         }
-        setHabitat(d.id, id);
+        setHabitat(id);
         this.app.audio.play('select');
         syncShowcase(); renderMine();
       }));
@@ -701,12 +706,39 @@ export class UI {
         save.gems[color]--; list.push(color);
         persist(); this.app.audio.play('powerup', { volume: 0.6, pitch: 1.3 }); renderMine();
       }));
-      body.querySelector('[data-use]')?.addEventListener('click', () => { this.app.audio.roar(d.scale); this.petStep = 'ride'; renderMine(); });
+      body.querySelector('[data-use]')?.addEventListener('click', () => { this.app.audio.roar(d.scale); this.petStep = 'pick'; renderMine(); });
     };
 
-    // ---------------- 成体点「使用」：选小骑手，再出发 ----------------
+    // ---------------- 点「使用」：列出所有宠物的名字，点谁就用谁 ----------------
+    const renderPick = () => {
+      const ids = Object.keys(P.owned);
+      const state = (id) => (isHungry(id) ? ['hungry', '🍖 ' + t('pet.hungry')] : isAdult(id) ? ['ready', '⚔️ ' + t('pet.stage.adult')] : ['baby', '🥚 ' + t('pet.stage.baby')]);
+      body.innerHTML = `
+        <div class="center-panel panel pet-pick">
+          <h2>${t('pet.pickPet')}</h2>
+          <div class="pick-list">${ids.map((id) => {
+            const pd = petDef(id);
+            const [cls, txt] = state(id);
+            return `<button class="btn pick-pet ${cls} ${id === P.active ? 'active' : ''}" data-pick="${id}">
+              <img src="${thumbs.dino[id] || ''}" alt=""><b>${pd.name}</b><small>${txt}</small></button>`;
+          }).join('')}</div>
+          <p class="pet-note">${t('pet.pickNote')}</p>
+          <div class="row-btns"><button class="btn ghost" data-cancel>${t('common.back')}</button></div>
+        </div>`;
+      body.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => {
+        P.active = b.dataset.pick; persist();
+        this.app.audio.roar(petDef(P.active).scale);
+        this.petStep = 'ride';
+        syncShowcase(); renderMine();
+      }));
+      body.querySelector('[data-cancel]').addEventListener('click', () => { this.petStep = 'view'; renderMine(); });
+    };
+
+    // ---------------- 选小骑手，再出发（幼年 / 饥饿的宠物只能选骑手，不能出战） ----------------
     const renderRide = () => {
       const d = petDef(P.active);
+      const ok = canUse(d.id);
+      const why = isHungry(d.id) ? t('pet.hungryHint') : t('pet.useHint');
       const gear = P.gear ? RIDERS.find((r) => r.id === P.gear) : null;
       const skill = P.skill ? RIDERS.find((r) => r.id === P.skill) : null;
       body.innerHTML = `
@@ -723,7 +755,7 @@ export class UI {
           </div>
           <div class="row-btns">
             <button class="btn ghost" data-cancel>${t('common.back')}</button>
-            <button class="btn" data-go>⚔️ ${t('pet.go')} · ${d.name}</button>
+            ${ok ? `<button class="btn" data-go>⚔️ ${t('pet.go')} · ${d.name}</button>` : `<button class="btn" disabled>🔒 ${why}</button>`}
           </div>
         </div>`;
       body.querySelectorAll('[data-rider]').forEach((c) => c.addEventListener('click', () => {
@@ -731,8 +763,9 @@ export class UI {
         body.querySelectorAll('[data-rider]').forEach((x) => x.classList.toggle('active', x === c));
       }));
       body.querySelector('[data-shop]').addEventListener('click', () => this.show('pets', { tab: 'shop' }));
-      body.querySelector('[data-cancel]').addEventListener('click', () => { this.petStep = 'view'; renderMine(); });
-      body.querySelector('[data-go]').addEventListener('click', () => this.show('levels', { pet: true }));
+      body.querySelector('[data-cancel]').addEventListener('click', () => { this.petStep = 'pick'; renderMine(); });
+      body.querySelector('[data-go]')?.addEventListener('click', () => this.show('levels', { pet: true }));
+      syncShowcase();
     };
 
     // ---------------- 宠物商城 ----------------
@@ -763,11 +796,11 @@ export class UI {
           const own = d && ownedPet(d.id);
           const adult = own && isAdult(d.id);
           const left = own ? feedsLeft(d.id) : 0;
-          const can = own && !adult && left > 0 && save.coins >= PET_RULES.feedPrice;
+          const can = own && left > 0 && save.coins >= PET_RULES.feedPrice;
           return `<div class="up-row">
             <div class="ico">${f.icon}</div>
             <div class="main"><div class="t">${f.name}${f.live ? ` <span style="color:#ff9a8a;font-size:13px">${t('pet.diet.live')}</span>` : ''}</div>
-              <div class="d">${own ? (adult ? t('pet.grown') : t('pet.shop.feedFor', { pet: d.name, n: left })) : t('pet.shop.noPet', { pet: d.name })}</div></div>
+              <div class="d">${own ? (adult ? t('pet.shop.feedAdult', { pet: d.name, n: recentFeeds(d.id), need: PET_RULES.adultFeedsPerWeek, left }) : t('pet.shop.feedFor', { pet: d.name, n: left })) : t('pet.shop.noPet', { pet: d.name })}</div></div>
             <button class="btn small" data-feed-pet="${d.id}" ${can ? '' : 'disabled'}><i class="coin-ico"></i> ${PET_RULES.feedPrice}</button>
           </div>`;
         }).join('')}
@@ -805,7 +838,7 @@ export class UI {
         if (!r.ok) return fail(r);
         const d = petDef(b.dataset.feedPet);
         if (r.grew) this.app.audio.play('levelUp');
-        again(r.grew ? t('pet.grew', { name: d.name }) : t('pet.fed', { n: PET_RULES.feedsToAdult - ownedPet(d.id).feeds }));
+        again(r.grew ? t('pet.grew', { name: d.name }) : r.adult ? t('pet.fedAdult', { n: recentFeeds(d.id) }) : t('pet.fed', { n: PET_RULES.feedsToAdult - ownedPet(d.id).feeds }));
       }));
       body.querySelectorAll('[data-buy-hab]').forEach((b) => b.addEventListener('click', () => {
         const r = buyHabitat(b.dataset.buyHab);
@@ -919,7 +952,7 @@ export class UI {
             <div><kbd>${t('help.mouse')}</kbd></div><div>${t('help.drag')}</div>
             <div><kbd>${t('help.space')}</kbd> / <kbd>W</kbd></div><div>${t('help.jump')}</div>
             <div><kbd>Q</kbd> / <kbd>E</kbd> / <kbd>Shift</kbd></div><div>${t('help.skill')}</div>
-            <div><kbd>R</kbd></div><div>${t('help.ult')}</div>
+            <div><kbd>R</kbd></div><div>${t((DINOS.find((d) => d.id === save.dino) || {}).ult === 'blaze' ? 'help.ultBlaze' : 'help.ult')}</div>
             <div><kbd>Esc</kbd> / <kbd>P</kbd></div><div>${t('help.pause')}</div>
           </div>
           <div class="help-tip">

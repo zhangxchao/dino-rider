@@ -104,7 +104,7 @@ export class Enemy {
     this.xp = Math.max(1, Math.round((this.def.score || 10) / 8));
     this.speed = this.def.speed * rand(0.9, 1.12);
     this.kind = this.flying ? 'flying' : this.def.ranged ? 'ranged' : 'melee';
-    this.mass = Math.pow(this.radius, 1.5) * (this.type === 'golem' || this.type === 'yeti' || this.type === 'darkKnight' || this.type === 'darkBear' || this.type === 'darkLizard' ? 1.8 : 1);
+    this.mass = Math.pow(this.radius, 1.5) * (this.type === 'golem' || this.def.titan || this.type === 'yeti' || this.type === 'darkKnight' || this.type === 'darkBear' || this.type === 'darkLizard' ? 1.8 : 1);
     this.pos.set(x, game.heightAt(x, z), z);
     this.homeX = x;
     this.vel.set(0, 0, 0);
@@ -600,7 +600,26 @@ export class Boss {
       g.fx.debris.burst(this.pos, { count: 24, speed: 12, up: 12, size: 0.5, color: g.rockColor ?? 0x7a6a5a });
       g.showBanner(t('banner.enrage'), t('banner.phase', { name: this.def.name, n: this.phase }), true);
       this.pattern = { name: 'roar', t: 0, dur: 1.4, fired: true, teles: [] };
+      if (this.def.halfSummon) this.summonTitans();
     }
+  }
+
+  /** 半血时黑心博士召唤三大泰坦：数值固定（不吃关卡倍率），不受场上怪物数量上限限制 */
+  summonTitans() {
+    const g = this.game;
+    const rh = g.track.roadHalf;
+    const list = this.def.halfSummon;
+    g.showBanner(t('banner.titans'), t('banner.titansSub'), true, 1800);
+    g.audio.play('portal', { volume: 0.9 });
+    list.forEach((type, i) => {
+      const x = clamp(this.pos.x + (i - (list.length - 1) / 2) * 5.5, -rh + 2, rh - 2);
+      const z = this.pos.z - this.radius - 3;
+      const e = g.spawnEnemy(type, x, z, { hp: 1, dmg: 1 });
+      const col = ENEMIES[type].glow;
+      g.fx.rings.ring(e.pos, { r0: 0.5, r1: 6, life: 0.7, color: col });
+      g.fx.rings.pillar(e.pos, { r: 1.6, h: 16, life: 1.1, color: col, opacity: 0.6 });
+      g.fx.sparks.burst(e.pos, { count: 40, speed: 9, life: 0.8, size: 0.9, color: col, color2: 0xffffff, up: 4 });
+    });
   }
 
   update(dt) {

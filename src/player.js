@@ -6,7 +6,7 @@ import { input } from './input.js';
 import { createDinoModel } from './models/dinos.js';
 import { createRiderModel } from './models/riders.js';
 import { WEAPON_LEVELS, WEAPON_MAX, XP_NEED, RUN_SPEED, BALANCE, skinnedDef, GEM, gemCount } from './data.js';
-import { clamp, damp, prepareModel, mergeStaticMeshes, rigidSkin } from './util.js';
+import { clamp, damp, rand, prepareModel, mergeStaticMeshes, rigidSkin } from './util.js';
 import { createShield, Afterimages } from './effects.js';
 import { t } from './i18n.js';
 import { curvature } from './bend.js';
@@ -21,6 +21,11 @@ const FWD = new THREE.Vector3(0, 0, 1);
 const GRAVITY = 32;
 const smoothstep01 = (x) => x * x * (3 - 2 * x);
 export const RAGE_TIME = 6;
+export const BLAZE_TIME = 5;       // 霸王龙的「烈火四溅」：整个技能持续时间（狂热槽倒计时）
+const BLAZE_SPAWN_TIME = 2.8;     // 前这么多秒里不断在跑道上燃起火焰
+const BLAZE_DMG = 160;            // 每个被火焰烧到的敌人吃一次 160（固定值，不乘攻击力）
+const BLAZE_R = 3.4;              // 单团火焰半径
+const BLAZE_LIFE = 3;             // 单团火焰燃烧时间
 const RAGE_COL = new THREE.Color(0xffb020);
 const HURT_COL = new THREE.Color(1, 0.45, 0.4);
 const _rc = new THREE.Color();
@@ -111,7 +116,10 @@ export class Player {
     this.skillCd = 2;
     this.skill = null;
     this.skillAnim = -1;
-    this.buffs = { frenzy: 0, fortress: 0, sprint: 0, power: 0, shield: 0, rage: 0, magnet: 0 };
+    this.buffs = { frenzy: 0, fortress: 0, sprint: 0, power: 0, shield: 0, rage: 0, blaze: 0, magnet: 0 };
+    this.blazePatches = [];
+    this.blazeSpawnT = 0;
+    this.blazeHit = new Set();
     this.rampAir = false;
     this.flipT = 0;
     this.baseScale = this.root.scale.x;
@@ -146,6 +154,10 @@ export class Player {
   getCenter(out) { return out.set(this.pos.x, this.pos.y + this.size.height * 0.75, this.pos.z); }
   /** 翼龙体型大、飞得高，但飞在空中也躲不开攻击（高度不再算闪避） */
   get alwaysHittable() { return this.def.body === 'pterosaur'; }
+  /** 终极技能（远古觉醒 / 烈火四溅）是否正在释放 */
+  get ultOn() { return this.buffs.rage > 0 || this.buffs.blaze > 0; }
+  /** 终极技能剩余时间比例 0..1（狂热槽倒计时用） */
+  get ultFrac() { return this.buffs.rage > 0 ? this.buffs.rage / RAGE_TIME : this.buffs.blaze > 0 ? this.buffs.blaze / BLAZE_TIME : 0; }
   get invulnerable() { return this.buffs.sprint > 0 || this.buffs.rage > 0 || !!(this.skill && this.skill.invuln); }
 
   // ------------------------------------------------------------------
@@ -303,8 +315,8 @@ export class Player {
     if (ctl.enabled) {
       if (this.fireCd <= 0 && this.riderDef.weapon) this.fire();
       if (this.biteCd <= 0 && this.atkT < 0 && !(sk && sk.noBite)) this.tryBite();
-      if (ctl.ult && this.buffs.rage <= 0) {
-        if (g.fever >= 100) this.startRage();
+      if (ctl.ult && !this.ultOn) {
+        if (g.fever >= 100) (this.def.ult === 'blaze' ? this.startBlaze() : this.startRage());
         else g.audio.play('error', { volume: 0.35 });
       }
       if (ctl.skill) {
@@ -672,6 +684,63 @@ export class Player {
     g.onRageStart();
   }
 
+  // ------------------------------------------------------------------
+  //  烈火四溅（霸王龙的终极技能，替代远古觉醒）：短时间内整条跑道到处燃起烈火，
+  //  每个被烧到的敌人吃一次 160 点伤害（固定值）并被点燃；恐龙本身不变大、也不无敌。
+  // ------------------------------------------------------------------
+  startBlaze() {
+    const g = this.game;
+    g.fever = 0;
+    this.buffs.blaze = BLAZE_TIME;
+    this.blazeSpawnT = 0;
+    this.blazePatches.length = 0;
+    this.blazeHit.clear();
+    this.blazeWas = true;
+    g.onBlazeStart();
+  }
+
+  updateBlaze(dt) {
+    const g = this.game;
+    const elapsed = BLAZE_TIME - this.buffs.blaze;
+    if (this.buffs.blaze > 0 && this.alive && elapsed < BLAZE_SPAWN_TIME) {
+      this.blazeSpawnT -= dt;
+      while (this.blazeSpawnT <= 0) {
+        this.blazeSpawnT += 0.11;
+        const rh = g.track.roadHalf - 1.5;
+        const pos = new THREE.Vector3(rand(-rh, rh), 0, this.pos.z + rand(5, 52));
+        pos.y = g.heightAt(pos.x, pos.z);
+        this.blazePatches.push({ pos, t: 0, fx: 0 });
+        g.fx.rings.disc(pos, { r: BLAZE_R, life: 0.5, color: 0xff7a1a, opacity: 0.7 });
+        g.fx.rings.ring(pos, { r0: 0.4, r1: BLAZE_R * 1.3, life: 0.4, color: 0xffd060 });
+        g.fx.rings.pillar(pos, { r: 1.2, h: 9, life: 0.6, color: 0xff6a1a, opacity: 0.55 });
+        g.fx.scorch.add(pos, BLAZE_R * 0.8, 4);
+        g.fx.sparks.burst(pos, { count: 10, speed: 6, life: 0.5, size: 0.8, color: 0xffd060, color2: 0xff2000, up: 5 });
+      }
+    }
+    for (let i = this.blazePatches.length - 1; i >= 0; i--) {
+      const f = this.blazePatches[i];
+      f.t += dt;
+      if (f.t >= BLAZE_LIFE) { this.blazePatches.splice(i, 1); continue; }
+      f.fx -= dt;
+      if (f.fx <= 0) {
+        f.fx = 0.05;
+        for (let k = 0; k < 2; k++) {
+          const a = rand(0, Math.PI * 2), d = rand(0, BLAZE_R * 0.9);
+          g.fx.sparks.spawn(f.pos.x + Math.cos(a) * d, f.pos.y + 0.2, f.pos.z + Math.sin(a) * d, rand(-0.6, 0.6), rand(3, 5), rand(-0.6, 0.6), rand(0.35, 0.6), 1.5, 0.2, 0xffd060, 0xff2000, 0.9, 0, 1);
+        }
+      }
+      for (const e of g.enemies) {
+        if (!e.targetable || this.blazeHit.has(e)) continue;
+        if (Math.hypot(e.pos.x - f.pos.x, e.pos.z - f.pos.z) > BLAZE_R + e.radius) continue;
+        this.blazeHit.add(e);
+        _dir.set(e.pos.x - f.pos.x, 0, 0.4).normalize();
+        g.damageEnemy(e, BLAZE_DMG, { dir: _dir, knock: 4, stun: 0.3, burn: 3, source: 'skill' });
+        g.fx.sparks.burst(e.getCenter(_v), { count: 12, speed: 7, life: 0.4, size: 0.8, color: 0xffd060, color2: 0xff2000, up: 3 });
+      }
+    }
+    if (this.buffs.blaze <= 0 && this.blazeWas && !this.blazePatches.length) { this.blazeWas = false; this.blazeHit.clear(); g.onBlazeEnd(); }
+  }
+
   updateRage(dt) {
     const g = this.game;
     const on = this.buffs.rage > 0;
@@ -884,6 +953,7 @@ export class Player {
     const g = this.game;
     this.afterimages.update(dt);
     this.updateRage(dt);
+    this.updateBlaze(dt);
     this.auraAcc += dt;
     if (this.auraAcc < 0.05) return;
     this.auraAcc = 0;
@@ -971,6 +1041,7 @@ export class Player {
     this.skillAnim = -1;
     this.spinAngle = 0;
     for (const k in this.buffs) this.buffs[k] = 0;
+    this.blazePatches.length = 0;
     this.game.onPlayerDeath();
   }
 

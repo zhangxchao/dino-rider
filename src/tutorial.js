@@ -49,8 +49,8 @@ export class Tutorial {
     this.t += dt;
     if (this.active) this.updateSteps(dt, g, p);
     // 第一次狂热槽满：提示觉醒（老玩家也提示一次）
-    if (this.ultPending && !this.shown && g.fever >= 100 && !(p.buffs.rage > 0)) { this.show('ult', '🦖'); this.shownUlt = true; }
-    if (this.shown === 'ult' && (p.buffs.rage > 0 || this.t > 7)) {
+    if (this.ultPending && !this.shown && g.fever >= 100 && !p.ultOn) { this.show(p.def.ult === 'blaze' ? 'ultBlaze' : 'ult', '🦖'); this.shownUlt = true; }
+    if ((this.shown === 'ult' || this.shown === 'ultBlaze') && (p.ultOn || this.t > 7)) {
       this.done(); this.ultPending = false; save.tutUlt = true; persist();
     }
   }

@@ -20,6 +20,8 @@ class Input {
     this.gameActive = false;      // 只有在游戏中才抢占指针
     this.onUnlock = null;         // 游戏中意外失去指针锁定时回调（用于暂停）
     this.joy = { x: 0, y: 0 };
+    this.motionX = 0;             // 体感（摄像头）左右倾斜 -1…1
+    this.motionSkill = 0;         // 体感举手触发技能的时间戳（读取后清零）
     this.isTouch = false;
     this.vibrate = true;          // 设置里的「震动反馈」
     this.lastBuzz = 0;
@@ -89,7 +91,14 @@ class Input {
   }
 
   held(action) { return ACTIONS[action].some((c) => this.down.has(c)); }
-  pressed(action) { return ACTIONS[action].some((c) => this.edge.has(c)); }
+  pressed(action) {
+    if (action === 'skill' && this.motionSkill) {
+      const fresh = performance.now() - this.motionSkill < 400;
+      this.motionSkill = 0;
+      if (fresh) return true;
+    }
+    return ACTIONS[action].some((c) => this.edge.has(c));
+  }
   key(code) { return this.down.has(code); }
   keyPressed(code) { return this.edge.has(code); }
 
@@ -111,6 +120,7 @@ class Input {
     if (this.down.has('KeyA') || this.down.has('ArrowLeft')) x -= 1;
     if (this.down.has('KeyD') || this.down.has('ArrowRight')) x += 1;
     x += this.joy.x;                 // 触屏虚拟摇杆
+    x += this.motionX;               // 体感倾斜
     return Math.max(-1, Math.min(1, x));
   }
 
@@ -122,7 +132,7 @@ class Input {
 
   endFrame() { this.edge.clear(); }
 
-  releaseAll() { this.down.clear(); this.edge.clear(); this.joy.x = 0; this.joy.y = 0; if (this.joyReset) this.joyReset(); }
+  releaseAll() { this.down.clear(); this.edge.clear(); this.motionSkill = 0; this.joy.x = 0; this.joy.y = 0; if (this.joyReset) this.joyReset(); }
 
   // ---------------- 触屏 ----------------
   buildTouch(root) {

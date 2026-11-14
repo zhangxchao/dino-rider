@@ -4,6 +4,7 @@ import { petDef, ownedPet, isAdult, isHungry, canUse, recentFeeds, adultPets, fe
 import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
+import { motion } from './motion.js';
 import { t, LANGS, getLang, setLang } from './i18n.js';
 import { meta, MISSIONS, ACHIEVEMENTS } from './meta.js';
 import { canFullscreen, isFullscreen, isStandalone, isIPhone, isInAppBrowser, toggleFullscreen } from './fullscreen.js';
@@ -897,6 +898,7 @@ export class UI {
           <div class="set-row"><label>${t('settings.shake')}</label><div class="seg" data-k="shake"><button data-v="1" class="${s.shake ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.shake ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.reduceMotion')}</label><div class="seg" data-k="reduceMotion"><button data-v="1" class="${s.reduceMotion ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.reduceMotion ? 'on' : ''}">${t('common.off')}</button></div></div>
           ${this.app.isTouch && canFullscreen() ? `<div class="set-row"><label>${t('settings.autoFs')}</label><div class="seg" data-k="autoFs"><button data-v="1" class="${s.autoFs !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.autoFs === false ? 'on' : ''}">${t('common.off')}</button></div></div>` : ''}
+          <div class="set-row"><label>${t('settings.motion')}<small class="set-sub">${t('settings.motionHint')}</small></label><div class="seg" data-k="motion"><button data-v="1" class="${s.motion ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.motion ? 'on' : ''}">${t('common.off')}</button></div></div>
           ${this.app.isTouch ? `<div class="set-row"><label>${t('settings.vibrate')}</label><div class="seg" data-k="vibrate"><button data-v="1" class="${s.vibrate !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.vibrate === false ? 'on' : ''}">${t('common.off')}</button></div></div>` : ''}
           ${from === 'title' ? `<div class="set-row"><label>${t('settings.tutorial')}</label><button class="btn ghost small" data-tut>${save.tutorialDone ? t('settings.tutorialBtn') : t('settings.tutorialOn')}</button></div>` : ''}
           ${from === 'title' ? `<div class="set-row"><label>${t('settings.reset')}</label><button class="btn danger small" data-reset>${t('settings.resetBtn')}</button></div>` : ''}
@@ -920,6 +922,7 @@ export class UI {
       seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
       this.app.applySettings();
       persist();
+      if (k === 'motion') { if (v) motion.start(); else motion.stop(); }
     })));
     const tut = n.querySelector('[data-tut]');
     if (tut) tut.addEventListener('click', () => { save.tutorialDone = false; save.tutUlt = false; persist(); tut.textContent = t('settings.tutorialOn'); });
@@ -935,7 +938,7 @@ export class UI {
     }
     n.querySelector('[data-back]').addEventListener('click', () => {
       if (from === 'pause') this.show('pause');
-      else this.show('title');
+      else { motion.stop(); this.show('title'); }   // 菜单里只是试一下摄像头，离开设置就关掉
     });
     return n;
   }

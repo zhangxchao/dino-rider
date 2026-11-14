@@ -21,7 +21,9 @@ class Input {
     this.onUnlock = null;         // 游戏中意外失去指针锁定时回调（用于暂停）
     this.joy = { x: 0, y: 0 };
     this.motionX = 0;             // 体感（摄像头）左右倾斜 -1…1
-    this.motionSkill = 0;         // 体感举手触发技能的时间戳（读取后清零）
+    this.motionSkill = 0;         // 体感触发技能 / 跳跃 / 大招的时间戳（读取后清零）
+    this.motionJump = 0;
+    this.motionUlt = 0;
     this.isTouch = false;
     this.vibrate = true;          // 设置里的「震动反馈」
     this.lastBuzz = 0;
@@ -92,9 +94,10 @@ class Input {
 
   held(action) { return ACTIONS[action].some((c) => this.down.has(c)); }
   pressed(action) {
-    if (action === 'skill' && this.motionSkill) {
-      const fresh = performance.now() - this.motionSkill < 400;
-      this.motionSkill = 0;
+    const mk = action === 'skill' ? 'motionSkill' : action === 'jump' ? 'motionJump' : action === 'ult' ? 'motionUlt' : null;
+    if (mk && this[mk]) {
+      const fresh = performance.now() - this[mk] < 400;
+      this[mk] = 0;
       if (fresh) return true;
     }
     return ACTIONS[action].some((c) => this.edge.has(c));
@@ -132,7 +135,7 @@ class Input {
 
   endFrame() { this.edge.clear(); }
 
-  releaseAll() { this.down.clear(); this.edge.clear(); this.motionSkill = 0; this.joy.x = 0; this.joy.y = 0; if (this.joyReset) this.joyReset(); }
+  releaseAll() { this.down.clear(); this.edge.clear(); this.motionSkill = 0; this.motionJump = 0; this.motionUlt = 0; this.joy.x = 0; this.joy.y = 0; if (this.joyReset) this.joyReset(); }
 
   // ---------------- 触屏 ----------------
   buildTouch(root) {

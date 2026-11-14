@@ -10,6 +10,13 @@ const FULL_LEAN = 0.11;     // 偏离中心占画面宽度的这个比例 = 推�
 const DEAD = 0.12;          // 死区（推满比例）
 const RAISE_FRAMES = 3;     // 手举过头要连续这几帧才算
 const SKILL_COOLDOWN = 700; // ms
+const JUMP_RISE = 0.45;     // 肩膀比平时高出「肩宽 × 这个值」= 跳起来了
+const JUMP_COOLDOWN = 450;  // ms
+const CROSS_FRAMES = 8;     // 双臂交叉要保持这几帧（约 0.27 秒）= 大招
+const ULT_COOLDOWN = 1500;  // ms
+const LOCK_KEEP = 1500;     // ms：锁定的人丢了这么久才允许换人
+const LOCK_DIST = 0.3;      // 锁定后，同一个人每帧最多移动这么远（画面比例）
+const MAX_POSES = 4;
 
 const base = () => new URL('./mediapipe/', document.baseURI).href;
 
@@ -36,6 +43,12 @@ class Motion {
     this.lastSkill = 0;
     this.lastTs = -1;
     this.seen = 0;
+    this.lock = null;        // 锁定的玩家 { cx, cy, ts }：镜头里有别人时不会被抢走
+    this.baseY = null;       // 肩膀平时的高度（慢慢跟随），跳起来时会明显高于它
+    this.jumpArmed = true;
+    this.lastJump = 0;
+    this.crossN = 0;
+    this.lastUlt = 0;
     input.motionX = 0;
   }
 
@@ -108,7 +121,7 @@ class Motion {
     const mk = (delegate) => mod.PoseLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: base() + 'pose_landmarker_lite.task', delegate },
       runningMode: 'VIDEO',
-      numPoses: 1,
+      numPoses: MAX_POSES,
     });
     try { return await mk('GPU'); } catch (e) { console.warn('[motion] GPU delegate failed, use CPU', e); return mk('CPU'); }
   }
@@ -157,25 +170,54 @@ class Motion {
         this.lastTs = ts;
         let res = null;
         try { res = this.landmarker.detectForVideo(v, ts); } catch (e) { console.warn('[motion] detect', e); }
-        this.process(res && res.landmarks && res.landmarks[0], ts);
+        this.process((res && res.landmarks) || [], ts);
       }
     }
     this._next();
   }
 
-  process(lm, ts) {
+  /** 从镜头里的多个人里挑出玩家：先锁定离镜头最近（肩最宽）的人，之后只跟着这个人，别人走进来也不会抢走 */
+  pick(poses, ts) {
     const ok = (p) => p && (p.visibility === undefined || p.visibility > 0.5);
-    const ready = lm && ok(lm[L_SH]) && ok(lm[R_SH]) && ok(lm[NOSE]);
-    this.draw(lm, ready);
-    if (!ready) {
+    const cand = [];
+    for (const lm of poses) {
+      if (!(ok(lm[L_SH]) && ok(lm[R_SH]) && ok(lm[NOSE]))) continue;
+      const sw = Math.abs(lm[L_SH].x - lm[R_SH].x);
+      if (sw < 0.06) continue;                        // 太远的路人不算
+      cand.push({ lm, sw, cx: (lm[L_SH].x + lm[R_SH].x) / 2, cy: (lm[L_SH].y + lm[R_SH].y) / 2 });
+    }
+    const lock = this.lock;
+    let best = null;
+    if (lock && ts - lock.ts < LOCK_KEEP) {
+      let bd = LOCK_DIST;
+      for (const c of cand) {
+        const d = Math.hypot(c.cx - lock.cx, c.cy - lock.cy);
+        if (d < bd) { bd = d; best = c; }
+      }
+    } else if (cand.length) {
+      best = cand.reduce((a, c) => (c.sw > a.sw ? c : a));
+      if (lock) this.recalibrate();                   // 换了人：重新校准
+      this.baseY = null;
+    }
+    if (best) this.lock = { cx: best.cx, cy: best.cy, ts };
+    return { best, others: cand.filter((c) => c !== best) };
+  }
+
+  process(poses, ts) {
+    const ok = (p) => p && (p.visibility === undefined || p.visibility > 0.5);
+    const { best, others } = this.pick(poses, ts);
+    this.draw(best, others);
+    if (!best) {
       this.seen = 0;
+      this.crossN = 0;
       input.motionX = 0;
       this.x *= 0.8;
       if (this.center !== null || this.calib.length === 0) this.msg(t('motion.find'), 'warn');
       return;
     }
+    const lm = best.lm, sw = best.sw;
     // 画面是镜像的：x 取 1 - x，这样你往右倾，屏幕上的恐龙也往右
-    const sx = 1 - (lm[L_SH].x + lm[R_SH].x) / 2;
+    const sx = 1 - best.cx;
     const nx = 1 - lm[NOSE].x;
     const raw = nx * 0.6 + sx * 0.4;
     this.seen++;
@@ -188,7 +230,7 @@ class Motion {
       if (n >= 24) {
         const mean = this.calib.reduce((a, b) => a + b, 0) / n;
         const spread = Math.max(...this.calib) - Math.min(...this.calib);
-        if (spread < 0.05) { this.center = mean; this.x = mean; this.msg(t('motion.ok'), 'ok'); }
+        if (spread < 0.05) { this.center = mean; this.x = mean; this.baseY = best.cy; this.msg(t('motion.ok'), 'ok'); }
         else this.calib.length = 0;
       }
       input.motionX = 0;
@@ -199,13 +241,39 @@ class Motion {
     v = Math.max(-1, Math.min(1, v));
     input.motionX = Math.abs(v) < DEAD ? 0 : (v - Math.sign(v) * DEAD) / (1 - DEAD);
 
-    // 举手：任意一只手腕高过鼻子；放下（低于肩膀）后才能再次触发
     const noseY = lm[NOSE].y;
-    const shY = (lm[L_SH].y + lm[R_SH].y) / 2;
+    const shY = best.cy;
+    const lw = lm[L_WR], rw = lm[R_WR];
+
+    // 跳跃：肩膀比平时高出一截（真跳，或快速上提身体）；落回后才能再跳
+    if (this.baseY === null) this.baseY = shY;
+    const rise = this.baseY - shY;
+    if (rise > sw * JUMP_RISE && this.jumpArmed && ts - this.lastJump > JUMP_COOLDOWN) {
+      this.jumpArmed = false;
+      this.lastJump = ts;
+      input.motionJump = ts;
+    } else if (rise < sw * 0.15) {
+      this.jumpArmed = true;
+    }
+    if (rise < sw * 0.2) this.baseY += (shY - this.baseY) * 0.03;   // 平时慢慢跟随（人慢慢蹲下、坐下也不会误判）
+
+    // 大招：双臂在胸前交叉成 X，保持一小会儿
+    const shDir = Math.sign(lm[L_SH].x - lm[R_SH].x) || 1;
+    const crossed = ok(lw) && ok(rw)
+      && Math.sign(lw.x - rw.x) === -shDir && Math.abs(lw.x - rw.x) > sw * 0.15
+      && lw.y > noseY && rw.y > noseY && lw.y < shY + sw * 2 && rw.y < shY + sw * 2;
+    if (crossed) this.crossN++; else this.crossN = 0;
+    if (this.crossN >= CROSS_FRAMES && ts - this.lastUlt > ULT_COOLDOWN) {
+      this.lastUlt = ts;
+      this.crossN = 0;
+      input.motionUlt = ts;
+    }
+
+    // 技能：任意一只手腕高过鼻子；放下（低于肩膀）后才能再次触发
     const up = (w) => ok(w) && w.y < noseY - 0.02;
     const down = (w) => !ok(w) || w.y > shY;
-    const handUp = up(lm[L_WR]) || up(lm[R_WR]);
-    const handsDown = down(lm[L_WR]) && down(lm[R_WR]);
+    const handUp = up(lw) || up(rw);
+    const handsDown = down(lw) && down(rw);
     if (handUp) this.raiseN++; else this.raiseN = 0;
     if (handsDown) this.armed = true;
     if (this.raiseN >= RAISE_FRAMES && this.armed && ts - this.lastSkill > SKILL_COOLDOWN) {
@@ -215,7 +283,7 @@ class Motion {
     }
   }
 
-  draw(lm, ready) {
+  draw(best, others) {
     const c = this.cvs;
     if (!c) return;
     const w = 160, h = 120;
@@ -227,13 +295,16 @@ class Motion {
       g.strokeStyle = 'rgba(255,255,255,.35)';
       g.beginPath(); g.moveTo(this.center * w, 0); g.lineTo(this.center * w, h); g.stroke();
     }
-    if (!lm) return;
-    g.fillStyle = ready ? '#7dff8a' : '#ffb04a';
-    for (const i of [NOSE, L_SH, R_SH, L_WR, R_WR]) {
-      const p = lm[i];
-      if (!p) continue;
-      g.beginPath(); g.arc((1 - p.x) * w, p.y * h, 3.5, 0, Math.PI * 2); g.fill();
-    }
+    const dots = (lm, color, r) => {
+      g.fillStyle = color;
+      for (const i of [NOSE, L_SH, R_SH, L_WR, R_WR]) {
+        const p = lm[i];
+        if (!p) continue;
+        g.beginPath(); g.arc((1 - p.x) * w, p.y * h, r, 0, Math.PI * 2); g.fill();
+      }
+    };
+    for (const o of others) dots(o.lm, 'rgba(160,160,160,.7)', 2.5);   // 别人：灰色，不参与控制
+    if (best) dots(best.lm, '#7dff8a', 3.5);
   }
 }
 

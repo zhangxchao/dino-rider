@@ -8,6 +8,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { audio } from './audio.js';
 import { input } from './input.js';
+import { motion } from './motion.js';
 import { save, persist } from './save.js';
 import { LEVELS } from './data.js';
 import { Game } from './game.js';
@@ -254,6 +255,7 @@ class App {
     document.getElementById('touch').classList.toggle('hidden', !input.isTouch);
     this.game = new Game(this, opts);
     this.mode = 'game';
+    if (save.settings.motion) { motion.start(); motion.recalibrate(); } else motion.stop();
     input.gameActive = true;
     input.releaseAll();
     save.stats.plays++;
@@ -270,6 +272,7 @@ class App {
     input.gameActive = false;
     input.exitLock();
     input.releaseAll();
+    motion.stop();
     this.hudRoot.classList.add('hidden');
     document.getElementById('touch').classList.add('hidden');
     if (!this.showcase) this.showcase = new Showcase(this, this.menuBiome());
@@ -293,6 +296,7 @@ class App {
   }
 
   onResult(r) {
+    motion.stop();
     input.gameActive = false;
     input.exitLock();
     this.ui.show('result', r);

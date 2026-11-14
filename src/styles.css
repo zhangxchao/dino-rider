@@ -702,3 +702,14 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
   #s-pets .grid-panel { width: 28vw; top: 70px; }
   #s-pets .info-panel { width: 52vw; top: 70px; }
 }
+
+/* 体感控制预览 */
+#motion-cam { position: fixed; left: 50%; bottom: calc(8px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: 160px; height: 120px; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid rgba(255,255,255,.4); z-index: 70; display: none; opacity: .88; touch-action: none; pointer-events: auto; }
+#motion-cam.on { display: block; }
+#motion-cam video, #motion-cam canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#motion-cam video { transform: scaleX(-1); }
+#motion-cam .mmsg { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 6px; font: 700 12px/1.3 system-ui, sans-serif; text-align: center; color: #fff; background: rgba(0,0,0,.65); }
+#motion-cam .mmsg[data-tone=ok] { color: #8fff9a; }
+#motion-cam .mmsg[data-tone=warn] { color: #ffd070; }
+#motion-cam .mmsg[data-tone=bad] { color: #ff8a8a; }
+.set-sub { display: block; font-weight: 400; font-size: 12px; opacity: .65; margin-top: 2px; }

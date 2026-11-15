@@ -4,7 +4,7 @@
 // =====================================================================
 
 // 近战攻击动作风格（模型动画 & 玩法判定共用）
-//   bite 撕咬 | horn 角顶 | claw 爪击 | tail 尾击 | stomp 踩踏 | peck 啄击 | headbutt 头槌
+//   bite 撕咬 | horn 角顶 | claw 爪击 | tail 尾击 | stomp 踩踏 | peck 啄击 | headbutt 头槌 | kick 踢击
 // 技能类型（玩法逻辑实现 / 模型可按类型做专属动画）
 //   roar 咆哮 | charge 冲锋 | pounce 飞扑 | spin 旋风 | stomp 震地 | frenzy 狂暴
 //   fortress 堡垒 | dive 俯冲 | sonic 音波 | venom 毒液 | wave 音爆 | spikes 尖刺 | sprint 疾跑
@@ -37,7 +37,7 @@ export const DINOS = [
     body: 'theropod', scale: 0.72, riderScale: 0.8,
     features: ['feathers', 'sickleClaw', 'stripes'],
     colors: { main: 0xb5763a, belly: 0xead2a8, accent: 0x5b2e14, extra: 0x2f6f8f, eye: 0xffe14a },
-    stats: { hp: 170, atk: 16, def: 0.05, speed: 14, reach: 1.8, atkRate: 1.8 },
+    stats: { hp: 170, atk: 16, def: 0.05, speed: 15, reach: 1.8, atkRate: 1.8 },
     attack: 'claw',
     skill: { type: 'pounce', name: '迅猛飞扑', desc: '高高跃起（空中无敌），落地造成范围伤害并释放冲击波。', cd: 6, power: 1.85, radius: 6, dist: 20 },
   },
@@ -47,7 +47,7 @@ export const DINOS = [
     body: 'stegosaur', scale: 1.1, riderScale: 1.0,
     features: ['plates', 'thagomizer'],
     colors: { main: 0x7a8a4a, belly: 0xd6cfa0, accent: 0xc4553a, extra: 0xe8b04a, eye: 0xffd24a },
-    stats: { hp: 280, atk: 22, def: 0.3, speed: 8.5, reach: 2.8, atkRate: 0.85 },
+    stats: { hp: 290, atk: 27, def: 0.3, speed: 8.5, reach: 2.8, atkRate: 0.85 },
     attack: 'tail',
     skill: { type: 'spin', name: '骨刺旋风', desc: '原地旋转甩尾，三连击周围敌人，还能打散飞来的子弹。', cd: 9, power: 1.7, radius: 8, hits: 3 },
   },
@@ -64,7 +64,7 @@ export const DINOS = [
   {
     id: 'spinosaurus', name: '棘龙', en: 'Spinosaurus', era: '白垩纪中期',
     desc: '背生巨帆的河流霸主，最大的肉食恐龙之一。',
-    body: 'theropod', scale: 1.3, riderScale: 1.0,
+    body: 'theropod', scale: 1.5, riderScale: 1.0,
     features: ['sail', 'crocSnout'],
     colors: { main: 0x4f5f6a, belly: 0xc8bfa8, accent: 0xd46a2a, extra: 0x2a3a44, eye: 0xffb000 },
     stats: { hp: 330, atk: 28, def: 0.15, speed: 10, reach: 2.6, atkRate: 0.95 },
@@ -77,7 +77,7 @@ export const DINOS = [
     body: 'ankylosaur', scale: 1.05, riderScale: 1.0,
     features: ['armor', 'tailClub'],
     colors: { main: 0x8a7a5a, belly: 0xcfc2a0, accent: 0x5a4a3a, extra: 0xb09a6a, eye: 0xffd24a },
-    stats: { hp: 285, atk: 22, def: 0.36, speed: 7.5, reach: 2.4, atkRate: 0.8 },
+    stats: { hp: 260, atk: 22, def: 0.45, speed: 7.5, reach: 2.4, atkRate: 0.8 },
     attack: 'tail',
     skill: { type: 'fortress', name: '铁甲堡垒', desc: '5 秒内减免 80% 伤害，并反弹部分伤害。', cd: 14, duration: 5, reduce: 0.8, thorns: 0.6 },
   },
@@ -104,10 +104,10 @@ export const DINOS = [
   {
     id: 'allosaurus', name: '异特龙', en: 'Allosaurus', era: '侏罗纪晚期',
     desc: '侏罗纪的顶级猎手，眼上的小角是它的标志。',
-    body: 'theropod', scale: 1.1, riderScale: 1.0,
+    body: 'theropod', scale: 1.3, riderScale: 1.0,
     features: ['browHorns', 'stripes'],
     colors: { main: 0xa0663a, belly: 0xe6c9a0, accent: 0x5a2e1a, extra: 0xd24a2a, eye: 0xffc400 },
-    stats: { hp: 300, atk: 29, def: 0.16, speed: 12.5, reach: 2.3, atkRate: 1.1 },
+    stats: { hp: 300, atk: 29, def: 0.16, speed: 13.5, reach: 2.3, atkRate: 1.1 },
     attack: 'bite',
     skill: { type: 'pounce', name: '猎杀突袭', desc: '猛然跃起扑杀，落地撕裂一片区域并释放冲击波。', cd: 7, power: 1.25, radius: 7, dist: 22 },
   },
@@ -117,7 +117,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.05, riderScale: 1.0,
     features: ['bullHorns', 'tinyArms', 'spots'],
     colors: { main: 0xa3432f, belly: 0xe0b98a, accent: 0x5a1e14, extra: 0xf0d080, eye: 0xffe14a },
-    stats: { hp: 240, atk: 25, def: 0.12, speed: 12.5, reach: 2.2, atkRate: 1.1 },
+    stats: { hp: 240, atk: 25, def: 0.12, speed: 13.5, reach: 2.2, atkRate: 1.1 },
     attack: 'headbutt',
     skill: { type: 'charge', name: '公牛冲撞', desc: '超高速无敌冲撞，撞飞一路上的怪物。', cd: 7, power: 2.5, dist: 28, speedMul: 3 },
   },
@@ -127,7 +127,7 @@ export const DINOS = [
     body: 'theropod', scale: 0.9, riderScale: 0.9,
     features: ['doubleCrest', 'neckFrill', 'stripes'],
     colors: { main: 0x6aa04a, belly: 0xefe2a0, accent: 0xe6c43a, extra: 0x8a3ab0, eye: 0xff4a4a },
-    stats: { hp: 190, atk: 18, def: 0.08, speed: 12, reach: 2.0, atkRate: 1.3 },
+    stats: { hp: 190, atk: 18, def: 0.08, speed: 13, reach: 2.0, atkRate: 1.3 },
     attack: 'bite',
     skill: { type: 'venom', name: '毒液喷射', desc: '扇形喷出 7 团毒液，命中敌人持续中毒。', cd: 7, power: 1.4, count: 7, spread: 50, poison: 3 },
   },
@@ -207,8 +207,8 @@ export const DINOS = [
     body: 'theropod', scale: 0.85, riderScale: 0.85,
     features: ['beak', 'feathers', 'longNeck'],
     colors: { main: 0xc9a05a, belly: 0xf2e6c8, accent: 0x7a5a2a, extra: 0x3a8ab0, eye: 0x222222 },
-    stats: { hp: 180, atk: 15, def: 0.05, speed: 16, reach: 1.8, atkRate: 1.6 },
-    attack: 'peck',
+    stats: { hp: 180, atk: 15, def: 0.05, speed: 17, reach: 1.8, atkRate: 1.6 },
+    attack: 'kick',
     skill: { type: 'sprint', name: '疾风冲刺', desc: '4 秒内速度激增且无敌，残影灼伤触碰的敌人。', cd: 10, duration: 4, speedMul: 1.8, power: 0.6 },
   },
   {
@@ -619,7 +619,7 @@ export function gemBagTotal(bag) {
 //  宠物模式
 //  5 只宠物（幼年 → 喂 10 次变成体）、饲料、住所、两位无攻击力的小骑手、
 //  装备（普通骑手的武器）与技能（普通骑手的被动）、黑化生物小怪、
-//  普通恐龙首领（骑手永远是黑心博士，黑化宝石 +800 血）。
+//  普通恐龙首领（骑手永远是黑心博士，黑化宝石 +2000 血）。
 //  所有价格、规则都集中在 PET_RULES，改数字只改这里。
 // =====================================================================
 export const PET_RULES = {
@@ -631,7 +631,7 @@ export const PET_RULES = {
   hungryWindow: 7,      // 「一周」按最近 7 天滚动计算
   habitatPrice: 20,     // 树林 / 荒原 / 湿地
   gearPrice: 100,       // 装备、技能
-  bossGemHp: 800,       // 黑化宝石给首领恐龙加的血量
+  bossGemHp: 2000,       // 黑化宝石给首领恐龙加的血量
   juvenileScale: 0.55,  // 幼年体的缩放（只影响菜单里的外观）
 };
 
@@ -646,7 +646,7 @@ export const FEEDS = {
 
 // 住所只换背景，不影响数值。biome：菜单里用哪种地形做背景
 export const HABITATS = [
-  { id: 'lawn',      name: '草坪', icon: '🌱', price: 0,  biome: 'jungle' },
+  { id: 'lawn',      name: '草坪', icon: '🌱', price: 0,  biome: 'lawn' },
   { id: 'forest',    name: '树林', icon: '🌲', price: 20, biome: 'jungle', tint: 'rgba(10,60,20,.28)' },
   { id: 'wasteland', name: '荒原', icon: '🏜️', price: 20, biome: 'desert' },
   { id: 'wetland',   name: '湿地', icon: '🪷', price: 20, biome: 'swamp' },
@@ -779,7 +779,7 @@ export const PET_LEVELS = [
 
 // ---------------------------------------------------------------------
 //  首领：普通恐龙 + 黑心博士。简单 1 星 / 中等 2 星 / 困难 3 星
-//  每只恐龙一份首领定义（BOSSES['pb_<id>']），血量 = 恐龙血量 + 黑化宝石 800
+//  每只恐龙一份首领定义（BOSSES['pb_<id>']），血量 = 恐龙血量 + 黑化宝石 2000
 // ---------------------------------------------------------------------
 export const petBossKey = (dinoId) => 'pb_' + dinoId;
 for (const d of DINOS) {
@@ -788,8 +788,8 @@ for (const d of DINOS) {
     get name() { return d.name; },
     title: '黑心博士的坐骑',
     hp: d.stats.hp + PET_RULES.bossGemHp,
-    dmg: Math.round(d.stats.atk * 0.8),
-    speed: 6, radius: Math.max(2, 1.7 * d.scale), height: 3 * d.scale + 1,
+    dmg: Math.round(d.stats.atk * 1.0),
+    speed: 8, radius: Math.max(2, 1.7 * d.scale), height: 3 * d.scale + 1,
     patterns: ['slam', 'charge', 'volley'], summon: [], halfSummon: TITANS,
     skills: { slam: '重踏', charge: '狂暴冲撞', volley: '黑心药水' },
     anim: { slam: 'slam', charge: 'charge', volley: 'volley' },

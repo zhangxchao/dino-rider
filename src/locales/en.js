@@ -209,6 +209,7 @@ export default {
     'banner.phase': '{name} enters phase {n}',
 
     'float.immune': 'Immune',
+    'float.dodge': 'Dodge',
     'float.skillCharge': 'Skill charged!',
     'float.power': 'Power +50%!',
     'float.frenzy': 'Frenzy! Double fire rate',

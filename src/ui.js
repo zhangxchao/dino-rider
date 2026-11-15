@@ -679,6 +679,7 @@ export class UI {
         const m2 = r.grew ? t('pet.grew', { name: d.name }) : r.adult ? t('pet.fedAdult', { n: recentFeeds(d.id) }) : t('pet.fed', { n: PET_RULES.feedsToAdult - ownedPet(d.id).feeds });
         body.querySelector('.pet-msg').textContent = m2;
         if (r.grew) this.app.audio.play('levelUp');
+        else this.app.showcase?.feed(d.feed, FEEDS[d.feed].live);
       });
       body.querySelectorAll('[data-hab]').forEach((b) => b.addEventListener('click', () => {
         const id = b.dataset.hab;
@@ -839,6 +840,7 @@ export class UI {
         if (!r.ok) return fail(r);
         const d = petDef(b.dataset.feedPet);
         if (r.grew) this.app.audio.play('levelUp');
+        else if (d.id === P.active) this.app.showcase?.feed(d.feed, FEEDS[d.feed].live);
         again(r.grew ? t('pet.grew', { name: d.name }) : r.adult ? t('pet.fedAdult', { n: recentFeeds(d.id) }) : t('pet.fed', { n: PET_RULES.feedsToAdult - ownedPet(d.id).feeds }));
       }));
       body.querySelectorAll('[data-buy-hab]').forEach((b) => b.addEventListener('click', () => {

@@ -1839,6 +1839,37 @@ BIOMES.hive = {
   },
 };
 
+// ======================= 草坪（宠物乐园用：克隆丛林，只留草，没有树 / 花 / 石头 / 池塘） =======================
+BIOMES.lawn = {
+  ...BIOMES.jungle,
+  height(ctx) {
+    const n = ctx.noise;
+    return (x, z) => {
+      const r = Math.hypot(x, z);
+      const flat = 0.15 + 0.4 * smooth(4, 26, r);
+      let h = fbm(n, x * 0.022, z * 0.022, 4) * 0.9 * flat + lift(n, x, z) * 0.5;
+      const e = smooth(ARENA_RADIUS + 1, ARENA_RADIUS + 34, r);
+      if (e > 0) h = h * (1 - e) + (6 + fbm(n, x * 0.017 + 40, z * 0.017 - 20, 3) * 5) * e;
+      return h;
+    };
+  },
+  ground(ctx) {
+    const n = ctx.noise;
+    const C = { a: new THREE.Color(0x4a8a2a), b: new THREE.Color(0x6fa338), c: new THREE.Color(0x3c7424) };
+    return (c, x, y, z, ny, rnd) => {
+      const p = fbm(n, x * 0.05 + 3, z * 0.05 - 5, 2) * 0.5 + 0.5;
+      c.copy(C.c).lerp(C.a, smooth(0.25, 0.5, p)).lerp(C.b, smooth(0.58, 0.85, p));
+      c.multiplyScalar(0.92 + rnd * 0.16);
+    };
+  },
+  decorate(ctx) {
+    const q = ctx.hi ? 1 : 0.5;
+    const grass = scatter(ctx, Math.round(900 * q), 2, 80, { s: [0.8, 1.5] });
+    addInstanced(ctx, geoGrass(), ctx.decoMat, grass, { name: 'grass', cast: false });
+  },
+  weather() {},
+};
+
 export const BIOME_IDS = Object.keys(BIOMES);
 
 export function createWorld(biome = 'jungle', scene, opts = {}) {
@@ -1931,7 +1962,7 @@ export function createWorld(biome = 'jungle', scene, opts = {}) {
     sun,
     fogColor: horizon.clone(),
     // 水面 / 岩浆高度（玩法层可选用：如判断涉水）
-    waterLevel: biome === 'jungle' ? POND.water : biome === 'swamp' ? SWAMP_WATER : biome === 'frost' ? LAKE.level : null,
+    waterLevel: biome === 'lawn' ? null : biome === 'jungle' ? POND.water : biome === 'swamp' ? SWAMP_WATER : biome === 'frost' ? LAKE.level : null,
     update(dt, t, focus) {
       if (disposed) return;
       const f = focus ? _focus.set(focus.x, focus.y, focus.z) : ORIGIN;

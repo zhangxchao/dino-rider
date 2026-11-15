@@ -209,6 +209,7 @@ export default {
     'banner.phase': '{name} 进入第 {n} 阶段',
 
     'float.immune': '免疫',
+    'float.dodge': '闪避',
     'float.skillCharge': '技能充能！',
     'float.power': '力量 +50%！',
     'float.frenzy': '狂暴！射速翻倍',

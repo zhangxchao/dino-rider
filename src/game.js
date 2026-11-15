@@ -899,6 +899,10 @@ export class Game {
       if (o.source !== 'dot' && Math.random() < 0.2) { e.getCenter(_v); _v.y += e.halfHeight; this.text.add(_v, t('float.immune'), 'info', 0.6); }
       return 0;
     }
+    if (e.isBoss && e.tryDodge(o)) {
+      e.getCenter(_v); _v.y += e.halfHeight; this.text.add(_v, t('float.dodge'), 'info', 0.7);
+      return 0;
+    }
     const d = Math.max(1, dmg);
     e.hp -= d;
     this.stats.dmgDealt += d;

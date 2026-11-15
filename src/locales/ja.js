@@ -209,6 +209,7 @@ export default {
     'banner.phase': '{name} が第 {n} 形態に突入',
 
     'float.immune': '無効',
+    'float.dodge': '回避',
     'float.skillCharge': 'スキルチャージ！',
     'float.power': 'パワー +50%！',
     'float.frenzy': '狂暴化！連射 2 倍',

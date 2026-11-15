@@ -9,7 +9,7 @@
 //
 //  音效名（play）：
 //   界面   click hover select buy error
-//   近战   bite claw horn tail stomp peck headbutt
+//   近战   bite claw horn tail stomp peck kick headbutt
 //          whoosh hit hitHeavy crit playerHurt enemyHurt enemyDie bossDie explosion shieldHit
 //   骑手   spear arrow fireball laser bullet shuriken missile ice rock cannon heart slash
 //   技能   charge pounce spin quake frenzy fortress dive sonic venom wave spikes sprint
@@ -119,6 +119,11 @@ const SFX = {
     a._tone(o, t, { type: 'sine', f: 1100, f2: 500, dur: 0.05, v: 0.4, a: 0.001 });
     a._noise(o, t, { ft: 'bandpass', ff: 2500, q: 4, dur: 0.03, v: 0.3, a: 0.001 });
     a._tone(o, t, { at: 0.02, type: 'triangle', f: 400, f2: 200, dur: 0.06, v: 0.3 });
+  } },
+  kick: { d: 0.3, r: 0.1, v: 0.85, f(a, o, t) {
+    a._noise(o, t, { color: 'pink', ft: 'bandpass', ff: 500, ff2: 1600, fsweep: 0.08, q: 1.2, dur: 0.12, v: 0.4, a: 0.03 });
+    a._tone(o, t, { at: 0.08, type: 'sine', f: 180, f2: 60, dur: 0.14, v: 0.8 });
+    a._noise(o, t, { at: 0.08, ft: 'lowpass', ff: 1800, dur: 0.06, v: 0.35 });
   } },
   headbutt: { d: 0.35, r: 0.12, v: 0.9, f(a, o, t) {
     a._tone(o, t, { type: 'triangle', f: 320, f2: 110, dur: 0.15, v: 0.6, a: 0.001 });

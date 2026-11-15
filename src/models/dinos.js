@@ -1039,6 +1039,13 @@ function makeUpdater(ctx) {
           jaw = Math.max(jaw, bump(a, 0.15, 0.5) * 0.8);
           break;
         }
+        case 'kick': {
+          // 踢击：身体后仰，一条腿猛地向前踢出
+          const r = a < 0.35 ? smooth(a / 0.35) : a < 0.55 ? 1 : 1 - smooth((a - 0.55) / 0.45);
+          kick = Math.max(kick, r);
+          bodyZ += bump(a, 0.3, 0.7) * 0.25; pitch += -r * 0.12; neckX += -r * 0.1;
+          break;
+        }
         case 'headbutt': {
           const lower = a < 0.35 ? smooth(a / 0.35) : a < 0.55 ? 1 : 1 - smooth((a - 0.55) / 0.45);
           const lunge = bump(a, 0.35, 0.8);

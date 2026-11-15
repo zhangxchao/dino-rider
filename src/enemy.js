@@ -551,7 +551,9 @@ export class Boss {
     this.phase = 1;
     this.phases = this.def.phases || 2;
     this.pattern = null;
-    this.patternCd = 1.8;
+    this.pet = !!this.def.dinoId;     // 黑心博士的恐龙：出招更快、预警更短、会闪避
+    this.patternCd = this.pet ? 0.9 : 1.8;
+    this.dodgeT = 0; this.dodgeCd = 0.8; this.dodgeDir = 1;
     this.lastPattern = null;
     this.invulnT = 0;
     this.stun = 0;
@@ -565,6 +567,21 @@ export class Boss {
     this.barT = 0;
     this.collideCd = 0;
     this.zones = []; // 蛛网 / 毒沼 / 流沙 / 灼地等持续地面区域
+  }
+
+  /** 预警音：黑心博士的恐龙几乎不给提示 */
+  warn(v) { if (!this.pet) this.game.audio.play('warning', { volume: v }); }
+
+  /** 被打中前有机会侧身闪开（只有黑心博士的恐龙会）；返回 true = 这一下落空 */
+  tryDodge(o) {
+    if (!this.pet || o.source === 'dot') return false;
+    if (this.dodgeT > 0) return true;
+    if (this.dodgeCd > 0 || this.stun > 0 || Math.random() > 0.38) return false;
+    const rh = this.game.track.roadHalf;
+    this.dodgeT = 0.38;
+    this.dodgeCd = 1.5;
+    this.dodgeDir = this.pos.x > rh * 0.5 ? -1 : this.pos.x < -rh * 0.5 ? 1 : (Math.random() < 0.5 ? -1 : 1);
+    return true;
   }
 
   get targetable() { return this.alive && this.state === 'fight' && this.anim.burrow < 0.5; }
@@ -683,6 +700,8 @@ export class Boss {
     if (this.slowT > 0) { this.slowT -= dt; if (this.slowT <= 0) this.slowMul = 1; }
 
     this.updateZones(dt);
+    this.dodgeCd -= dt;
+    if (this.dodgeT > 0) this.dodgeT -= dt;
     const rh = g.track.roadHalf;
     let tx = clamp(Math.sin(this.anim.t * 0.45) * rh * 0.55 + pl.pos.x * 0.35, -rh + 2, rh - 2);
     let tz = pl.pos.z + this.anchorD;
@@ -703,6 +722,7 @@ export class Boss {
       if (vl > sp * 1.5) this.vel.multiplyScalar(sp * 1.5 / vl);
       this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
     }
+    if (this.dodgeT > 0) this.pos.x += this.dodgeDir * 22 * dt;
     this.pos.x = clamp(this.pos.x, -rh + 1, rh - 1);
     this.pos.y = g.heightAt(this.pos.x, this.pos.z);
     const face = Math.atan2(pl.pos.x - this.pos.x, pl.pos.z - this.pos.z);
@@ -738,11 +758,11 @@ export class Boss {
     const g = this.game;
     const pl = g.player;
     const ph = this.phase;
-    const fast = 1 - 0.12 * (ph - 1);
+    const fast = (1 - 0.12 * (ph - 1)) * (this.pet ? 0.62 : 1);
     const rh = g.track.roadHalf;
     const P = { name, t: 0, dur: 1.5, fired: false, teles: [], count: 0 };
     const skill = this.def.skills && this.def.skills[name];
-    if (skill && g.hud) g.hud.notice(`${this.def.name} · ${skill}`, 'boss');
+    if (skill && g.hud && !this.pet) g.hud.notice(`${this.def.name} · ${skill}`, 'boss');
     switch (name) {
       case 'frostSlam':
       case 'slam': {
@@ -756,10 +776,10 @@ export class Boss {
           P.spots.push({ x, z });
           P.teles.push(g.tele.add({ shape: 'circle', x, z, radius: 4.3, duration: P.windup, color: name === 'frostSlam' ? 0x60c8ff : 0xff3030 }));
         }
-        g.audio.play('warning', { volume: 0.5 });
+        this.warn(0.5);
         break;
       }
-      case 'volley': P.dur = 2.3; P.shots = 2 + (ph >= 2 ? 1 : 0) + (ph >= 3 ? 1 : 0); g.audio.play('warning', { volume: 0.4 }); break;
+      case 'volley': P.dur = 2.3; P.shots = 2 + (ph >= 2 ? 1 : 0) + (ph >= 3 ? 1 : 0); this.warn(0.4); break;
       case 'barrage': P.shots = 6 + ph * 3; P.dur = 0.6 + P.shots * 0.16 + 0.4; break;
       case 'summon':
         P.dur = 1.8;
@@ -771,7 +791,7 @@ export class Boss {
         P.aim = 0.55 * fast; P.windup = 1.05 * fast;
         P.speed = 32 * (1 + 0.1 * (ph - 1));
         P.dur = 6;
-        g.audio.play('warning', { volume: 0.6 });
+        this.warn(0.6);
         break;
       case 'burrow': P.dur = 5.2; g.audio.play('quake', { volume: 0.6 }); break;
       case 'breath': {
@@ -794,7 +814,7 @@ export class Boss {
           P.queue.push({ t: 0.3 + i * 0.14, x, z });
         }
         P.dur = 0.3 + n * 0.14 + 1.5; // 等最后一颗落地（灼烧地面在落地时生成）
-        g.audio.play('warning', { volume: 0.6 });
+        this.warn(0.6);
         break;
       }
       // —— 螳螂王 ——
@@ -809,7 +829,7 @@ export class Boss {
           const dx = Math.sin(a), dz = Math.cos(a);
           P.teles.push(g.tele.add({ shape: 'rect', x: P.cx - dx * P.len / 2, z: P.cz - dz * P.len / 2, angle: a, length: P.len, width: P.w, duration: P.windup, color: 0xff3030 }));
         }
-        g.audio.play('warning', { volume: 0.55 });
+        this.warn(0.55);
         break;
       }
       case 'sweep':
@@ -817,7 +837,7 @@ export class Boss {
         P.windup = 0.75 * fast;
         P.waves = ph >= 3 ? 2 : 1;
         P.dur = P.windup + 0.5 * P.waves + 0.6;
-        g.audio.play('warning', { volume: 0.5 });
+        this.warn(0.5);
         break;
       case 'blink':
         // 瞬移突袭：隐身 → 出现在玩家身侧 → 下劈
@@ -1165,7 +1185,7 @@ export class Boss {
     if (P.t >= P.dur) {
       this.endPattern();
       this.anim.burrow = 0;
-      this.patternCd = rand(1.2, 2.2) * (1 - 0.18 * (ph - 1)) * this.game.diff.rest * BALANCE.bossRest;
+      this.patternCd = rand(1.2, 2.2) * (1 - 0.18 * (ph - 1)) * this.game.diff.rest * BALANCE.bossRest * (this.pet ? 0.4 : 1);
     }
     return out;
   }
@@ -1216,7 +1236,7 @@ export class Boss {
         P.list = this.spots(1 + ph * 2, -2, 9);
         P.dur = P.lobT + P.flight + 0.4;
         for (const sp of P.list) P.teles.push(g.tele.add({ shape: 'circle', x: sp.x, z: sp.z, radius: 3.2, duration: P.lobT + P.flight, color: 0xe8f0e0 }));
-        g.audio.play('warning', { volume: 0.4 });
+        this.warn(0.4);
         return true;
       }
       case 'pounce': {
@@ -1227,7 +1247,7 @@ export class Boss {
         P.tx = pl.pos.x; P.tz = pl.pos.z + 2;
         P.r = 6.8;
         P.teles.push(g.tele.add({ shape: 'circle', x: P.tx, z: P.tz, radius: P.r, duration: P.windup, color: 0xff3030 }));
-        g.audio.play('warning', { volume: 0.55 });
+        this.warn(0.55);
         return true;
       }
       case 'brood':
@@ -1246,7 +1266,7 @@ export class Boss {
       case 'sandstorm':
         // 沙暴吐息：三波扇形沙弹，每波留一条安全缝
         P.waves = 3; P.gap = 0.55; P.dur = 0.6 + P.waves * P.gap + 0.5;
-        g.audio.play('warning', { volume: 0.45 });
+        this.warn(0.45);
         return true;
 
       // —— 冰霜巨人：冰冻减速 + 重击 ——
@@ -1262,13 +1282,13 @@ export class Boss {
         P.laneColor = 0x9ae0ff; P.laneDmg = 1.1; P.laneSlow = 0.8;
         P.dur = P.waves[0].t + 0.6;
         this.teleLanes(P, P.waves[0], P.waves[0].t);
-        g.audio.play('warning', { volume: 0.5 });
+        this.warn(0.5);
         return true;
       }
       case 'iceWall':
         // 冰墙推进：整排冰墙压过来，只留一个缺口（也可以跳过去）
         P.walls = ph; P.wallGap = 1.1; P.dur = 0.7 + P.walls * P.wallGap + 0.4;
-        g.audio.play('warning', { volume: 0.45 });
+        this.warn(0.45);
         return true;
 
       // —— 沼泽三头蛇：多头齐攻 + 持续毒 ——
@@ -1291,7 +1311,7 @@ export class Boss {
         P.list = this.spots(2 + ph, -2, 9);
         P.dur = P.lobT + P.flight + 0.4;
         for (const sp of P.list) P.teles.push(g.tele.add({ shape: 'circle', x: sp.x, z: sp.z, radius: 3.4, duration: P.lobT + P.flight, color: 0x7aff4a }));
-        g.audio.play('warning', { volume: 0.4 });
+        this.warn(0.4);
         return true;
       case 'mistOrbs':
         // 迷雾毒弹：一串预判走位的毒弹
@@ -1337,7 +1357,7 @@ export class Boss {
         P.laneColor = 0xb04aff; P.laneDmg = 1.15; P.laneSlow = 0;
         P.dur = P.waves[P.waves.length - 1].t + 0.6;
         for (const W of P.waves) this.teleLanes(P, W, W.t);
-        g.audio.play('warning', { volume: 0.55 });
+        this.warn(0.55);
         return true;
       }
     }

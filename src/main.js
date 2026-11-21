@@ -18,6 +18,7 @@ import { Showcase } from './showcase.js';
 import { renderThumbnails } from './thumbs.js';
 import { t } from './i18n.js';
 import { Juice } from './juice.js';
+import { ArtStyle } from './artstyle.js';
 import { setFxLevel } from './effects.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -75,6 +76,9 @@ class App {
     this.juice = new Juice(this);
     this.juice.install(this.composer, 2);
     this.composer.addPass(new OutputPass());
+    // 画风滤镜在色调映射之后（屏幕颜色空间里做笔触），是最后一个 Pass
+    this.art = new ArtStyle();
+    this.composer.addPass(this.art.pass);
 
     this.audio = audio;
     this.saveRef = save;
@@ -146,7 +150,10 @@ class App {
     this.dyn.pr = Math.min(this.maxPR, hiQ ? (this.mobile ? 1 : 1.25) : 1);
     this.dyn.good = 0; this.dyn.bad = 0;
     this.setPixelRatio(this.dyn.pr);
-    this.useComposer = s.quality === 'high';
+    // 画风滤镜要走后期：流畅画质下也开合成，但不开泛光
+    this.art.set(s.artStyle || 'none');
+    this.useComposer = hiQ || this.art.on;
+    this.bloom.enabled = hiQ;
     setFxLevel(s.fx || 'medium');
     FX.dmgNum = s.dmgNum || (this.mobile ? 'crit' : 'all');
     this.juice.motion = !!s.shake && !rm;

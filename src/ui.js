@@ -5,6 +5,7 @@ import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
 import { motion } from './motion.js';
+import { ART_STYLES } from './artstyle.js';
 import { KINDS, KIND_ICON, TEAM_MAX, BOOST, emptyBoost, creatureIds, creatureInfo } from './arena.js';
 import { t, LANGS, getLang, setLang } from './i18n.js';
 import { meta, MISSIONS, ACHIEVEMENTS } from './meta.js';
@@ -1025,6 +1026,7 @@ export class UI {
           <div class="set-row"><label>${t('settings.sfx')}</label><input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-k="sfx"></div>
           <div class="set-row"><label>${t('settings.mute')}</label><div class="seg" data-k="mute"><button data-v="1" class="${s.mute ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${!s.mute ? 'on' : ''}">${t('common.off')}</button></div></div>
           <div class="set-row"><label>${t('settings.quality')}</label><div class="seg" data-k="quality"><button data-v="high" class="${s.quality === 'high' ? 'on' : ''}">${t('settings.qualityHigh')}</button><button data-v="low" class="${s.quality === 'low' ? 'on' : ''}">${t('settings.qualityLow')}</button></div></div>
+          <div class="set-row"><label>${t('settings.art')}<small class="set-sub">${t('settings.artHint')}</small></label><div class="seg" data-k="artStyle">${ART_STYLES.map((v) => `<button data-v="${v}" class="${(s.artStyle || 'none') === v ? 'on' : ''}">${t('settings.art.' + v)}</button>`).join('')}</div></div>
           <div class="set-row"><label>${t('settings.fx')}</label><div class="seg" data-k="fx">${['full', 'medium', 'low'].map((v) => `<button data-v="${v}" class="${(s.fx || 'medium') === v ? 'on' : ''}">${t('settings.fx.' + v)}</button>`).join('')}</div></div>
           <div class="set-row"><label>${t('settings.dmgNum')}</label><div class="seg" data-k="dmgNum">${['all', 'crit', 'off'].map((v) => `<button data-v="${v}" class="${(s.dmgNum || (this.app.mobile ? 'crit' : 'all')) === v ? 'on' : ''}">${t('settings.dmgNum.' + v)}</button>`).join('')}</div></div>
           <div class="set-row"><label>${t('settings.autoRes')}</label><div class="seg" data-k="autoRes"><button data-v="1" class="${s.autoRes !== false ? 'on' : ''}">${t('common.on')}</button><button data-v="0" class="${s.autoRes === false ? 'on' : ''}">${t('common.off')}</button></div></div>
@@ -1052,11 +1054,11 @@ export class UI {
     n.querySelectorAll('.seg[data-k]').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       const k = seg.dataset.k;
       const v = b.dataset.v;
-      s[k] = k === 'quality' || k === 'fx' || k === 'difficulty' || k === 'dmgNum' ? v : v === '1';
+      s[k] = k === 'quality' || k === 'fx' || k === 'artStyle' || k === 'difficulty' || k === 'dmgNum' ? v : v === '1';
       seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
       this.app.applySettings();
       persist();
-      if (k === 'motion') { if (v) motion.start(); else motion.stop(); }
+      if (k === 'motion') { if (v === '1') motion.start(); else motion.stop(); }
     })));
     const tut = n.querySelector('[data-tut]');
     if (tut) tut.addEventListener('click', () => { save.tutorialDone = false; save.tutUlt = false; persist(); tut.textContent = t('settings.tutorialOn'); });

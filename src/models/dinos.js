@@ -167,6 +167,7 @@ function makeMats(def) {
     blanket: S(BLANKETS[hashStr(def.id) % BLANKETS.length], { side: THREE.DoubleSide }),
     trim: S(0xe8c050, { metalness: 0.55, roughness: 0.35 }),
     membrane: S(c.extra ?? 0x888888, { side: THREE.DoubleSide }),
+    bellyLine: S(new THREE.Color(c.belly ?? 0xcccccc).multiplyScalar(0.72)),
   };
 }
 
@@ -195,8 +196,9 @@ const PTERO = {
 };
 
 const SPECIES = {
+  // detail：精细版模型（肌肉分块、分趾的脚、背部鳞突、喉部褶皱、鼻孔和唇鳞），尾巴多一节更柔顺
   trex: { hipX: 0.4, legR: 0.33, bodyW: 0.62, bodyH: 0.64, bodyL: 1.3, neckL: 0.5, neckR: 0.44, neckA: 0.45, neckA2: 0.15,
-    headL: 1.2, headH: 0.72, headW: 0.66, tailL: 2.6, tailR: 0.5, armL: 0.32, armR: 0.07, claws: 2 },
+    headL: 1.2, headH: 0.72, headW: 0.66, tailN: 5, tailL: 2.6, tailR: 0.5, armL: 0.32, armR: 0.07, claws: 2, detail: 1 },
   giganotosaurus: { hipX: 0.38, legR: 0.31, bodyW: 0.58, bodyH: 0.62, bodyL: 1.42, neckL: 0.6, neckR: 0.38,
     headL: 1.45, headH: 0.56, headW: 0.5, tailL: 2.9, tailR: 0.48, armL: 0.42, armR: 0.08 },
   allosaurus: { headL: 1.05, headH: 0.48, headW: 0.42, armL: 0.62, tailL: 2.6 },
@@ -357,6 +359,18 @@ function addMarkings(ctx, torso, W, H, L, skipZ) {
   }
 }
 
+// 精细版躯干：背中线一排鳞突（避开鞍座）
+function addBodyDetail(ctx, torso, W, H, L, skipZ) {
+  const M = ctx.mats;
+  const gap = 0.55 * ctx.k + 0.15;
+  for (const u of [0.72, 0.56, 0.4, 0.24, 0.08, -0.08, -0.24, -0.4, -0.56, -0.72, -0.86]) {
+    const z = u * L;
+    if (Math.abs(z - skipZ) < gap) continue;
+    const f = Math.sqrt(1 - u * u);
+    spike(torso, [0, H * f * 0.94, z], [0, 1, -0.4], 0.12 + 0.06 * f, 0.06 + 0.03 * f, M.accent, 4);
+  }
+}
+
 function buildNeck(ctx, parent, base, segs, r0, r1) {
   const M = ctx.mats;
   let p = parent, pos = base, r = r0;
@@ -369,6 +383,11 @@ function buildNeck(ctx, parent, base, segs, r0, r1) {
     const rn = r - dr;
     seg(n, [0, 0, 0], e, r, rn, M.main, 8);
     seg(n, [0, -r * 0.34, r * 0.1], [0, e[1] - rn * 0.34, e[2]], r * 0.74, rn * 0.74, M.belly, 7);
+    if (ctx.P.detail) {
+      // 脖子后面的鳞突 + 喉部褶皱
+      spike(n, [0, e[1] * 0.5 + lerp(r, rn, 0.5) * 0.92, e[2] * 0.5], [0, 1, -0.35], lerp(r, rn, 0.5) * 0.4, lerp(r, rn, 0.5) * 0.16, M.accent, 4);
+      seg(n, [0, e[1] * 0.45 - lerp(r, rn, 0.45) * 0.34, e[2] * 0.45], [0, e[1] * 0.55 - lerp(r, rn, 0.55) * 0.34, e[2] * 0.55], lerp(r, rn, 0.45) * 0.77, lerp(r, rn, 0.55) * 0.77, M.bellyLine, 7);
+    }
     if (ctx.F.has('rockPlates')) {
       // 脖子：沿这一节的背面和两侧贴岩片
       const dir = _v.set(0, e[1], e[2]).normalize().clone();
@@ -410,6 +429,13 @@ function buildTail(ctx, parent, base) {
           const nrm = new THREE.Vector3(Math.sin(a), Math.cos(a), 0);
           rockPlate(g, nrm.x * rr * 0.98, e[1] * u + nrm.y * rr * 0.98, e[2] * u, nrm, rr * 0.8, (tone + i + (u > 0.5 ? 1 : 0)) % 3, M);
         }
+      }
+    }
+    if (P.detail && r > 0.08) {
+      // 尾巴背上的一排鳞突，越往后越小
+      for (const u of [0.25, 0.7]) {
+        const rr = lerp(r, rn, u);
+        spike(g, [0, e[1] * u + rr * 0.9, e[2] * u], [0, 1, -0.45], rr * 0.42, rr * 0.18, M.accent, 4);
       }
     }
     if (F.has('stripes') && i < n - 1) {
@@ -456,6 +482,19 @@ function buildHead(ctx, head) {
         }
         seg(head, [0, H * 0.3, L * 0.3], [0, H * 0.14, L * 0.92], W * 0.3, W * 0.22, M.main, 6, 0.95);
         msh(head, gSphLo(), M.main, 0, H * 0.04, L * 0.97, W * 0.25, H * 0.24, L * 0.08); // 钝鼻尖
+        if (P.detail) {
+          // 鼻孔
+          for (const s of [-1, 1]) msh(head, gSphLo(), M.pupil, s * W * 0.15, H * 0.2, L * 0.97, W * 0.06, H * 0.05, L * 0.04);
+          // 吻部上方粗糙的鳞突
+          for (let i = 0; i < 4; i++) {
+            const u = 0.15 + i * 0.22;
+            msh(head, gSphLo(), M.accent, 0, lerp(H * 0.3, H * 0.14, u) + lerp(W * 0.3, W * 0.22, u) * 0.92, lerp(L * 0.3, L * 0.92, u), W * 0.07, H * 0.05, L * 0.06);
+          }
+          // 嘴边一圈浅色唇鳞
+          for (const s of [-1, 1]) seg(head, [s * r0 * 0.74, y0 - r0 * fl * 0.5, z0 + L * 0.05], [s * r1 * 0.78, y1 - r1 * fl * 0.48, z1 - L * 0.04], W * 0.045, W * 0.035, M.belly, 5);
+          // 颧骨上的小角突
+          for (const s of [-1, 1]) spike(head, [s * W * 0.5, -H * 0.02, L * 0.18], [s, -0.35, -0.25], H * 0.2, W * 0.07, M.accent, 4);
+        }
       }
       if (F.has('snoutHorn')) spike(head, [0, H * 0.3, L * 0.72], [0, 1, 0.3], H * 0.62, W * 0.13, M.horn, 5); // 角鼻龙的鼻角
       if (F.has('bullHorns')) for (const s of [-1, 1]) spike(head, [s * W * 0.36, H * 0.5, L * 0.2], [s, 0.75, 0.1], H * 0.8, W * 0.13, M.horn, 6);
@@ -643,17 +682,35 @@ function buildBipedLeg(ctx, body, side) {
   const H = P.hipH, R = P.legR;
   const hip = grp(body, side * P.hipX, 0, 0);
   const K = [0, -0.45 * H, 0.2 * H], A = [0, -0.84 * H, -0.1 * H], Ft = [0, -H, 0.03 * H];
-  msh(hip, gSph(), M.main, side * R * 0.15, K[1] * 0.45, K[2] * 0.45, R * 1.2, 0.33 * H, R * 1.45, -0.42, 0, 0);
+  if (P.detail) {
+    // 大腿：细长的主肌肉 + 前侧股四头肌 + 连到尾巴的尾股肌（大腿后方鼓起的一大块）
+    msh(hip, gSph(), M.main, side * R * 0.12, K[1] * 0.45, K[2] * 0.45, R * 1.05, 0.37 * H, R * 1.2, -0.42, 0, 0);
+    msh(hip, gSph(), M.main, side * R * 0.32, K[1] * 0.38, K[2] * 0.45 + R * 0.45, R * 0.62, 0.21 * H, R * 0.62, -0.3, 0, 0);
+    msh(hip, gSph(), M.main, side * R * 0.08, K[1] * 0.12, -R * 0.75, R * 0.85, 0.2 * H, R * 1.05, 0.35, 0, 0);
+  } else msh(hip, gSph(), M.main, side * R * 0.15, K[1] * 0.45, K[2] * 0.45, R * 1.2, 0.33 * H, R * 1.45, -0.42, 0, 0);
   const knee = grp(hip, K[0], K[1], K[2]);
   const KA = [A[0] - K[0], A[1] - K[1], A[2] - K[2]];
   msh(knee, gSphLo(), M.main, 0, 0, 0, R * 0.62, R * 0.62, R * 0.62);
   seg(knee, [0, 0, 0], KA, R * 0.62, R * 0.42, M.main, 7);
+  // 小腿肚
+  if (P.detail) msh(knee, gSph(), M.main, 0, KA[1] * 0.3, KA[2] * 0.3 - R * 0.22, R * 0.5, Math.hypot(KA[1], KA[2]) * 0.3, R * 0.55, Math.atan2(KA[2], -KA[1]), 0, 0);
   const ankle = grp(knee, KA[0], KA[1], KA[2]);
   const AF = [Ft[0] - A[0], Ft[1] - A[1], Ft[2] - A[2]];
   seg(ankle, [0, 0, 0], AF, R * 0.4, R * 0.3, M.main, 6);
   const foot = grp(ankle, AF[0], AF[1], AF[2]);
-  msh(foot, gBox(), M.main, 0, R * 0.13, R * 0.5, R * 0.95, R * 0.26, R * 1.4);
-  for (const tx of [-1, 0, 1]) spike(foot, [tx * R * 0.34, R * 0.12, R * 1.15], [tx * 0.25, -0.3, 1], R * 0.55, R * 0.12, M.claw, 5);
+  if (P.detail) {
+    // 分开的三根脚趾（中趾最长）+ 脚掌肉垫 + 内侧的小悬趾
+    msh(foot, gSphLo(), M.main, 0, R * 0.14, R * 0.18, R * 0.52, R * 0.2, R * 0.55);
+    for (const tx of [-1, 0, 1]) {
+      const tip = [tx * R * 0.45, R * 0.07, R * (tx ? 1.05 : 1.25)];
+      seg(foot, [tx * R * 0.18, R * 0.14, R * 0.25], tip, R * 0.17, R * 0.1, M.main, 6, 0.75);
+      spike(foot, tip, [tx * 0.25, -0.35, 1], R * 0.42, R * 0.1, M.claw, 5);
+    }
+    spike(foot, [-side * R * 0.3, R * 0.3, -R * 0.05], [-side * 0.4, -0.5, -0.6], R * 0.3, R * 0.08, M.claw, 4);
+  } else {
+    msh(foot, gBox(), M.main, 0, R * 0.13, R * 0.5, R * 0.95, R * 0.26, R * 1.4);
+    for (const tx of [-1, 0, 1]) spike(foot, [tx * R * 0.34, R * 0.12, R * 1.15], [tx * 0.25, -0.3, 1], R * 0.55, R * 0.12, M.claw, 5);
+  }
   if (F.has('sickleClaw')) spike(foot, [-side * R * 0.3, R * 0.3, R * 0.75], [-side * 0.1, 1, 0.55], R * 1.0, R * 0.14, M.claw, 5);
   ctx.legs.push({ hip, knee, ankle, foot, side, front: false });
 }
@@ -818,6 +875,7 @@ function buildBiped(ctx) {
   if (F.has('potBelly')) ctx.torsoMeshes.push(msh(torso, gSph(), M.belly, 0, -H * 0.36, L * 0.22, W * 1.06, H * 0.8, L * 0.7));
   const sz = P.saddleZ * L;
   addMarkings(ctx, torso, W, H, L, sz);
+  if (P.detail) addBodyDetail(ctx, torso, W, H, L, sz);
   const f = Math.sqrt(Math.max(0.05, 1 - (sz / L) ** 2));
   ctx.saddle = buildSaddle(ctx, torso, sz, W * f, H * f);
   const head = buildNeck(ctx, torso, [0, H * 0.3, L * 0.78],

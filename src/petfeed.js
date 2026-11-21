@@ -23,7 +23,9 @@ function animal({ body, head, belly, horn, antler, spots, size, wool, legW = 0.0
   neck.rotation.x = 0.75;
   g.add(neck);
   const hy = legH + 0.62, hz = 1.02;
-  g.add(ico(0.2, hm, 0.9, 0.95, 1.25)).position.set(0, hy, hz);
+  const headM = ico(0.2, hm, 0.9, 0.95, 1.25);
+  headM.position.set(0, hy, hz);
+  g.add(headM);
   const snout = mesh(new THREE.BoxGeometry(0.16, 0.14, 0.26), mat(wool ? 0x2a2222 : 0x3a2c24), 0, hy - 0.06, hz + 0.28);
   g.add(snout);
   for (const sd of [-1, 1]) {

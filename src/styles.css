@@ -793,3 +793,4 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 /* 标题菜单现在有 8 个按钮：矮一点的屏幕上收紧，避免盖住标语 */
 @media (max-height: 860px) { #s-title .menu { gap: 6px; } #s-title .menu .btn { padding-top: 8px; padding-bottom: 8px; } #s-title .title-wrap { top: 6vh; } }
 @media (max-height: 760px) { #s-title .tagline { display: none; } }
+body.arena-on #touch .tpause { display: none; }

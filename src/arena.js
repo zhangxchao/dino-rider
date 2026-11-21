@@ -341,7 +341,7 @@ class Fighter {
         if (Math.hypot(mv.x, mv.y) > 0.1) moveDir = _a.set(mv.x, 0, -mv.y).normalize().clone();
         if (!busy && input.pressed('skill')) this.tryCastSkill(foes, true);
         if (input.pressed('ult')) this.tryAwaken();                    // 觉醒变身不受技能动画限制
-        if (!busy && (input.keyPressed('KeyF') || input.pressed('jump'))) this.tryUlt(foes);
+        if (!busy && (input.keyPressed('KeyF') || input.keyPressed('Space') || input.keyPressed('T_jump'))) this.tryUlt(foes);
       } else if (tg && !this.sk) {
         const d = this.pos.distanceTo(tg.pos);
         const rng = this.range(tg);
@@ -419,13 +419,15 @@ class Fighter {
   ai(foes, tg, d) {
     const A = this.arena;
     if (this.kind === 'boss') return;           // 首领的招式在 bossThink 里
-    if (this.canAwaken && this.fever >= 100 && this.awakeT <= 0) {
-      // 两个都开了：优先觉醒；只有大招就放大招
-      this.tryAwaken();
+    if (this.fever >= 100 && (this.canAwaken || this.canUlt)) {
+      // 两个都开了：交替释放（觉醒 → 大招 → 觉醒 …）；觉醒还没结束时直接放大招
+      const both = this.canAwaken && this.canUlt;
+      let want = both ? (this.nextBig || 'awaken') : this.canAwaken ? 'awaken' : 'ult';
+      if (want === 'awaken' && this.awakeT > 0) want = both ? 'ult' : null;
+      if (want === 'awaken' && this.tryAwaken()) this.nextBig = 'ult';
+      else if (want === 'ult' && this.tryUlt(foes)) this.nextBig = 'awaken';
       return;
     }
-    if (this.canUlt && this.fever >= 100 && (!this.canAwaken)) { this.tryUlt(foes); return; }
-    if (this.canUlt && this.canAwaken && this.fever >= 100 && this.awakeT > 0) { this.tryUlt(foes); return; }
     if (this.hasSkill && this.skillCd <= 0) {
       const sk = this.info.skill;
       const ty = sk.type;
@@ -693,9 +695,10 @@ export class Arena {
         <div class="ar-team b"><b>${t('arena.teamB')}</b><div class="ar-cards">${this.teams.B.map(card).join('')}</div></div>
       </div>
       <div class="ar-msg"></div>
-      <div class="ar-help">${this.cfg.mode === 'duel' && this.cfg.control ? t('arena.help') : t('arena.helpAi')}</div>
+      ${input.isTouch ? '' : `<div class="ar-help">${this.cfg.mode === 'duel' && this.cfg.control ? t('arena.help') : t('arena.helpAi')}</div>`}
       <div class="ar-overlay"></div>`;
     document.body.appendChild(hud);
+    document.body.classList.add('arena-on');          // 触屏的暂停键会压住 B 组血条，斗兽场用自己的暂停按钮
     this.hud = hud;
     this.elCards = {};
     hud.querySelectorAll('.ar-card').forEach((c) => { this.elCards[c.dataset.f] = { hp: c.querySelector('.hp i'), fv: c.querySelector('.fv i'), root: c }; });
@@ -862,6 +865,7 @@ export class Arena {
     this.fx.dispose();
     this.world.dispose();
     this.hud.remove();
+    document.body.classList.remove('arena-on');
     this.camera.fov = this.oldFov || 60; this.camera.near = this.oldNear || 0.1; this.camera.far = this.oldFar || 1500; this.camera.updateProjectionMatrix();
     input.releaseAll();
   }

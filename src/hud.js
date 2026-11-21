@@ -196,6 +196,15 @@ export class Hud {
     });
     this.set('hpt', Math.ceil(p.hp), (v) => { this.el.hpText.textContent = `${v} / ${st.maxHp}`; });
 
+    // 黑心光线冻结倒计时（屏幕上方）
+    const fz = p.frozenT > 0 ? Math.ceil(p.frozenT * 10) / 10 : 0;
+    this.set('frz', fz, (v) => {
+      if (v > 0) {
+        if (!this.freezeEl) { this.freezeEl = document.createElement('div'); this.freezeEl.className = 'freeze-bar'; this.root.appendChild(this.freezeEl); }
+        this.freezeEl.innerHTML = `<span class="ice">🟣</span> ${t('hud.freeze', { s: v.toFixed(1) })}<i style="width:${Math.min(100, v / 4 * 100).toFixed(0)}%"></i>`;
+      } else if (this.freezeEl) { this.freezeEl.remove(); this.freezeEl = null; }
+    });
+
     // 武器
     const W = p.weapon;
     this.set('wlv', W.level, (v) => {
@@ -309,6 +318,7 @@ export class Hud {
       this.tb.fill.style.height = '0%'; this.tb.ct.textContent = ''; this.tb.cd.style.setProperty('--p', '0%');
     }
     this.root.innerHTML = '';
+    this.freezeEl = null;
     this.root.classList.remove('low-hp');
     this.reticle.remove();
   }

@@ -713,3 +713,8 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 #motion-cam .mmsg[data-tone=warn] { color: #ffd070; }
 #motion-cam .mmsg[data-tone=bad] { color: #ff8a8a; }
 .set-sub { display: block; font-weight: 400; font-size: 12px; opacity: .65; margin-top: 2px; }
+
+/* 黑心光线：冻结倒计时 */
+.freeze-bar { position: absolute; left: 50%; top: 126px; transform: translateX(-50%); min-width: 240px; padding: 8px 22px 12px; border-radius: 14px; text-align: center; font-weight: 900; font-size: 22px; letter-spacing: .06em; color: #f0d8ff; background: rgba(36,10,60,.82); border: 2px solid #b04aff; box-shadow: 0 0 24px rgba(176,74,255,.55); animation: freezePulse .6s ease-in-out infinite alternate; overflow: hidden; }
+.freeze-bar i { position: absolute; left: 0; bottom: 0; height: 5px; background: linear-gradient(90deg, #b04aff, #ff6ad8); }
+@keyframes freezePulse { from { box-shadow: 0 0 14px rgba(176,74,255,.4); } to { box-shadow: 0 0 34px rgba(176,74,255,.8); } }

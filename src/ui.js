@@ -193,7 +193,7 @@ export class UI {
             ${bar(t('stat.hp'), s.hp + gemN * GEM.hp, 330, gemN ? `${s.hp}<em class="gem-plus">+${gemN * GEM.hp}</em>` : s.hp)}
             ${bar(t('stat.atk'), s.atk + gemN * GEM.atk, 38, gemN ? `${s.atk}<em class="gem-plus">+${gemN * GEM.atk}</em>` : s.atk)}
             ${bar(t('stat.def'), s.def, 0.45, Math.round(s.def * 100) + '%')}
-            ${bar(t('stat.speed'), s.speed, 16, s.speed)}
+            ${bar(t('stat.speed'), s.speed, 17, s.speed)}
             ${bar(t('stat.atkRate'), s.atkRate, 1.8, s.atkRate.toFixed(1))}
             ${bar(t('stat.reach'), s.reach, 3.2, s.reach.toFixed(1))}
           </div>
@@ -629,7 +629,7 @@ export class UI {
             ${bar(t('stat.hp'), s.hp + gemN * GEM.hp, 1300, gemN ? `${s.hp}<em class="gem-plus">+${gemN * GEM.hp}</em>` : s.hp)}
             ${bar(t('stat.atk'), s.atk + gemN * GEM.atk, 50, gemN ? `${s.atk}<em class="gem-plus">+${gemN * GEM.atk}</em>` : s.atk)}
             ${bar(t('stat.def'), s.def, 0.45, Math.round(s.def * 100) + '%')}
-            ${bar(t('stat.speed'), s.speed, 16, s.speed)}
+            ${bar(t('stat.speed'), s.speed, 17, s.speed)}
           </div>
           <div class="skill-box">
             <div class="t">🍖 ${t('pet.growth', { n: Math.min(o.feeds, PET_RULES.feedsToAdult), max: PET_RULES.feedsToAdult })}

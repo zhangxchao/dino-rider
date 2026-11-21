@@ -1525,6 +1525,105 @@ function buildDarkLizard(c) {
   };
 }
 
+// ---------------- 黑化捕蝇草 ----------------
+//  扎根不动的大植物：茎上顶着两瓣带尖齿的大叶，平时微微张开，有人靠近就猛地合上。
+function buildDarkFlytrap(c) {
+  const stem = mat(0x2c5a2a, { roughness: 0.7 }), lobeO = mat(c.color, { roughness: 0.6 }), lobeI = mat(0xa02850, { roughness: 0.5 });
+  const tooth = mat(0xf0e8d8), leafM = mat(0x234a24, { side: THREE.DoubleSide }), eyeM = redEye();
+  const root = grp(c.base, 0, 0, 0);
+  add(root, G.cyl(0.55, 0.7, 0.3, 8), mat(0x2a1c22), 0, 0.15, 0);                       // 土墩
+  for (let i = 0; i < 5; i++) {                                                          // 地面的叶片
+    const a = (i / 5) * TAU + 0.3;
+    const l = add(root, G.box(0.22, 0.04, 0.95), leafM, Math.sin(a) * 0.7, 0.3, Math.cos(a) * 0.7);
+    l.rotation.set(-0.35, a, 0);
+  }
+  const neck = grp(root, 0, 0.3, 0);
+  add(neck, G.cyl(0.14, 0.2, 1.1, 6), stem, 0, 0.55, 0).rotation.x = 0.15;
+  const head = grp(neck, 0, 1.1, 0.12);
+  const lobes = [-1, 1].map((sd) => {
+    const hinge = grp(head, 0, 0, 0);
+    const half = grp(hinge);
+    add(half, G.hemi(0.62, 10), lobeO, 0, 0, 0).scale.set(1, 1, 0.95);
+    add(half, G.hemi(0.5, 10), lobeI, 0, 0.0, 0).scale.set(1, 0.95, 0.9);
+    for (let i = 0; i < 7; i++) {                                                         // 边缘的尖齿
+      const a = -PI / 2 + (i / 6) * PI;
+      add(half, G.cone(0.05, 0.3, 4), tooth, Math.sin(a) * 0.6 * 0.0 + (i - 3) * 0.17, 0.05, 0.6 * Math.cos((i - 3) * 0.2)).rotation.x = sd > 0 ? 0 : PI;
+    }
+    return { hinge, half, sd };
+  });
+  add(head, G.sph(0.06, 5, 4), eyeM, -0.25, 0.4, 0.4);
+  add(head, G.sph(0.06, 5, 4), eyeM, 0.25, 0.4, 0.4);
+  darkShard(neck, 0, 1.55, -0.2, 0.8);
+  const muzzle = grp(head, 0, 0.2, 0.6);
+  return {
+    designR: 1.0, muzzle,
+    anim(t, mv, a) {
+      // 平时一张一合轻轻呼吸；攻击时先张到最大，再「啪」地合上
+      const w = windup(a), s = strike(a);
+      const idle = 0.55 + 0.12 * Math.sin(t * 2.2);
+      const open = a < 0 ? idle : Math.max(0, lerp(idle, 1.15, w) * (1 - s));
+      for (const L of lobes) {
+        L.half.rotation.x = L.sd * (0.06 + open * 0.85);
+        L.half.position.y = 0;
+      }
+      neck.rotation.x = 0.1 * Math.sin(t * 1.3) - 0.3 * w + 0.45 * s;
+      head.rotation.z = 0.06 * Math.sin(t * 1.7);
+    },
+  };
+}
+
+// ---------------- 黑化巨鳄 ----------------
+//  贴地爬行的大鳄鱼：长吻、满口尖牙、背上一排骨甲；攻击时先张大嘴，再整个身体向前一扑。
+function buildDarkCroc(c) {
+  const hide = mat(c.color, { roughness: 0.65 }), belly = mat(shade(c.color, 2.0)), eyeM = redEye();
+  const tooth = mat(0xf4f0e0), plate = mat(shade(c.color, 0.6), { roughness: 0.8 }), claw = mat(0x14100c);
+  const body = grp(c.base, 0, 0.62, 0);
+  add(body, G.sph(0.62, 10, 8), hide).scale.set(1.05, 0.7, 2.0);
+  add(body, G.sph(0.45, 8, 6), belly, 0, -0.14, 0.05).scale.set(1.0, 0.6, 1.8);
+  for (let i = 0; i < 7; i++) {
+    const sc = add(body, G.cone(0.1, 0.22, 4), plate, (i % 2 ? 0.16 : -0.16), 0.42 - Math.abs(i - 3) * 0.03, 0.8 - i * 0.28);
+    sc.rotation.z = (i % 2 ? -0.3 : 0.3);
+  }
+  darkShard(body, 0, 0.5, -0.1, 1.0);
+  const tail = grp(body, 0, 0, -1.2);
+  add(tail, G.cone(0.42, 2.4, 5), hide, 0, 0, -1.2).rotation.x = -PI / 2;
+  for (let i = 0; i < 4; i++) add(tail, G.cone(0.07, 0.2, 4), plate, 0, 0.3 - i * 0.05, -0.4 - i * 0.5);
+  const neck = grp(body, 0, 0.05, 1.1);
+  const head = grp(neck, 0, 0, 0.25);
+  add(head, G.box(0.62, 0.34, 0.8), hide, 0, 0.02, 0.35);
+  add(head, G.box(0.46, 0.2, 0.9), hide, 0, 0.02, 1.05);                                // 长吻
+  add(head, G.sph(0.1, 6, 5), eyeM, -0.24, 0.27, 0.22);
+  add(head, G.sph(0.1, 6, 5), eyeM, 0.24, 0.27, 0.22);
+  add(head, G.box(0.05, 0.05, 0.05), plate, -0.1, 0.17, 1.46);
+  add(head, G.box(0.05, 0.05, 0.05), plate, 0.1, 0.17, 1.46);
+  for (let i = 0; i < 6; i++) for (const sx of [-1, 1]) add(head, G.cone(0.04, 0.13, 4), tooth, sx * 0.22, -0.1, 0.5 + i * 0.17).rotation.x = PI;
+  const jaw = grp(head, 0, -0.1, 0.25);
+  add(jaw, G.box(0.56, 0.12, 1.3), belly, 0, -0.06, 0.62);
+  for (let i = 0; i < 6; i++) for (const sx of [-1, 1]) add(jaw, G.cone(0.04, 0.12, 4), tooth, sx * 0.2, 0.05, 0.28 + i * 0.17);
+  const legs = [];
+  for (const [x, z] of [[-0.62, 0.7], [0.62, 0.7], [-0.62, -0.7], [0.62, -0.7]]) {
+    const L = grp(body, x, -0.2, z);
+    add(L, G.cyl(0.16, 0.13, 0.5, 6), hide, x > 0 ? 0.18 : -0.18, -0.12, 0).rotation.z = x > 0 ? -1.1 : 1.1;
+    add(L, G.box(0.3, 0.07, 0.4), claw, x > 0 ? 0.4 : -0.4, -0.32, 0.08);
+    legs.push({ L, ph: (x > 0 ? 0 : PI) + (z > 0 ? 0 : PI / 2) });
+  }
+  const muzzle = grp(head, 0, 0, 1.5);
+  return {
+    designR: 1.9, muzzle,
+    anim(t, mv, a) {
+      const m = Math.min(mv, 1.4), p = t * (4 + 3 * m);
+      const w = windup(a), s = strike(a);
+      for (const G2 of legs) G2.L.rotation.y = Math.sin(p + G2.ph) * 0.35 * m;
+      body.position.set(0, 0.62 + 0.02 * Math.sin(p * 2) * m, 0.8 * s);
+      body.rotation.y = Math.sin(p) * 0.08 * m;
+      body.rotation.x = -0.1 * w + 0.08 * s;
+      head.rotation.x = -0.25 * w + 0.15 * s;
+      jaw.rotation.x = 0.1 + 1.0 * w * (1 - s) + 0.1 * Math.sin(t * 2);
+      tail.rotation.y = Math.sin(p * 0.9) * (0.3 + 0.2 * m);
+    },
+  };
+}
+
 const BUILDERS = {
   slime: buildSlime,
   goblin: buildGoblin,
@@ -1556,6 +1655,8 @@ const BUILDERS = {
   darkBear: buildYeti,
   darkWyvern: buildDarkWyvern,
   darkLizard: buildDarkLizard,
+  darkFlytrap: buildDarkFlytrap,
+  darkCroc: buildDarkCroc,
 };
 
 export const ENEMY_MODEL_TYPES = Object.keys(BUILDERS);

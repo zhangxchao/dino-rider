@@ -63,10 +63,35 @@ function disposeModel(root) {
   });
 }
 
+// 黑心博士的黑心光线：每 10 秒一道，命中后宠物被冻住 4 秒
+const RAY_EVERY = 10, RAY_CHARGE = 0.9, RAY_FREEZE = 4;
+// 首领恐龙的紫色远古觉醒（血量掉到 28% 触发一次）
+const AWAKEN_AT = 0.28, AWAKEN_TIME = 9, AWAKEN_COL = 0xb04aff;
+const _UP = new THREE.Vector3(0, 1, 0);
+const _beamGeo = new THREE.CylinderGeometry(1, 1, 1, 10, 1, true);
+function makeBeam() {
+  const g = new THREE.Group();
+  const glow = new THREE.Mesh(_beamGeo, new THREE.MeshBasicMaterial({ color: 0xb04aff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  const core = new THREE.Mesh(_beamGeo, new THREE.MeshBasicMaterial({ color: 0x120418, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
+  g.add(glow, core);
+  g.userData = { glow, core };
+  g.visible = false;
+  g.frustumCulled = false;
+  return g;
+}
+function aimBeam(g, a, b, r) {
+  _dir.subVectors(b, a);
+  const len = Math.max(0.01, _dir.length());
+  g.position.copy(a).add(b).multiplyScalar(0.5);
+  g.quaternion.setFromUnitVectors(_UP, _dir.multiplyScalar(1 / len));
+  g.userData.glow.scale.set(r * 1.9, len, r * 1.9);
+  g.userData.core.scale.set(r * 0.7, len, r * 0.7);
+}
+
 const PROJ_KIND = { arrow: 'earrow', spore: 'spore', orb: 'orb', fireball: 'efire', ice: 'ice' };
 const MARCH = { melee: 0.75, ranged: 0.3, flying: 0.85 };
 const LATERAL = { wolf: 3.2, bat: 2.6, goblin: 1.6, slime: 1.2, skeleton: 1.4, scorpion: 1.4, yeti: 1.0, golem: 0.8, darkKnight: 1.4,
-  darkAnt: 2.2, darkSnake: 2.4, darkWolf: 3.2, darkSpider: 2.0, darkCentipede: 2.0, darkEagle: 2.6, darkZombie: 1.2, darkTiger: 2.6, darkLion: 2.2, darkBear: 1.0, darkWyvern: 2.0, darkLizard: 1.0 };
+  darkAnt: 2.2, darkSnake: 2.4, darkWolf: 3.2, darkSpider: 2.0, darkCentipede: 2.0, darkEagle: 2.6, darkZombie: 1.2, darkTiger: 2.6, darkLion: 2.2, darkBear: 1.0, darkWyvern: 2.0, darkLizard: 1.0, darkFlytrap: 0.01, darkCroc: 1.4 };
 
 // ---------------------------------------------------------------------
 //  普通怪物
@@ -104,7 +129,7 @@ export class Enemy {
     this.xp = Math.max(1, Math.round((this.def.score || 10) / 8));
     this.speed = this.def.speed * rand(0.9, 1.12);
     this.kind = this.flying ? 'flying' : this.def.ranged ? 'ranged' : 'melee';
-    this.mass = Math.pow(this.radius, 1.5) * (this.type === 'golem' || this.def.titan || this.type === 'yeti' || this.type === 'darkKnight' || this.type === 'darkBear' || this.type === 'darkLizard' ? 1.8 : 1);
+    this.mass = Math.pow(this.radius, 1.5) * (this.type === 'golem' || this.def.titan || this.type === 'yeti' || this.type === 'darkKnight' || this.type === 'darkBear' || this.type === 'darkLizard' || this.type === 'darkCroc' ? 1.8 : 1);
     this.pos.set(x, game.heightAt(x, z), z);
     this.homeX = x;
     this.vel.set(0, 0, 0);
@@ -552,7 +577,15 @@ export class Boss {
     this.phases = this.def.phases || 2;
     this.pattern = null;
     this.pet = !!this.def.dinoId;     // 黑心博士的恐龙：出招更快、预警更短、会闪避
-    this.patternCd = this.pet ? 0.9 : 1.8;
+    this.patternCd = this.pet ? 0.6 : 1.8;
+    this.rayT = RAY_EVERY;            // 黑心光线倒计时
+    this.ray = null;                  // 正在蓄力的光线 { t }
+    this.beam = this.pet ? makeBeam() : null;
+    if (this.beam) game.scene.add(this.beam);
+    this.awakeT = 0;                  // 紫色远古觉醒剩余时间
+    this.awoke = false;
+    this.awakeScale = 1;
+    this.baseDmg = this.dmg;
     this.dodgeT = 0; this.dodgeCd = 0.8; this.dodgeDir = 1;
     this.lastPattern = null;
     this.invulnT = 0;
@@ -594,7 +627,7 @@ export class Boss {
     if (o.poison) { this.poisonT = Math.max(this.poisonT, o.poison); this.poisonDps = Math.max(this.poisonDps, dotBase * 0.3); }
   }
 
-  kill() { this.alive = false; this.state = 'dead'; this.deadT = 0; this.endPattern(); this.clearZones(); }
+  kill() { this.alive = false; this.state = 'dead'; this.deadT = 0; this.endPattern(); this.clearZones(); this.ray = null; if (this.beam) this.beam.visible = false; this.root.scale.setScalar(1); }
 
   checkPhase() {
     const th = this.phases === 3 ? [0.66, 0.33] : [0.5];
@@ -700,6 +733,7 @@ export class Boss {
     if (this.slowT > 0) { this.slowT -= dt; if (this.slowT <= 0) this.slowMul = 1; }
 
     this.updateZones(dt);
+    if (this.pet) this.updatePetExtras(dt);
     this.dodgeCd -= dt;
     if (this.dodgeT > 0) this.dodgeT -= dt;
     const rh = g.track.roadHalf;
@@ -739,7 +773,85 @@ export class Boss {
 
     if (this.flashT > 0) this.flash.setFlash(0.7 * this.flashT / 0.12);
     else if (this.invulnT > 0) this.flash.setFlash(0.3 + 0.2 * Math.sin(this.anim.t * 20), _col.set(this.def.projColor));
+    else if (this.awakeT > 0) this.flash.setFlash(0.34 + 0.12 * Math.sin(this.anim.t * 9), _col.set(AWAKEN_COL));
     else this.flash.setFlash(0);
+  }
+
+  /** 黑心博士的恐龙专属：紫色远古觉醒 + 黑心光线 */
+  updatePetExtras(dt) {
+    const g = this.game;
+    const pl = g.player;
+    // ---- 紫色远古觉醒
+    if (!this.awoke && this.hp / this.maxHp < AWAKEN_AT && this.invulnT <= 0 && this.alive) {
+      this.awoke = true;
+      this.awakeT = AWAKEN_TIME;
+      this.invulnT = 1.0;
+      this.endPattern();
+      this.dmg = this.baseDmg * 1.35;
+      g.audio.play('bossRoar');
+      g.shake.add(0.5);
+      g.showBanner(t('banner.awaken'), t('banner.awakenSub'), true, 1800);
+      g.fx.rings.ring(this.pos, { r0: 2, r1: 20, life: 0.9, color: AWAKEN_COL });
+      g.fx.rings.pillar(this.pos, { r: this.radius * 1.5, h: 24, life: 1.4, color: AWAKEN_COL });
+      g.fx.sparks.burst(this.getCenter(_v), { count: 90, speed: 15, life: 1.1, size: 1.3, color: AWAKEN_COL, color2: 0xffffff });
+      g.juice.flash(AWAKEN_COL, 0.4);
+    }
+    if (this.awakeT > 0) {
+      this.awakeT -= dt;
+      if (Math.random() < 0.5) {
+        this.getCenter(_v);
+        _v.x += rand(-1, 1) * this.radius; _v.z += rand(-1, 1) * this.radius;
+        g.fx.sparks.spawn(_v.x, _v.y + rand(-0.5, 1.2), _v.z, 0, rand(2, 4), 0, 0.7, 0.8, 0.1, AWAKEN_COL, 0xe8c0ff, 0.9, 0, 0);
+      }
+      if (this.awakeT <= 0) {
+        this.dmg = this.baseDmg;
+        g.fx.rings.ring(this.pos, { r0: 2, r1: 12, life: 0.6, color: AWAKEN_COL });
+      }
+    }
+    this.awakeScale = damp(this.awakeScale, this.awakeT > 0 ? 1.28 : 1, this.awakeT > 0 ? 5 : 3, dt);
+    this.root.scale.setScalar(this.awakeScale);
+
+    // ---- 黑心光线：每 10 秒一道，蓄力 0.9 秒后命中，宠物被冻住 4 秒；冻住期间首领连续出招
+    if (this.beam) this.beam.visible = false;
+    if (!pl.alive || g.state === 'win') { this.ray = null; return; }
+    if (pl.frozenT > 0) this.patternCd = Math.min(this.patternCd, 0.25);
+    if (this.ray) {
+      const R = this.ray;
+      R.t += dt;
+      this.model.muzzle.getWorldPosition(_v);
+      _v2.set(pl.pos.x, pl.pos.y + pl.size.height * 0.5, pl.pos.z);
+      const k = Math.min(1, R.t / RAY_CHARGE);
+      if (k < 1) {
+        // 蓄力：细细一条暗紫色的线，越来越亮，宠物脚下亮起预警圈
+        this.beam.visible = true;
+        aimBeam(this.beam, _v, _v2, 0.12 + 0.1 * k);
+        this.beam.userData.glow.material.opacity = 0.25 + 0.4 * k + 0.15 * Math.sin(R.t * 40);
+        this.beam.userData.core.material.opacity = 0.5;
+        if (!R.warned) { R.warned = true; g.audio.play('warning', { volume: 0.7 }); g.hud?.notice(t('hud.rayWarn'), 'boss'); }
+        if (Math.random() < 0.4) g.fx.sparks.burst(_v, { count: 2, speed: 3, life: 0.35, size: 0.7, color: AWAKEN_COL, color2: 0x200830 });
+      } else {
+        if (!R.fired) {
+          R.fired = true;
+          pl.freeze(RAY_FREEZE);
+          g.audio.play('explosion', { volume: 0.7, pitch: 0.6 });
+          g.shake.add(0.35);
+          g.juice.flash(0x6a2ab0, 0.4);
+          g.showBanner(t('banner.ray'), t('banner.raySub', { n: RAY_FREEZE }), true, 1400);
+          g.fx.rings.ring(pl.pos, { r0: 0.5, r1: 7, life: 0.6, color: AWAKEN_COL });
+          g.fx.sparks.burst(_v2, { count: 60, speed: 9, life: 0.8, size: 1.0, color: AWAKEN_COL, color2: 0x120418 });
+        }
+        const kk = (R.t - RAY_CHARGE) / 0.3;
+        if (kk < 1) {
+          this.beam.visible = true;
+          aimBeam(this.beam, _v, _v2, 0.5 * (1 - kk * 0.8));
+          this.beam.userData.glow.material.opacity = 0.8 * (1 - kk);
+          this.beam.userData.core.material.opacity = 1 - kk;
+        } else this.ray = null;
+      }
+    } else if (this.state === 'fight' && pl.frozenT <= 0) {
+      this.rayT -= dt;
+      if (this.rayT <= 0 && this.stun <= 0 && this.alive) { this.rayT = RAY_EVERY; this.ray = { t: 0, warned: false, fired: false }; }
+    }
   }
 
   choosePattern() {
@@ -758,7 +870,7 @@ export class Boss {
     const g = this.game;
     const pl = g.player;
     const ph = this.phase;
-    const fast = (1 - 0.12 * (ph - 1)) * (this.pet ? 0.62 : 1);
+    const fast = (1 - 0.12 * (ph - 1)) * (this.pet ? (this.awakeT > 0 ? 0.36 : 0.5) : 1);
     const rh = g.track.roadHalf;
     const P = { name, t: 0, dur: 1.5, fired: false, teles: [], count: 0 };
     const skill = this.def.skills && this.def.skills[name];
@@ -1185,7 +1297,7 @@ export class Boss {
     if (P.t >= P.dur) {
       this.endPattern();
       this.anim.burrow = 0;
-      this.patternCd = rand(1.2, 2.2) * (1 - 0.18 * (ph - 1)) * this.game.diff.rest * BALANCE.bossRest * (this.pet ? 0.4 : 1);
+      this.patternCd = rand(1.2, 2.2) * (1 - 0.18 * (ph - 1)) * this.game.diff.rest * BALANCE.bossRest * (this.pet ? (this.awakeT > 0 ? 0.2 : 0.28) : 1);
     }
     return out;
   }
@@ -1661,5 +1773,6 @@ export class Boss {
     this.clearZones();
     this.game.scene.remove(this.root);
     disposeModel(this.root);
+    if (this.beam) { this.game.scene.remove(this.beam); this.beam.userData.glow.material.dispose(); this.beam.userData.core.material.dispose(); }
   }
 }

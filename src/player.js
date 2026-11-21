@@ -27,6 +27,7 @@ const BLAZE_DMG = 160;            // 每个被火焰烧到的敌人吃一次 160
 const BLAZE_R = 3.4;              // 单团火焰半径
 const BLAZE_LIFE = 3;             // 单团火焰燃烧时间
 const RAGE_COL = new THREE.Color(0xffb020);
+const FREEZE_COL = new THREE.Color(0x7a3ad8);
 const HURT_COL = new THREE.Color(1, 0.45, 0.4);
 const _rc = new THREE.Color();
 
@@ -109,6 +110,7 @@ export class Player {
     this.weapon = { level: 1, xp: 0, count: 0, rate: 1, dmg: 1, pierce: 0, gates: [] };
     this.fireCd = 0.5;
     this.shootT = -1;
+    this.frozenT = 0;               // 被黑心光线冻住的剩余时间：不能移动 / 跳跃 / 放技能，也不会自动攻击
     this.biteCd = 0;
     this.atkT = -1;
     this.atkDur = 0.4;
@@ -213,9 +215,16 @@ export class Player {
 
   // ------------------------------------------------------------------
   /** ctl: { enabled, run, steer(-1..1), drag(px), dragScale, jump, skill } */
+  freeze(sec) { this.frozenT = Math.max(this.frozenT, sec); this.vel.x = 0; }
+
   update(dt, ctl) {
     const g = this.game;
     const st = this.stats;
+    if (this.frozenT > 0) {
+      this.frozenT -= dt;
+      // 冻住：所有操作失效（键盘、触屏、体感都走这里，一并拦住）
+      ctl = { ...ctl, enabled: false, run: false, steer: 0, drag: 0, jump: false, skill: false, ult: false };
+    }
     this.anim.t += dt;
     this.riderAnim.t += dt;
 
@@ -364,6 +373,7 @@ export class Player {
 
     // 受击闪一下暖红色（原来是满强度纯白，被围攻时整只恐龙一直是白的，看不清）
     if (this.flashT > 0) this.flash.setFlash(0.55 * this.flashT / 0.15, HURT_COL);
+    else if (this.frozenT > 0) this.flash.setFlash(0.38 + 0.12 * Math.sin(this.anim.t * 10), FREEZE_COL);
     else if (this.buffs.rage > 0) this.flash.setFlash(0.16 + 0.08 * Math.sin(this.anim.t * 14), RAGE_COL);
     else if (this.buffs.frenzy > 0) this.flash.setFlash(0.22 + 0.12 * Math.sin(this.anim.t * 12), FRENZY_COL);
     else if (this.buffs.sprint > 0 || (sk && sk.type === 'charge')) this.flash.setFlash(0.3, SPRINT_COL);

@@ -8,28 +8,65 @@ const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, flatShadi
 const mesh = (geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; return o; };
 const ico = (r, m, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), m); o.scale.set(sx, sy, sz); o.castShadow = true; return o; };
 
-/** 四条腿的小动物：legs 里的腿会随走路摆动 */
-function animal({ body, head, horn, size, wool }) {
+/** 四条腿的小动物：legs 里的腿会随走路摆动。数值是「大致真实的比例」，整体再按 size 缩小 */
+function animal({ body, head, belly, horn, antler, spots, size, wool, legW = 0.07, legH = 0.62, tail = 0.22 }) {
   const g = new THREE.Group();
   const legs = [];
   const bm = mat(body), hm = mat(head);
-  const torso = ico(0.5, wool ? mat(wool) : bm, 1, 0.85, 1.45);
-  torso.position.y = 0.85;
+  const torso = ico(0.5, wool ? mat(wool) : bm, 0.95, 0.8, 1.5);
+  torso.position.y = 0.2 + legH + 0.1;
   g.add(torso);
-  if (size > 1.3) { const hump = ico(0.4, bm, 1, 0.8, 1); hump.position.set(0, 1.25, 0.35); g.add(hump); }
-  const neck = mesh(new THREE.BoxGeometry(0.3, 0.4, 0.4), hm, 0, 1.0, 0.75);
-  neck.rotation.x = 0.5;
+  if (belly) { const bl = ico(0.4, mat(belly), 0.9, 0.5, 1.3); bl.position.y = legH + 0.02; g.add(bl); }
+  if (size > 1.3) { const hump = ico(0.4, bm, 1, 0.8, 1); hump.position.set(0, legH + 0.62, 0.35); g.add(hump); }
+  // 脖子、头、口鼻、耳朵、眼睛
+  const neck = mesh(new THREE.CylinderGeometry(0.12, 0.17, 0.55, 6), hm, 0, legH + 0.45, 0.72);
+  neck.rotation.x = 0.75;
   g.add(neck);
-  g.add(mesh(new THREE.BoxGeometry(0.34, 0.34, 0.5), hm, 0, 1.05, 1.05));
-  if (horn) for (const s of [-1, 1]) {
-    const h = mesh(new THREE.ConeGeometry(0.07, 0.45, 5), mat(0xeadfc0), s * 0.22, 1.3, 1.0);
-    h.rotation.z = -s * 1.1;
+  const hy = legH + 0.62, hz = 1.02;
+  const headM = ico(0.2, hm, 0.9, 0.95, 1.25);
+  headM.position.set(0, hy, hz);
+  g.add(headM);
+  const snout = mesh(new THREE.BoxGeometry(0.16, 0.14, 0.26), mat(wool ? 0x2a2222 : 0x3a2c24), 0, hy - 0.06, hz + 0.28);
+  g.add(snout);
+  for (const sd of [-1, 1]) {
+    const ear = mesh(new THREE.ConeGeometry(0.07, 0.2, 4), hm, sd * 0.2, hy + 0.12, hz - 0.1);
+    ear.rotation.z = -sd * 1.0;
+    g.add(ear);
+    g.add(mesh(new THREE.SphereGeometry(0.03, 5, 4), mat(0x0a0a0a), sd * 0.13, hy + 0.05, hz + 0.12));
+  }
+  if (horn) for (const sd of [-1, 1]) {
+    const h = mesh(new THREE.ConeGeometry(0.06, 0.42, 5), mat(0xeadfc0), sd * 0.2, hy + 0.2, hz - 0.05);
+    h.rotation.z = -sd * 1.15;
     g.add(h);
   }
-  for (const [x, z] of [[-0.28, 0.55], [0.28, 0.55], [-0.28, -0.5], [0.28, -0.5]]) {
+  if (antler) for (const sd of [-1, 1]) {      // 鹿角：主枝加三个小叉
+    const am = mat(0xc9b07a, { roughness: 0.8 });
+    const main = mesh(new THREE.CylinderGeometry(0.02, 0.035, 0.6, 4), am, sd * 0.12, hy + 0.42, hz - 0.12);
+    main.rotation.z = -sd * 0.35; main.rotation.x = -0.3;
+    g.add(main);
+    for (let k = 0; k < 3; k++) {
+      const br = mesh(new THREE.CylinderGeometry(0.012, 0.022, 0.26, 4), am, sd * (0.15 + k * 0.045), hy + 0.32 + k * 0.15, hz - 0.17 + k * 0.06);
+      br.rotation.z = -sd * 0.9;
+      g.add(br);
+    }
+  }
+  if (spots) {                                   // 梅花鹿身上的白色梅花斑点
+    const sm = mat(0xfff4dc);
+    for (let k = 0; k < 14; k++) {
+      const a = (k * 2.4) % (Math.PI * 1.0) - Math.PI * 0.5, zz = -0.5 + (k % 7) * 0.17;
+      const sp = ico(0.045, sm, 1, 0.4, 1);
+      sp.position.set(Math.sin(a) * 0.46, torso.position.y + Math.cos(a) * 0.38 * (k % 2 ? 1 : 0.8), zz);
+      g.add(sp);
+    }
+  }
+  const tl = mesh(new THREE.ConeGeometry(0.07, tail, 4), wool ? mat(wool) : bm, 0, legH + 0.42, -0.76);
+  tl.rotation.x = -2.3;
+  g.add(tl);
+  for (const [x, z] of [[-0.24, 0.5], [0.24, 0.5], [-0.24, -0.46], [0.24, -0.46]]) {
     const leg = new THREE.Group();
-    leg.position.set(x, 0.6, z);
-    leg.add(mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.6, 5), hm, 0, -0.3, 0));
+    leg.position.set(x, legH + 0.05, z);
+    leg.add(mesh(new THREE.CylinderGeometry(legW, legW * 0.75, legH, 5), hm, 0, -legH / 2, 0));
+    leg.add(mesh(new THREE.BoxGeometry(legW * 1.6, 0.06, legW * 2), mat(0x1c1612), 0, -legH, 0.01));   // 蹄子
     g.add(leg);
     legs.push(leg);
   }
@@ -38,8 +75,10 @@ function animal({ body, head, horn, size, wool }) {
   return g;
 }
 
-function makeSheep() { return animal({ body: 0xf4f0e6, head: 0x3a3030, size: 1.1, wool: 0xf4f0e6 }); }
-function makeBuffalo() { return animal({ body: 0x5a3a24, head: 0x2e2018, size: 1.7, horn: true }); }
+// 比之前小一圈：绵羊 ~0.7 m 高、梅花鹿 ~0.9 m、水牛 ~1.1 m（相对宠物更像「猎物」）
+function makeSheep() { return animal({ body: 0xf4f0e6, head: 0x3a3030, size: 0.72, wool: 0xf4f0e6, legH: 0.5, legW: 0.06 }); }
+function makeBuffalo() { return animal({ body: 0x4a3322, head: 0x2e2018, size: 1.15, horn: true, legW: 0.1, legH: 0.55 }); }
+function makeDeer() { return animal({ body: 0xb8763e, head: 0x9a6232, belly: 0xf0dcc0, antler: true, spots: true, size: 0.85, legW: 0.05, legH: 0.8, tail: 0.18 }); }
 
 function makeFish() {
   const g = new THREE.Group();
@@ -49,7 +88,7 @@ function makeFish() {
   tail.rotation.z = Math.PI / 2;
   g.add(tail);
   g.add(mesh(new THREE.SphereGeometry(0.05, 6, 4), mat(0x101010), 0.45, 0.08, 0.15));
-  g.scale.setScalar(1.5);
+  g.scale.setScalar(1.0);
   return g;
 }
 
@@ -64,7 +103,7 @@ function makeBucket() {
   const rim = mesh(new THREE.TorusGeometry(0.75, 0.04, 5, 14), mat(0x5a6674), 0, 1.0, 0);
   rim.rotation.x = Math.PI / 2;
   g.add(rim);
-  g.scale.setScalar(1.5);
+  g.scale.setScalar(1.0);
   return g;
 }
 
@@ -93,8 +132,9 @@ function makeShrub() {
   return g;
 }
 
-const MAKERS = { sheep: makeSheep, buffalo: makeBuffalo, fish: makeFish, branch: makeBranch, shrub: makeShrub };
-const SPEED = { sheep: 2.6, buffalo: 1.8 };
+const small = (fn, k) => () => { const w = new THREE.Group(); const g = fn(); g.scale.multiplyScalar(k); w.add(g); return w; };
+const MAKERS = { sheep: makeSheep, deer: makeDeer, buffalo: makeBuffalo, fish: makeFish, branch: small(makeBranch, 0.7), shrub: small(makeShrub, 0.65) };
+const SPEED = { sheep: 2.6, deer: 3.2, buffalo: 1.8 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const turnTo = (cur, target, k) => {
   let d = ((target - cur + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
@@ -102,7 +142,7 @@ const turnTo = (cur, target, k) => {
 };
 
 export class PetFeed {
-  /** sc = Showcase；feedId = 'sheep' | 'fish' | 'buffalo' | 'branch' | 'shrub' */
+  /** sc = Showcase；feedId = 'sheep' | 'deer' | 'fish' | 'buffalo' | 'branch' | 'shrub' */
   constructor(sc, feedId, live) {
     this.sc = sc;
     this.feedId = feedId;

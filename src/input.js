@@ -20,6 +20,7 @@ class Input {
     this.gameActive = false;      // 只有在游戏中才抢占指针
     this.onUnlock = null;         // 游戏中意外失去指针锁定时回调（用于暂停）
     this.joy = { x: 0, y: 0 };
+    this.joy2d = false;           // 斗兽场里摇杆要上下左右都能推
     this.motionX = 0;             // 体感（摄像头）左右倾斜 -1…1
     this.motionSkill = 0;         // 体感触发技能 / 跳跃 / 大招的时间戳（读取后清零）
     this.motionJump = 0;
@@ -166,13 +167,20 @@ class Input {
     const joy = root.querySelector('.joy'), knob = joy.querySelector('.knob');
     let joyId = null, cx = 0, cy = 0;
     const setKnob = (x, y) => { knob.style.transform = `translate(${x}px, ${y}px)`; };
-    this.joyReset = () => { joyId = null; this.joy.x = 0; joy.classList.remove('on'); setKnob(0, 0); };
+    this.joyReset = () => { joyId = null; this.joy.x = 0; this.joy.y = 0; joy.classList.remove('on'); setKnob(0, 0); };
     const joyMove = (tc) => {
       const R = joy.clientWidth * 0.42;
       const dx = Math.max(-R, Math.min(R, tc.clientX - cx));
+      const dead = (v) => (Math.abs(v) < 0.12 ? 0 : (v - Math.sign(v) * 0.12) / 0.88);
+      if (this.joy2d) {
+        const dy2 = Math.max(-R, Math.min(R, tc.clientY - cy));
+        this.joy.x = dead(dx / R);
+        this.joy.y = dead(-dy2 / R);          // 往上推 = 向前
+        setKnob(dx, dy2);
+        return;
+      }
       const dy = Math.max(-20, Math.min(20, (tc.clientY - cy) * 0.35));
-      const v = dx / R;
-      this.joy.x = Math.abs(v) < 0.12 ? 0 : (v - Math.sign(v) * 0.12) / 0.88;
+      this.joy.x = dead(dx / R);
       setKnob(dx, dy);
     };
     joy.addEventListener('touchstart', (e) => {

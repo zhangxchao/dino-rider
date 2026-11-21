@@ -37,7 +37,7 @@ export const DINOS = [
     body: 'theropod', scale: 0.72, riderScale: 0.8,
     features: ['feathers', 'sickleClaw', 'stripes'],
     colors: { main: 0xb5763a, belly: 0xead2a8, accent: 0x5b2e14, extra: 0x2f6f8f, eye: 0xffe14a },
-    stats: { hp: 170, atk: 16, def: 0.05, speed: 15, reach: 1.8, atkRate: 1.8 },
+    stats: { hp: 170, atk: 16, def: 0.05, speed: 15.5, reach: 1.8, atkRate: 1.8 },
     attack: 'claw',
     skill: { type: 'pounce', name: '迅猛飞扑', desc: '高高跃起（空中无敌），落地造成范围伤害并释放冲击波。', cd: 6, power: 1.85, radius: 6, dist: 20 },
   },
@@ -87,7 +87,7 @@ export const DINOS = [
     body: 'pterosaur', scale: 1.0, riderScale: 0.85,
     features: ['wings', 'headCrest'],
     colors: { main: 0x9aa6b8, belly: 0xe8e2d4, accent: 0xd9532b, extra: 0x5a6a84, eye: 0xffd24a },
-    stats: { hp: 180, atk: 18, def: 0.05, speed: 13, reach: 2.0, atkRate: 1.3 },
+    stats: { hp: 180, atk: 18, def: 0.05, speed: 14.5, reach: 2.0, atkRate: 1.3 },
     attack: 'peck',
     skill: { type: 'dive', name: '俯冲轰炸', desc: '冲上更高的天空，向前方敌人投下炸弹，落地再造成爆炸（空中仍会受到攻击）。', cd: 9, power: 1.5, radius: 9, dist: 24 },
   },
@@ -107,7 +107,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.3, riderScale: 1.0,
     features: ['browHorns', 'stripes'],
     colors: { main: 0xa0663a, belly: 0xe6c9a0, accent: 0x5a2e1a, extra: 0xd24a2a, eye: 0xffc400 },
-    stats: { hp: 300, atk: 29, def: 0.16, speed: 13.5, reach: 2.3, atkRate: 1.1 },
+    stats: { hp: 300, atk: 29, def: 0.16, speed: 14, reach: 2.3, atkRate: 1.1 },
     attack: 'bite',
     skill: { type: 'pounce', name: '猎杀突袭', desc: '猛然跃起扑杀，落地撕裂一片区域并释放冲击波。', cd: 7, power: 1.25, radius: 7, dist: 22 },
   },
@@ -117,7 +117,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.05, riderScale: 1.0,
     features: ['bullHorns', 'tinyArms', 'spots'],
     colors: { main: 0xa3432f, belly: 0xe0b98a, accent: 0x5a1e14, extra: 0xf0d080, eye: 0xffe14a },
-    stats: { hp: 240, atk: 25, def: 0.12, speed: 13.5, reach: 2.2, atkRate: 1.1 },
+    stats: { hp: 240, atk: 25, def: 0.12, speed: 14, reach: 2.2, atkRate: 1.1 },
     attack: 'headbutt',
     skill: { type: 'charge', name: '公牛冲撞', desc: '超高速无敌冲撞，撞飞一路上的怪物。', cd: 7, power: 2.5, dist: 28, speedMul: 3 },
   },
@@ -207,7 +207,7 @@ export const DINOS = [
     body: 'theropod', scale: 0.85, riderScale: 0.85,
     features: ['beak', 'feathers', 'longNeck'],
     colors: { main: 0xc9a05a, belly: 0xf2e6c8, accent: 0x7a5a2a, extra: 0x3a8ab0, eye: 0x222222 },
-    stats: { hp: 180, atk: 15, def: 0.05, speed: 17, reach: 1.8, atkRate: 1.6 },
+    stats: { hp: 180, atk: 15, def: 0.05, speed: 16.8, reach: 1.8, atkRate: 1.6 },
     attack: 'kick',
     skill: { type: 'sprint', name: '疾风冲刺', desc: '4 秒内速度激增且无敌，残影灼伤触碰的敌人。', cd: 10, duration: 4, speedMul: 1.8, power: 0.6 },
   },
@@ -217,7 +217,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.38, riderScale: 1.0,
     features: ['bigHead', 'stripes'],
     colors: { main: 0x9a7a5a, belly: 0xe2cfae, accent: 0x5a3a26, extra: 0xb84a3a, eye: 0xffb000 },
-    stats: { hp: 320, atk: 30, def: 0.15, speed: 10, reach: 2.7, atkRate: 0.9 },
+    stats: { hp: 320, atk: 30, def: 0.17, speed: 10, reach: 2.7, atkRate: 0.9 },
     attack: 'bite',
     skill: { type: 'frenzy', name: '鲨齿狂噬', desc: '6 秒内射速大增、撕咬加速，锯齿牙咬中还能吸血。', cd: 13, duration: 6, rateMul: 2.2, lifesteal: 0.25 },
   },
@@ -237,7 +237,7 @@ export const DINOS = [
     body: 'theropod', scale: 1.05, riderScale: 0.95,
     features: ['feathers', 'longNeck'],
     colors: { main: 0x4a6a8a, belly: 0xe6dcc8, accent: 0x2a3a4a, extra: 0xe0603a, eye: 0xffd24a },
-    stats: { hp: 270, atk: 20, def: 0.1, speed: 13.8, reach: 2.2, atkRate: 1.1 },
+    stats: { hp: 270, atk: 20, def: 0.1, speed: 16.5, reach: 2.2, atkRate: 1.1 },
     attack: 'peck',
     skill: { type: 'sprint', name: '巨盗疾奔', desc: '4 秒内速度激增且无敌，残影灼伤触碰的敌人。', cd: 10, duration: 4, speedMul: 1.7, power: 0.7 },
   },
@@ -638,6 +638,7 @@ export const PET_RULES = {
 // 肉食恐龙吃的都是活物
 export const FEEDS = {
   sheep:   { name: '绵羊', icon: '🐑', live: true },
+  deer:    { name: '梅花鹿', icon: '🦌', live: true },
   fish:    { name: '活鱼', icon: '🐟', live: true },
   buffalo: { name: '水牛', icon: '🐃', live: true },
   branch:  { name: '树枝', icon: '🌿', live: false },
@@ -705,6 +706,16 @@ export const PETS = [
     attack: 'bite', feed: 'buffalo',
     skill: { type: 'roar', name: '烈焰咆哮', desc: '震耳欲聋的咆哮，伤害前方整条道路上的敌人并眩晕 2.5 秒。', cd: 12, power: 1.5, radius: 14, stun: 2.5 },
   },
+  {
+    id: 'venomAllo', modelId: 'allosaurus', name: '毒液异特龙', en: 'Venom Allosaurus', era: '侏罗纪晚期',
+    desc: '通体翠绿的异特龙，獠牙上滴着剧毒，被它咬中的猎物会一路中毒。',
+    body: 'theropod', scale: 1.3, riderScale: 1.0,
+    features: ['browHorns', 'stripes'],
+    colors: { main: 0x2f9a3a, belly: 0xd4f2a0, accent: 0x14501c, extra: 0x9cff3a, eye: 0xd8ff3a },
+    stats: { hp: 1020, atk: 44, def: 0.18, speed: 11, reach: 2.5, atkRate: 1.0 },
+    attack: 'bite', feed: 'deer',
+    skill: { type: 'venom', name: '剧毒喷吐', desc: '扇形喷出 7 团毒液，命中敌人持续中毒。', cd: 8, power: 1.5, count: 7, spread: 50, poison: 4 },
+  },
 ];
 export const petById = (id) => PETS.find((p) => p.id === id) || null;
 /** 菜单、缩略图、战斗里统一用它找恐龙定义：普通恐龙或宠物 */
@@ -750,31 +761,33 @@ Object.assign(ENEMIES, {
   darkBear:      { name: '黑化棕熊',   hp: 240, dmg: 5,  speed: 5.0, radius: 1.5, atkRange: 2.4, atkCd: 1.5, score: 34, coins: 5, color: 0x4a2c1c, eye: 0xff2a2a, skin: 0x6a4a34, ears: true },
   // 攻击力超强
   darkWyvern:    { name: '黑化飞龙',   hp: 380, dmg: 8,  speed: 7.0, radius: 1.5, atkRange: 2.6, atkCd: 1.4, score: 60, coins: 8, flying: true, hover: 3.4, color: 0x3a2a5a },
+  darkFlytrap:   { name: '黑化捕蝇草', hp: 150, dmg: 3,  speed: 0,   radius: 1.0, atkRange: 2.4, atkCd: 1.0, score: 20, coins: 3, color: 0x4a2a5a },
+  darkCroc:      { name: '黑化巨鳄',   hp: 560, dmg: 10, speed: 5.0, radius: 1.8, atkRange: 3.0, atkCd: 1.7, score: 80, coins: 10, color: 0x2a3a2e },
   darkLizard:    { name: '黑化蜥蜴怪', hp: 620, dmg: 10, speed: 5.5, radius: 1.8, atkRange: 3.2, atkCd: 1.7, score: 90, coins: 12, color: 0x2e3a2a },
 });
 // 三大泰坦：黑心博士的坐骑血量降到一半时，博士召唤它们助战（数值固定，不吃关卡倍率）
 Object.assign(ENEMIES, {
-  forestTitan:  { name: '森林泰坦', hp: 160, dmg: 15, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 50, coins: 6, color: 0x4c7a3a, glow: 0x9cff4a, eye: 0xd8ff6a, titan: 'forest' },
-  iceTitan:     { name: '冰雪泰坦', hp: 150, dmg: 14, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 48, coins: 6, color: 0x8ec8e8, glow: 0x6ae0ff, eye: 0xe8faff, titan: 'ice' },
-  radiantTitan: { name: '光辉泰坦', hp: 140, dmg: 13, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 46, coins: 6, color: 0xd8b84a, glow: 0xffe27a, eye: 0xffffff, titan: 'radiant' },
+  forestTitan:  { name: '森林泰坦', hp: 220, dmg: 16, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 50, coins: 6, color: 0x4c7a3a, glow: 0x9cff4a, eye: 0xd8ff6a, titan: 'forest' },
+  iceTitan:     { name: '冰雪泰坦', hp: 210, dmg: 15, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 48, coins: 6, color: 0x8ec8e8, glow: 0x6ae0ff, eye: 0xe8faff, titan: 'ice' },
+  radiantTitan: { name: '光辉泰坦', hp: 200, dmg: 14, speed: 3.8, radius: 1.7, atkRange: 2.8, atkCd: 1.8, score: 46, coins: 6, color: 0xd8b84a, glow: 0xffe27a, eye: 0xffffff, titan: 'radiant' },
 });
 export const TITANS = ['forestTitan', 'iceTitan', 'radiantTitan'];
 
 export const DARK_TIERS = {
   1: ['darkAnt', 'darkSnake', 'darkWolf', 'darkSpider', 'darkCentipede'],
   2: ['darkEagle', 'darkZombie', 'darkTiger', 'darkLion', 'darkBear'],
-  3: ['darkWyvern', 'darkLizard'],
+  3: ['darkWyvern', 'darkLizard', 'darkCroc'],
 };
 
 // 宠物模式每关的怪物组成（地形沿用原来的 7 关）
 export const PET_LEVELS = [
-  { pool: { darkAnt: 3, darkSnake: 3, darkSpider: 2, darkCentipede: 2 },                           elite: 'darkEagle' },
-  { pool: { darkWolf: 4, darkSnake: 2, darkAnt: 2 },                                               elite: 'darkBear' },
-  { pool: { darkSpider: 3, darkSnake: 3, darkCentipede: 2, darkAnt: 2 },                           elite: 'darkZombie' },
-  { pool: { darkWolf: 2, darkCentipede: 2, darkEagle: 2, darkZombie: 2 },                          elite: 'darkTiger' },
+  { pool: { darkAnt: 3, darkSnake: 3, darkSpider: 2, darkCentipede: 2, darkFlytrap: 1 },                       elite: 'darkEagle' },
+  { pool: { darkWolf: 4, darkSnake: 2, darkAnt: 2, darkFlytrap: 1 },                                               elite: 'darkBear' },
+  { pool: { darkSpider: 3, darkSnake: 3, darkCentipede: 2, darkAnt: 2, darkFlytrap: 2 },                           elite: 'darkZombie' },
+  { pool: { darkWolf: 2, darkCentipede: 2, darkEagle: 2, darkZombie: 2, darkFlytrap: 1 },                          elite: 'darkTiger' },
   { pool: { darkZombie: 3, darkWolf: 2, darkEagle: 2, darkTiger: 2 },                              elite: 'darkLion' },
-  { pool: { darkSnake: 2, darkSpider: 2, darkTiger: 2, darkLion: 2, darkBear: 1, darkEagle: 1 },  elite: 'darkWyvern' },
-  { pool: { darkLion: 2, darkBear: 2, darkTiger: 2, darkZombie: 2, darkEagle: 2, darkWyvern: 1 },  elite: 'darkLizard' },
+  { pool: { darkSnake: 2, darkSpider: 2, darkTiger: 2, darkLion: 2, darkBear: 1, darkEagle: 1, darkCroc: 1 },  elite: 'darkWyvern' },
+  { pool: { darkLion: 2, darkBear: 2, darkTiger: 2, darkZombie: 2, darkEagle: 2, darkWyvern: 1, darkCroc: 2 },  elite: 'darkLizard' },
 ];
 
 // ---------------------------------------------------------------------

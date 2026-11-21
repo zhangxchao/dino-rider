@@ -9,6 +9,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { audio } from './audio.js';
 import { input } from './input.js';
 import { motion } from './motion.js';
+import { Arena } from './arena.js';
 import { save, persist } from './save.js';
 import { LEVELS } from './data.js';
 import { Game } from './game.js';
@@ -83,6 +84,7 @@ class App {
     this.toastEl = document.getElementById('toast');
     this.mode = 'loading';
     this.game = null;
+    this.arena = null;
     this.showcase = null;
     this.thumbs = { dino: {}, rider: {} };
     this.ui = new UI(this);
@@ -119,6 +121,7 @@ class App {
     document.addEventListener('webkitfullscreenchange', () => this.resize());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.game && this.game.controlsActive) this.onPause();
+      if (document.hidden && this.arena) this.arena.togglePause(true);
     });
 
     this.applySettings();
@@ -262,6 +265,29 @@ class App {
     persist();
   }
 
+  /** 斗兽场：cfg = { mode, control, A, B } */
+  startArena(cfg) {
+    this.ui.hide();
+    motion.stop();
+    if (this.game) { this.game.dispose(); this.game = null; }
+    if (this.showcase) { this.showcase.dispose(); this.showcase = null; }
+    if (this.arena) { this.arena.dispose(); this.arena = null; }
+    this.hudRoot.classList.add('hidden');
+    const ctl = cfg.mode === 'duel' && cfg.control;
+    document.getElementById('touch').classList.toggle('hidden', !(input.isTouch && ctl));
+    input.joy2d = true;
+    input.gameActive = false;
+    this.arena = new Arena(this, cfg);
+    this.mode = 'arena';
+    audio.startMusic('boss');
+  }
+
+  exitArena(screen = 'colosseum') {
+    if (this.arena) { this.arena.dispose(); this.arena = null; }
+    input.joy2d = false;
+    this.exitToMenu(screen);
+  }
+
   restart() {
     if (this.lastOpts) this.startGame(this.lastOpts);
   }
@@ -312,6 +338,8 @@ class App {
       if (this.mode === 'game' && this.game) {
         if (this.game.paused && this.ui.current === 'pause' && input.keyPressed('KeyP')) this.resume();
         this.game.update(dt);
+      } else if (this.mode === 'arena' && this.arena) {
+        this.arena.update(dt);
       } else if (this.showcase) {
         this.showcase.update(dt);
       }

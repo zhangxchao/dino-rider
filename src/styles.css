@@ -713,3 +713,84 @@ kbd { display: inline-block; min-width: 30px; padding: 4px 9px; border-radius: 7
 #motion-cam .mmsg[data-tone=warn] { color: #ffd070; }
 #motion-cam .mmsg[data-tone=bad] { color: #ff8a8a; }
 .set-sub { display: block; font-weight: 400; font-size: 12px; opacity: .65; margin-top: 2px; }
+
+/* 黑心光线：冻结倒计时 */
+.freeze-bar { position: absolute; left: 50%; top: 126px; transform: translateX(-50%); min-width: 240px; padding: 8px 22px 12px; border-radius: 14px; text-align: center; font-weight: 900; font-size: 22px; letter-spacing: .06em; color: #f0d8ff; background: rgba(36,10,60,.82); border: 2px solid #b04aff; box-shadow: 0 0 24px rgba(176,74,255,.55); animation: freezePulse .6s ease-in-out infinite alternate; overflow: hidden; }
+.freeze-bar i { position: absolute; left: 0; bottom: 0; height: 5px; background: linear-gradient(90deg, #b04aff, #ff6ad8); }
+@keyframes freezePulse { from { box-shadow: 0 0 14px rgba(176,74,255,.4); } to { box-shadow: 0 0 34px rgba(176,74,255,.8); } }
+
+/* ============ 斗兽场 ============ */
+.ar-sel .topbar { gap: 12px; flex-wrap: wrap; }
+.ar-sel .seg button { padding: 8px 16px; }
+.ar-cols { position: absolute; left: 4vw; right: 4vw; top: 84px; bottom: 96px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; overflow: hidden; }
+.ar-col { overflow-y: auto; padding: 14px 16px 18px; border-radius: 16px; background: rgba(10,14,22,.72); border: 2px solid var(--line); }
+.ar-col.a { border-color: rgba(255,74,74,.7); box-shadow: 0 0 30px rgba(255,74,74,.2) inset; }
+.ar-col.b { border-color: rgba(77,255,106,.7); box-shadow: 0 0 30px rgba(77,255,106,.18) inset; }
+.ar-col h3 { margin: 0 0 10px; font-size: 22px; letter-spacing: .1em; }
+.ar-col.a h3 { color: #ff7a7a; } .ar-col.b h3 { color: #7dff94; }
+.ar-slot { margin-bottom: 10px; border-radius: 12px; background: rgba(255,255,255,.06); border: 1px solid var(--line); }
+.ar-slot.open { background: rgba(255,255,255,.1); }
+.ar-slot .head { display: flex; align-items: center; gap: 12px; padding: 8px 10px; }
+.ar-slot .pt { width: 64px; height: 64px; flex: none; border-radius: 10px; background: rgba(0,0,0,.35); display: grid; place-items: center; overflow: hidden; }
+.ar-slot .pt img { width: 100%; height: 100%; object-fit: contain; }
+.ar-slot .pt .emo { font-size: 34px; }
+.ar-slot .mn { flex: 1; min-width: 0; }
+.ar-slot .nm { font-weight: 900; font-size: 17px; }
+.ar-slot .st { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.ar-slot .tags i { font-style: normal; font-size: 12px; margin-right: 6px; padding: 1px 6px; border-radius: 8px; background: rgba(255,200,80,.18); }
+.ar-slot .bt { display: flex; flex-direction: column; gap: 6px; }
+.ar-add { width: 100%; margin-top: 4px; }
+.ar-boost { padding: 6px 12px 12px; border-top: 1px dashed var(--line); }
+.ar-boost .bh { font-weight: 900; margin: 6px 0; color: var(--gold); }
+.ar-boost .br { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; font-weight: 800; }
+.ar-boost .br small { display: block; font-weight: 500; font-size: 12px; color: var(--muted); }
+.ar-boost .bn { font-size: 12px; color: #ffb4a0; margin-top: 4px; }
+.ar-boost .step { display: inline-flex; align-items: center; gap: 10px; }
+.ar-boost .step button { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.1); color: #fff; font-size: 18px; font-weight: 900; cursor: pointer; }
+.ar-boost .step b { min-width: 18px; text-align: center; }
+.seg.mini button { padding: 5px 12px; font-size: 13px; }
+.seg.mini button[disabled] { opacity: .4; cursor: not-allowed; }
+.ar-pick { position: absolute; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 5; }
+.ar-pick.hidden { display: none; }
+.ar-pick-box { width: min(900px, 92vw); max-height: 84vh; overflow-y: auto; padding: 16px 20px 20px; }
+.ar-pick-box .ph { display: flex; justify-content: space-between; align-items: center; }
+.ar-pick-box .tabs { display: flex; gap: 8px; margin: 10px 0 14px; flex-wrap: wrap; }
+.ar-pick-box .card .emo { font-size: 44px; line-height: 92px; }
+@media (max-width: 800px) { .ar-cols { grid-template-columns: 1fr; overflow-y: auto; } }
+
+/* 战斗中的 HUD */
+#arena-hud { position: fixed; inset: 0; z-index: 30; pointer-events: none; font-family: inherit; color: #fff; }
+.ar-top { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 14px; gap: 10px; }
+.ar-team { flex: 1; max-width: 42vw; }
+.ar-team b { display: block; font-size: 18px; letter-spacing: .1em; text-shadow: 0 2px 6px #000; }
+.ar-team.a b { color: #ff6a6a; } .ar-team.b b { color: #6aff86; text-align: right; }
+.ar-cards { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+.ar-team.b .ar-cards { align-items: flex-end; }
+.ar-card { width: min(260px, 38vw); padding: 4px 8px 6px; border-radius: 8px; background: rgba(8,10,16,.7); border-left: 4px solid; }
+.ar-team.a .ar-card { border-color: #ff4a4a; } .ar-team.b .ar-card { border-color: #4dff6a; }
+.ar-card .nm { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ar-card .hp, .ar-card .fv { height: 8px; margin-top: 3px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
+.ar-card .fv { height: 5px; }
+.ar-card .hp i { display: block; height: 100%; transition: width .15s; }
+.ar-team.a .hp i { background: linear-gradient(90deg, #ff4a4a, #ff9a6a); } .ar-team.b .hp i { background: linear-gradient(90deg, #35d85a, #9aff7a); }
+.ar-card .fv i { display: block; height: 100%; background: linear-gradient(90deg, #c084fc, #ffd84a); }
+.ar-card .fv.full { box-shadow: 0 0 8px #ffd84a; }
+.ar-card.dead { opacity: .4; filter: grayscale(1); }
+.ar-mid { text-align: center; }
+.ar-mid .ar-time { font-size: 22px; font-weight: 900; text-shadow: 0 2px 6px #000; }
+.ar-mid .btn { pointer-events: auto; margin-top: 4px; }
+.ar-msg { position: absolute; left: 0; right: 0; top: 24%; text-align: center; font-size: clamp(26px, 5vw, 56px); font-weight: 900; letter-spacing: .1em; opacity: 0; transition: opacity .25s; text-shadow: 0 4px 0 #000, 0 0 24px rgba(0,0,0,.8); }
+.ar-msg.show { opacity: 1; } .ar-msg.a { color: #ffb070; } .ar-msg.b { color: #d0a0ff; }
+.ar-help { position: absolute; left: 14px; bottom: 10px; font-size: 13px; opacity: .8; text-shadow: 0 2px 4px #000; }
+.ar-overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.ar-box { pointer-events: auto; padding: 26px 40px; border-radius: 18px; text-align: center; background: rgba(10,12,20,.88); border: 2px solid var(--line); display: flex; flex-direction: column; gap: 12px; min-width: 280px; }
+.ar-box.a { border-color: #ff4a4a; } .ar-box.b { border-color: #4dff6a; }
+.ar-box h2 { margin: 0 0 6px; font-size: 34px; }
+.dmg.arenaA { color: #ff4a4a; font-size: 24px; -webkit-text-stroke: 1px #3a0000; }
+.dmg.arenaB { color: #4dff6a; font-size: 24px; -webkit-text-stroke: 1px #003a10; }
+.dmg.arenaA.big, .dmg.arenaB.big { font-size: 34px; }
+.ar-sel .bottom { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; gap: 12px; }
+/* 标题菜单现在有 8 个按钮：矮一点的屏幕上收紧，避免盖住标语 */
+@media (max-height: 860px) { #s-title .menu { gap: 6px; } #s-title .menu .btn { padding-top: 8px; padding-bottom: 8px; } #s-title .title-wrap { top: 6vh; } }
+@media (max-height: 760px) { #s-title .tagline { display: none; } }
+body.arena-on #touch .tpause { display: none; }

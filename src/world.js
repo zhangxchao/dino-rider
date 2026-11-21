@@ -1870,6 +1870,157 @@ BIOMES.lawn = {
   weather() {},
 };
 
+// ---------------------------------------------------------------------
+//  古罗马斗兽场（斗兽场模式的战场）：平坦的沙地竞技场 + 环形阶梯看台 + 拱廊 + 观众
+//  A 队从西侧（-x）出场，B 队从东侧（+x）出场
+// ---------------------------------------------------------------------
+export const COLOSSEUM_R = 36;
+function buildColosseum(ctx) {
+  const R = COLOSSEUM_R, hi = ctx.hi;
+  const root = ctx.root;
+  const stone = new THREE.MeshStandardMaterial({ color: 0xd6c298, flatShading: true, roughness: 0.92, side: THREE.DoubleSide });
+  const stoneD = new THREE.MeshStandardMaterial({ color: 0xb09a70, flatShading: true, roughness: 0.95, side: THREE.DoubleSide });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1d1410, flatShading: true, roughness: 1 });
+  const iron = new THREE.MeshStandardMaterial({ color: 0x3a3a40, flatShading: true, roughness: 0.5, metalness: 0.5 });
+  const seg = hi ? 72 : 40;
+  const add = (geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; root.add(o); return o; };
+
+  // 阶梯看台：一次旋转成型（8 级台阶），底下是 3.4 米高的护墙
+  const STEPS = 8, RUN = 2.6, RISE = 1.55, WALL = 3.4;
+  const prof = [new THREE.Vector2(R, 0), new THREE.Vector2(R, WALL)];
+  for (let i = 0; i < STEPS; i++) {
+    prof.push(new THREE.Vector2(R + i * RUN, WALL + i * RISE));
+    prof.push(new THREE.Vector2(R + (i + 1) * RUN, WALL + i * RISE));
+  }
+  const topY = WALL + STEPS * RISE, outerR = R + STEPS * RUN;
+  prof.push(new THREE.Vector2(outerR, topY), new THREE.Vector2(outerR, 0));
+  const stands = add(new THREE.LatheGeometry(prof, seg), stone);
+  stands.castShadow = false;
+  // 外围高墙 + 最上层的柱廊
+  add(new THREE.CylinderGeometry(outerR + 0.5, outerR + 0.5, topY + 7, seg, 1, true), stoneD, 0, (topY + 7) / 2, 0);
+  const NC = hi ? 56 : 32;
+  const colGeo = new THREE.CylinderGeometry(0.55, 0.65, 6.4, 8);
+  const cols = new THREE.InstancedMesh(colGeo, stone, NC);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
+  for (let i = 0; i < NC; i++) {
+    const a = (i / NC) * TAU;
+    v.set(Math.cos(a) * (outerR - 0.6), topY + 3.2, Math.sin(a) * (outerR - 0.6));
+    m4.compose(v, q, sc); cols.setMatrixAt(i, m4);
+  }
+  cols.castShadow = true; root.add(cols);
+  const lintel = add(new THREE.TorusGeometry(outerR - 0.6, 0.55, 6, seg), stone, 0, topY + 6.6, 0);
+  lintel.rotation.x = Math.PI / 2;
+
+  // 护墙上一圈暗色拱洞 + 顶沿
+  const NA = hi ? 36 : 22;
+  const archGeo = new THREE.BoxGeometry(2.2, 2.4, 0.6);
+  const arches = new THREE.InstancedMesh(archGeo, dark, NA);
+  const capGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.6, 10, 1, false, 0, Math.PI);
+  const caps = new THREE.InstancedMesh(capGeo, dark, NA);
+  const e = new THREE.Euler();
+  for (let i = 0; i < NA; i++) {
+    const a = ((i + 0.5) / NA) * TAU;
+    q.setFromEuler(e.set(0, -a + Math.PI / 2, 0));
+    v.set(Math.cos(a) * (R + 0.05), 1.3, Math.sin(a) * (R + 0.05));
+    m4.compose(v, q, sc); arches.setMatrixAt(i, m4);
+    q.setFromEuler(e.set(Math.PI / 2, -a + Math.PI / 2, 0, 'YXZ'));
+    v.set(Math.cos(a) * (R + 0.05), 2.5, Math.sin(a) * (R + 0.05));
+    m4.compose(v, q, sc); caps.setMatrixAt(i, m4);
+  }
+  root.add(arches, caps);
+  add(new THREE.TorusGeometry(R + 0.1, 0.35, 5, seg), stoneD, 0, WALL, 0).rotation.x = Math.PI / 2;
+
+  // 两座大门（A 队西 / B 队东）：石框 + 铁栅栏 + 队旗
+  for (const sd of [-1, 1]) {
+    const gx = sd * (R - 0.2);
+    const g = new THREE.Group();
+    g.position.set(gx, 0, 0);
+    g.rotation.y = sd > 0 ? -Math.PI / 2 : Math.PI / 2;
+    root.add(g);
+    const part = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
+    part(new THREE.BoxGeometry(7.6, 6, 1.4), stone, 0, 3, -0.2);
+    part(new THREE.BoxGeometry(5.2, 4.2, 1.6), dark, 0, 2.1, 0);
+    const top = part(new THREE.CylinderGeometry(2.6, 2.6, 1.6, 16, 1, false, 0, Math.PI), dark, 0, 4.2, 0);
+    top.rotation.x = Math.PI / 2;
+    for (let i = -2; i <= 2; i++) part(new THREE.BoxGeometry(0.16, 5.4, 0.16), iron, i * 0.9, 2.7, 0.7);
+    for (const y of [1.2, 3.0]) part(new THREE.BoxGeometry(5.2, 0.14, 0.16), iron, 0, y, 0.7);
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 4.2), new THREE.MeshStandardMaterial({ color: sd < 0 ? 0xd02a2a : 0x2ab04a, side: THREE.DoubleSide, roughness: 0.8 }));
+    flag.position.set(0, 7.6, 0.2); g.add(flag);
+    part(new THREE.CylinderGeometry(0.08, 0.08, 5.2, 5), iron, 0, 7.4, 0.2).position.x = -1.2;
+    for (const tx of [-4.4, 4.4]) {                      // 门边火把
+      part(new THREE.CylinderGeometry(0.12, 0.16, 1.6, 6), stoneD, tx, 3.6, 0.2);
+      const fl = part(new THREE.ConeGeometry(0.34, 0.9, 6), new THREE.MeshStandardMaterial({ color: 0xff8a20, emissive: 0xff7010, emissiveIntensity: 2.4 }), tx, 4.7, 0.2);
+      fl.castShadow = false;
+      ctx.pulse.push({ mat: fl.material, base: 1.8, amp: 0.8, speed: 6 + tx });
+    }
+  }
+
+  // 观众：每级台阶站一圈彩色小方块，随机轻轻起伏欢呼
+  const rowsN = STEPS;
+  const spec = [];
+  for (let i = 1; i < rowsN; i++) {
+    const rr = R + i * RUN + RUN * 0.45;
+    const n = Math.round((TAU * rr) / (hi ? 1.25 : 2.0));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * TAU + ctx.rand() * 0.04;
+      if (Math.abs(Math.sin(a)) < 0.04 && i < 3) continue;       // 门口那几格留空
+      spec.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr, y: WALL + i * RISE, a, ph: ctx.rand() * 6.28 });
+    }
+  }
+  const body = new THREE.InstancedMesh(new THREE.BoxGeometry(0.62, 1.0, 0.5), new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.9 }), spec.length);
+  const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), new THREE.MeshStandardMaterial({ color: 0xe8c29a, flatShading: true, roughness: 0.9 }), spec.length);
+  const cols2 = [0xc43a3a, 0x3a6ac4, 0xe0c040, 0xf0f0e8, 0x7a3ab4, 0x3aa46a, 0xd88a3a, 0x9a9aa4];
+  const col = new THREE.Color();
+  spec.forEach((s, i) => body.setColorAt(i, col.set(cols2[Math.floor(ctx.rand() * cols2.length)]).multiplyScalar(0.85 + ctx.rand() * 0.3)));
+  const place = (i, bob) => {
+    const s = spec[i];
+    q.setFromEuler(e.set(0, -s.a + Math.PI / 2, 0));
+    v.set(s.x, s.y + 0.5 + bob, s.z); m4.compose(v, q, sc); body.setMatrixAt(i, m4);
+    v.set(s.x, s.y + 1.18 + bob, s.z); m4.compose(v, q, sc); head.setMatrixAt(i, m4);
+  };
+  for (let i = 0; i < spec.length; i++) place(i, 0);
+  body.castShadow = false; head.castShadow = false;
+  root.add(body, head);
+  let phase = 0;
+  ctx.updaters.push((dt, t) => {
+    // 每帧只更新 1/6 的观众
+    phase = (phase + 1) % 6;
+    for (let i = phase; i < spec.length; i += 6) place(i, Math.max(0, Math.sin(t * 3.2 + spec[i].ph)) * 0.22);
+    body.instanceMatrix.needsUpdate = true; head.instanceMatrix.needsUpdate = true;
+  });
+
+  // 沙地：自己铺一块平整的圆形沙地（地形网格有细微起伏，会让地面标记断断续续），再画几圈标记
+  const sand = new THREE.Mesh(new THREE.CircleGeometry(R + 0.2, seg), new THREE.MeshStandardMaterial({ color: 0xe0c286, roughness: 1, flatShading: true }));
+  sand.rotation.x = -Math.PI / 2; sand.position.y = 0.3; sand.receiveShadow = true;
+  root.add(sand);
+  const mark = (r0, r1, color, y) => {
+    const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, seg), new THREE.MeshStandardMaterial({ color, roughness: 1, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.rotation.x = -Math.PI / 2; m.position.y = y; m.receiveShadow = true;
+    root.add(m);
+  };
+  mark(R * 0.55, R * 0.55 + 0.4, 0xf4e6c0, 0.33);          // 中圈
+  mark(R - 3.2, R + 0.2, 0xc9a86a, 0.31);                  // 靠墙一圈深色沙
+  mark(1.2, 1.7, 0xf4e6c0, 0.33);                          // 圆心
+}
+
+BIOMES.colosseum = {
+  ...BIOMES.desert,
+  height() { return () => 0; },
+  ground(ctx) {
+    const n = ctx.noise;
+    const C = { a: new THREE.Color(0xe6c88e), b: new THREE.Color(0xd8b478), c: new THREE.Color(0xf0d9a4), out: new THREE.Color(0xb09a70) };
+    return (c, x, y, z, ny, rnd) => {
+      const r = Math.hypot(x, z);
+      if (r > COLOSSEUM_R) { c.copy(C.out).multiplyScalar(0.9 + rnd * 0.15); return; }
+      const p = fbm(n, x * 0.08 - 3, z * 0.08 + 6, 2) * 0.5 + 0.5;
+      c.copy(C.b).lerp(C.a, smooth(0.3, 0.7, p)).lerp(C.c, 0.2 + 0.2 * Math.sin(x * 0.7 + z * 0.3));
+      c.multiplyScalar(0.94 + rnd * 0.1);
+    };
+  },
+  decorate(ctx) { buildColosseum(ctx); },
+  weather() {},
+};
+
 export const BIOME_IDS = Object.keys(BIOMES);
 
 export function createWorld(biome = 'jungle', scene, opts = {}) {

@@ -5,6 +5,7 @@ import { save, persist, resetSave } from './save.js';
 import { SKILL_ICON, WEAPON_ICON } from './hud.js';
 import { formatTime } from './util.js';
 import { motion } from './motion.js';
+import { KINDS, KIND_ICON, TEAM_MAX, BOOST, emptyBoost, creatureIds, creatureInfo } from './arena.js';
 import { t, LANGS, getLang, setLang } from './i18n.js';
 import { meta, MISSIONS, ACHIEVEMENTS } from './meta.js';
 import { canFullscreen, isFullscreen, isStandalone, isIPhone, isInAppBrowser, toggleFullscreen } from './fullscreen.js';
@@ -112,6 +113,7 @@ export class UI {
           <button class="btn ghost" data-act="select"><span class="ico">🦖</span>${t('title.select')}</button>
           <button class="btn ghost" data-act="shop"><span class="ico">🛒</span>${t('title.mall')}</button>
           <button class="btn ghost" data-act="pets"><span class="ico">🐾</span>${t('title.pets')}</button>
+          <button class="btn ghost" data-act="colosseum"><span class="ico">🏟️</span>${t('title.arena')}</button>
           <button class="btn ghost" data-act="missions"><span class="ico">🎯</span>${t('title.missions')}${meta.claimable ? `<i class="badge">${meta.claimable}</i>` : ''}</button>
           <button class="btn ghost" data-act="settings"><span class="ico">⚙️</span>${t('title.settings')}</button>
           <button class="btn ghost" data-act="help"><span class="ico">📖</span>${t('title.help')}</button>
@@ -880,6 +882,136 @@ export class UI {
   }
 
   // ------------------------------------------------------------------
+  // ------------------------------------------------------------------
+  //  斗兽场：选 A 组 / B 组的生物、恐龙加强框、单挑 / 团战
+  // ------------------------------------------------------------------
+  build_colosseum() {
+    if (!this.arenaCfg) {
+      this.arenaCfg = { mode: 'duel', control: null, A: [{ id: 'trex', boost: emptyBoost() }], B: [{ id: 'triceratops', boost: emptyBoost() }] };
+    }
+    const cfg = this.arenaCfg;
+    const thumbs = this.app.thumbs || { dino: {}, rider: {} };
+    let boostOpen = null;       // 'A0' 这样的槽位键
+    let picker = null;          // { team, idx(-1 = 新增), kind }
+    const n = el(`
+      <div class="ar-sel">
+        <div class="topbar">
+          <button class="btn ghost small" data-back>${t('common.back')}</button>
+          <h2>🏟️ ${t('arena.title')}</h2>
+          <div class="seg" data-seg="mode"><button data-v="duel">${t('arena.duel')}</button><button data-v="team">${t('arena.team')}</button></div>
+          <div class="seg" data-seg="control"><button data-v="">${t('arena.ctlNone')}</button><button data-v="A">${t('arena.ctlA')}</button><button data-v="B">${t('arena.ctlB')}</button></div>
+          <div class="spacer"></div>
+        </div>
+        <div class="ar-cols"></div>
+        <div class="ar-pick hidden"></div>
+        <div class="bottom"><button class="btn" data-go>⚔️ ${t('arena.go')}</button></div>
+      </div>`);
+    const cols = n.querySelector('.ar-cols');
+    const pickEl = n.querySelector('.ar-pick');
+
+    const portrait = (info) => {
+      const img = thumbs.dino[info.id];
+      return img ? `<img src="${img}" alt="">` : `<div class="emo">${KIND_ICON[info.kind]}</div>`;
+    };
+    const effStats = (slot, info) => {
+      const b = slot.boost;
+      const hp = info.hp + b.gem * GEM.hp + (b.power ? BOOST.powerHp : 0) + (b.black ? BOOST.blackHp : 0);
+      const atk = Math.round(info.atk + b.gem * GEM.atk);
+      return `${t('stat.hp')} ${hp} · ${t('stat.atk')} ${atk}${info.dfn ? ` · ${t('stat.def')} ${Math.round(info.dfn * 100)}%` : ''}`;
+    };
+    const toggle = (key, on, dis) => `<div class="seg mini" data-b="${key}"><button data-v="1" class="${on ? 'on' : ''}" ${dis ? 'disabled' : ''}>${t('common.on')}</button><button data-v="0" class="${!on ? 'on' : ''}" ${dis ? 'disabled' : ''}>${t('common.off')}</button></div>`;
+    const boostPanel = (slot, info) => {
+      const b = slot.boost;
+      const can = info.canBoost;
+      return `<div class="ar-boost">
+        <div class="bh">🧪 ${t('arena.boostBox')}</div>
+        <div class="br"><span>💎 ${t('boost.gem')}<small>${t('boost.gemHint', { hp: GEM.hp, atk: GEM.atk })}</small></span>
+          <span class="step"><button data-gem="-1">−</button><b>${b.gem}</b><button data-gem="1">＋</button></span></div>
+        <div class="br"><span>🔷 ${t('boost.power')}<small>${t('boost.powerHint', { hp: BOOST.powerHp })}</small></span>${toggle('power', b.power)}</div>
+        <div class="br"><span>🖤 ${t('boost.black')}<small>${t('boost.blackHint', { hp: BOOST.blackHp })}</small></span>${toggle('black', b.black)}</div>
+        <div class="br"><span>💥 ${t('boost.ult')}<small>${can ? t('boost.ultHint') : t('boost.only')}</small></span>${toggle('ult', b.ult && can, !can)}</div>
+        <div class="br"><span>🌟 ${t('boost.awaken')}<small>${can ? t('boost.awakenHint') : t('boost.only')}</small></span>${toggle('awaken', b.awaken && can, !can)}</div>
+        ${can ? `<div class="bn">${t('boost.note')}</div>` : ''}
+      </div>`;
+    };
+    const render = () => {
+      // 单挑：每组 1 个；团战：每组最多 5 个
+      for (const tm of ['A', 'B']) {
+        if (cfg.mode === 'duel') cfg[tm] = cfg[tm].slice(0, 1);
+        if (!cfg[tm].length) cfg[tm] = [{ id: tm === 'A' ? 'trex' : 'triceratops', boost: emptyBoost() }];
+      }
+      if (cfg.mode !== 'duel') cfg.control = null;
+      n.querySelectorAll('[data-seg="mode"] button').forEach((b) => b.classList.toggle('on', b.dataset.v === cfg.mode));
+      const ctlSeg = n.querySelector('[data-seg="control"]');
+      ctlSeg.style.display = cfg.mode === 'duel' ? '' : 'none';
+      ctlSeg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === (cfg.control || '')));
+      cols.innerHTML = ['A', 'B'].map((tm) => {
+        const rows = cfg[tm].map((slot, i) => {
+          const info = creatureInfo(slot.id);
+          const key = tm + i;
+          return `<div class="ar-slot ${boostOpen === key ? 'open' : ''}" data-key="${key}">
+            <div class="head">
+              <div class="pt">${portrait(info)}</div>
+              <div class="mn"><div class="nm">${info.name}${cfg.control === tm ? ' 🎮' : ''}</div><div class="st">${KIND_ICON[info.kind]} ${t('arena.kind.' + info.kind)} · ${effStats(slot, info)}</div>
+                <div class="tags">${slot.boost.ult && info.canBoost ? `<i>💥</i>` : ''}${slot.boost.awaken && info.canBoost ? `<i>🌟</i>` : ''}${slot.boost.gem ? `<i>💎×${slot.boost.gem}</i>` : ''}${slot.boost.power ? '<i>🔷</i>' : ''}${slot.boost.black ? '<i>🖤</i>' : ''}</div></div>
+              <div class="bt"><button class="btn small ghost" data-change>${t('arena.change')}</button><button class="btn small ghost" data-boost>🧪 ${t('arena.boost')}</button>${cfg.mode === 'team' && cfg[tm].length > 1 ? `<button class="btn small danger" data-del>✕</button>` : ''}</div>
+            </div>
+            ${boostOpen === key ? boostPanel(slot, info) : ''}
+          </div>`;
+        }).join('');
+        const add = cfg.mode === 'team' && cfg[tm].length < TEAM_MAX ? `<button class="btn ghost small ar-add" data-add="${tm}">＋ ${t('arena.add')} (${cfg[tm].length}/${TEAM_MAX})</button>` : '';
+        return `<section class="ar-col ${tm.toLowerCase()}"><h3>${t('arena.team' + tm)}</h3>${rows}${add}</section>`;
+      }).join('');
+      bindCols();
+    };
+    const renderPicker = () => {
+      if (!picker) { pickEl.classList.add('hidden'); pickEl.innerHTML = ''; return; }
+      pickEl.classList.remove('hidden');
+      pickEl.innerHTML = `<div class="ar-pick-box panel">
+        <div class="ph"><h3>${t('arena.choose', { team: t('arena.team' + picker.team) })}</h3><button class="btn ghost small" data-close>✕</button></div>
+        <div class="tabs">${KINDS.map((k) => `<div class="tab ${picker.kind === k ? 'active' : ''}" data-kind="${k}">${KIND_ICON[k]} ${t('arena.kind.' + k)}</div>`).join('')}</div>
+        <div class="card-grid">${creatureIds(picker.kind).map((id) => {
+          const info = creatureInfo(id);
+          return `<div class="card" data-id="${id}">${portrait(info)}<div class="nm">${info.name}</div></div>`;
+        }).join('')}</div>
+      </div>`;
+      pickEl.querySelector('[data-close]').addEventListener('click', () => { picker = null; renderPicker(); });
+      pickEl.querySelectorAll('[data-kind]').forEach((tb) => tb.addEventListener('click', () => { picker.kind = tb.dataset.kind; renderPicker(); }));
+      pickEl.querySelectorAll('[data-id]').forEach((c) => c.addEventListener('click', () => {
+        const info = creatureInfo(c.dataset.id);
+        const keep = (b) => ({ ...emptyBoost(), ...b, ult: info.canBoost && b.ult, awaken: info.canBoost && b.awaken });
+        if (picker.idx < 0) cfg[picker.team].push({ id: info.id, boost: emptyBoost() });
+        else { const slot = cfg[picker.team][picker.idx]; slot.id = info.id; slot.boost = keep(slot.boost); }
+        picker = null; renderPicker(); render();
+      }));
+    };
+    const bindCols = () => {
+      cols.querySelectorAll('.ar-slot').forEach((row) => {
+        const key = row.dataset.key, tm = key[0], idx = +key.slice(1);
+        const slot = cfg[tm][idx];
+        row.querySelector('[data-change]').addEventListener('click', () => { picker = { team: tm, idx, kind: creatureInfo(slot.id).kind }; renderPicker(); });
+        row.querySelector('[data-boost]').addEventListener('click', () => { boostOpen = boostOpen === key ? null : key; render(); });
+        const del = row.querySelector('[data-del]');
+        if (del) del.addEventListener('click', () => { cfg[tm].splice(idx, 1); boostOpen = null; render(); });
+        row.querySelectorAll('[data-gem]').forEach((b) => b.addEventListener('click', () => {
+          slot.boost.gem = Math.max(0, Math.min(BOOST.gemMax, slot.boost.gem + +b.dataset.gem)); render();
+        }));
+        row.querySelectorAll('.seg[data-b] button').forEach((b) => b.addEventListener('click', () => {
+          slot.boost[b.parentElement.dataset.b] = b.dataset.v === '1'; render();
+        }));
+      });
+      cols.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => { picker = { team: b.dataset.add, idx: -1, kind: 'dino' }; renderPicker(); }));
+    };
+    n.querySelectorAll('[data-seg="mode"] button').forEach((b) => b.addEventListener('click', () => { cfg.mode = b.dataset.v; boostOpen = null; render(); }));
+    n.querySelectorAll('[data-seg="control"] button').forEach((b) => b.addEventListener('click', () => { cfg.control = b.dataset.v || null; render(); }));
+    n.querySelector('[data-back]').addEventListener('click', () => this.show('title'));
+    n.querySelector('[data-go]').addEventListener('click', () => {
+      this.app.startArena(JSON.parse(JSON.stringify(cfg)));
+    });
+    render();
+    return n;
+  }
+
   build_settings({ from = 'title' } = {}) {
     const s = save.settings;
     const n = el(`
